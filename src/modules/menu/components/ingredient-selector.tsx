@@ -47,13 +47,13 @@ export function IngredientSelector({
     const available = stockItems.find((s) => !usedIds.has(s.id));
     if (!available) return;
     onChange([
-      ...ingredients,
       {
         stock_item_id: available.id,
         stock_item_name: available.name,
         quantity: 0.1,
         unit: available.unit,
       },
+      ...ingredients,
     ]);
   };
 
