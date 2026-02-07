@@ -1,0 +1,191 @@
+import { Employee, WorkTime } from '@/types/employee';
+import { EmploymentType, WorkTimeStatus } from '@/types/enums';
+import { LOCATION_IDS } from './locations';
+
+export const EMPLOYEE_IDS = {
+  CHEF_1: '55555555-5555-5555-5555-555555555001',
+  COOK_1: '55555555-5555-5555-5555-555555555002',
+  CASHIER_1: '55555555-5555-5555-5555-555555555003',
+  DELIVERY_1: '55555555-5555-5555-5555-555555555004',
+  MANAGER_1: '55555555-5555-5555-5555-555555555005',
+  WAREHOUSE_1: '55555555-5555-5555-5555-555555555006',
+} as const;
+
+export const WORK_TIME_IDS = {
+  WT1: '77777777-7777-7777-7777-777777777001',
+  WT2: '77777777-7777-7777-7777-777777777002',
+  WT3: '77777777-7777-7777-7777-777777777003',
+  WT4: '77777777-7777-7777-7777-777777777004',
+  WT5: '77777777-7777-7777-7777-777777777005',
+} as const;
+
+export const employees: Employee[] = [
+  {
+    id: EMPLOYEE_IDS.CHEF_1,
+    first_name: 'Anna',
+    last_name: 'Kowalska',
+    email: 'anna.kowalska@mesopos.pl',
+    phone: '+48 501 111 111',
+    employee_code: 'EMP001',
+    pin: '1234',
+    role: 'chef',
+    employment_type: EmploymentType.FULL_TIME,
+    hourly_rate: 28,
+    overtime_rate: 42,
+    location_id: LOCATION_IDS.CENTRAL_KITCHEN,
+    is_active: true,
+    created_at: '2024-01-15T00:00:00.000Z',
+    updated_at: '2024-01-15T00:00:00.000Z',
+  },
+  {
+    id: EMPLOYEE_IDS.COOK_1,
+    first_name: 'Jan',
+    last_name: 'Kowalski',
+    email: 'jan.k@mesopos.pl',
+    phone: '+48 501 222 222',
+    employee_code: 'EMP002',
+    pin: '2345',
+    role: 'cook',
+    employment_type: EmploymentType.FULL_TIME,
+    hourly_rate: 22,
+    overtime_rate: 33,
+    location_id: LOCATION_IDS.CENTRAL_KITCHEN,
+    is_active: true,
+    created_at: '2024-02-01T00:00:00.000Z',
+    updated_at: '2024-02-01T00:00:00.000Z',
+  },
+  {
+    id: EMPLOYEE_IDS.CASHIER_1,
+    first_name: 'Maria',
+    last_name: 'Wiśniewska',
+    email: 'maria.w@mesopos.pl',
+    phone: '+48 501 333 333',
+    employee_code: 'EMP003',
+    pin: '3456',
+    role: 'cashier',
+    employment_type: EmploymentType.PART_TIME,
+    hourly_rate: 20,
+    location_id: LOCATION_IDS.FOOD_TRUCK_MOKOTOW,
+    is_active: true,
+    created_at: '2024-02-15T00:00:00.000Z',
+    updated_at: '2024-02-15T00:00:00.000Z',
+  },
+  {
+    id: EMPLOYEE_IDS.DELIVERY_1,
+    first_name: 'Piotr',
+    last_name: 'Nowak',
+    email: 'piotr.n@mesopos.pl',
+    phone: '+48 501 444 444',
+    employee_code: 'EMP004',
+    pin: '4567',
+    role: 'delivery',
+    employment_type: EmploymentType.CONTRACT,
+    hourly_rate: 18,
+    location_id: LOCATION_IDS.FOOD_TRUCK_MOKOTOW,
+    is_active: true,
+    created_at: '2024-03-01T00:00:00.000Z',
+    updated_at: '2024-03-01T00:00:00.000Z',
+  },
+  {
+    id: EMPLOYEE_IDS.MANAGER_1,
+    first_name: 'Katarzyna',
+    last_name: 'Lewandowska',
+    email: 'katarzyna.l@mesopos.pl',
+    phone: '+48 501 555 555',
+    employee_code: 'EMP005',
+    pin: '5678',
+    role: 'manager',
+    employment_type: EmploymentType.FULL_TIME,
+    hourly_rate: 35,
+    overtime_rate: 52.5,
+    location_id: LOCATION_IDS.PUNKT_CENTRUM,
+    is_active: true,
+    created_at: '2024-01-10T00:00:00.000Z',
+    updated_at: '2024-01-10T00:00:00.000Z',
+  },
+  {
+    id: EMPLOYEE_IDS.WAREHOUSE_1,
+    first_name: 'Tomasz',
+    last_name: 'Zieliński',
+    email: 'tomasz.z@mesopos.pl',
+    phone: '+48 501 666 666',
+    employee_code: 'EMP006',
+    pin: '6789',
+    role: 'warehouse',
+    employment_type: EmploymentType.FULL_TIME,
+    hourly_rate: 20,
+    overtime_rate: 30,
+    location_id: LOCATION_IDS.CENTRAL_KITCHEN,
+    is_active: true,
+    created_at: '2024-03-15T00:00:00.000Z',
+    updated_at: '2024-03-15T00:00:00.000Z',
+  },
+];
+
+// Generate work time entries relative to current time
+function generateWorkTimes(): WorkTime[] {
+  const now = new Date();
+  const todayMorning = new Date(now);
+  todayMorning.setHours(6, 0, 0, 0);
+
+  return [
+    // 3 currently clocked in (active)
+    {
+      id: WORK_TIME_IDS.WT1,
+      employee_id: EMPLOYEE_IDS.CHEF_1,
+      location_id: LOCATION_IDS.CENTRAL_KITCHEN,
+      status: WorkTimeStatus.CLOCKED_IN,
+      clock_in: new Date(todayMorning.getTime()).toISOString(),
+      total_break_minutes: 0,
+      created_at: todayMorning.toISOString(),
+      updated_at: todayMorning.toISOString(),
+    },
+    {
+      id: WORK_TIME_IDS.WT2,
+      employee_id: EMPLOYEE_IDS.COOK_1,
+      location_id: LOCATION_IDS.CENTRAL_KITCHEN,
+      status: WorkTimeStatus.CLOCKED_IN,
+      clock_in: new Date(todayMorning.getTime() + 30 * 60000).toISOString(),
+      total_break_minutes: 0,
+      created_at: new Date(todayMorning.getTime() + 30 * 60000).toISOString(),
+      updated_at: new Date(todayMorning.getTime() + 30 * 60000).toISOString(),
+    },
+    {
+      id: WORK_TIME_IDS.WT3,
+      employee_id: EMPLOYEE_IDS.CASHIER_1,
+      location_id: LOCATION_IDS.FOOD_TRUCK_MOKOTOW,
+      status: WorkTimeStatus.CLOCKED_IN,
+      clock_in: new Date(todayMorning.getTime() + 2 * 3600000).toISOString(),
+      total_break_minutes: 0,
+      created_at: new Date(todayMorning.getTime() + 2 * 3600000).toISOString(),
+      updated_at: new Date(todayMorning.getTime() + 2 * 3600000).toISOString(),
+    },
+    // 2 completed shifts from today
+    {
+      id: WORK_TIME_IDS.WT4,
+      employee_id: EMPLOYEE_IDS.WAREHOUSE_1,
+      location_id: LOCATION_IDS.CENTRAL_KITCHEN,
+      status: WorkTimeStatus.CLOCKED_OUT,
+      clock_in: new Date(todayMorning.getTime() - 2 * 3600000).toISOString(),
+      clock_out: new Date(todayMorning.getTime() + 4 * 3600000).toISOString(),
+      total_break_minutes: 30,
+      total_work_minutes: 330,
+      created_at: new Date(todayMorning.getTime() - 2 * 3600000).toISOString(),
+      updated_at: new Date(todayMorning.getTime() + 4 * 3600000).toISOString(),
+    },
+    {
+      id: WORK_TIME_IDS.WT5,
+      employee_id: EMPLOYEE_IDS.DELIVERY_1,
+      location_id: LOCATION_IDS.FOOD_TRUCK_MOKOTOW,
+      status: WorkTimeStatus.CLOCKED_OUT,
+      clock_in: new Date(todayMorning.getTime()).toISOString(),
+      clock_out: new Date(todayMorning.getTime() + 3 * 3600000).toISOString(),
+      total_break_minutes: 15,
+      total_work_minutes: 165,
+      created_at: todayMorning.toISOString(),
+      updated_at: new Date(todayMorning.getTime() + 3 * 3600000).toISOString(),
+    },
+  ];
+}
+
+export const workTimes = generateWorkTimes();

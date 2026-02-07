@@ -1,0 +1,88 @@
+import { Category } from '@/types/menu';
+
+// Fixed UUIDs for cross-referencing in other seed modules
+export const CATEGORY_IDS = {
+  BURGERS: '33333333-3333-3333-3333-333333333001',
+  FRIES: '33333333-3333-3333-3333-333333333002',
+  SALADS: '33333333-3333-3333-3333-333333333003',
+  DRINKS: '33333333-3333-3333-3333-333333333004',
+  DESSERTS: '33333333-3333-3333-3333-333333333005',
+  COMBOS: '33333333-3333-3333-3333-333333333006',
+} as const;
+
+const now = '2024-01-15T10:00:00.000Z';
+
+export const categories: Category[] = [
+  {
+    id: CATEGORY_IDS.BURGERS,
+    name: 'Burgery',
+    slug: 'burgery',
+    description: 'Nasze pyszne burgery z najlepszych skladnikow',
+    sort_order: 1,
+    is_active: true,
+    color: 'from-orange-500 to-red-600',
+    icon: 'Beef',
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: CATEGORY_IDS.FRIES,
+    name: 'Frytki i dodatki',
+    slug: 'frytki-i-dodatki',
+    description: 'Chrupiace frytki i pyszne dodatki',
+    sort_order: 2,
+    is_active: true,
+    color: 'from-yellow-400 to-orange-500',
+    icon: 'French Fries',
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: CATEGORY_IDS.SALADS,
+    name: 'Salatki',
+    slug: 'salatki',
+    description: 'Swieze salatki na kazda okazje',
+    sort_order: 3,
+    is_active: true,
+    color: 'from-green-400 to-emerald-600',
+    icon: 'Salad',
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: CATEGORY_IDS.DRINKS,
+    name: 'Napoje',
+    slug: 'napoje',
+    description: 'Napoje zimne i gorace',
+    sort_order: 4,
+    is_active: true,
+    color: 'from-blue-400 to-cyan-600',
+    icon: 'GlassWater',
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: CATEGORY_IDS.DESSERTS,
+    name: 'Desery',
+    slug: 'desery',
+    description: 'Slodkie zakonczenie posilku',
+    sort_order: 5,
+    is_active: true,
+    color: 'from-pink-400 to-rose-600',
+    icon: 'Cake',
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: CATEGORY_IDS.COMBOS,
+    name: 'Zestawy',
+    slug: 'zestawy',
+    description: 'Zestawy w atrakcyjnych cenach',
+    sort_order: 6,
+    is_active: true,
+    color: 'from-violet-400 to-purple-600',
+    icon: 'Package',
+    created_at: now,
+    updated_at: now,
+  },
+];

@@ -1,0 +1,89 @@
+'use client';
+
+import { create } from 'zustand';
+import { Warehouse, StockItem } from '@/types/inventory';
+import { inventoryRepository } from './repository';
+
+interface InventoryStore {
+  warehouses: Warehouse[];
+  stockItems: StockItem[];
+  selectedWarehouseId: string | null;
+  isLoading: boolean;
+  // Actions
+  loadWarehouses: () => Promise<void>;
+  loadStockItems: (warehouseId?: string) => Promise<void>;
+  adjustStock: (stockItemId: string, quantity: number, reason: string) => Promise<void>;
+  createStockItem: (data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>) => Promise<StockItem>;
+  setSelectedWarehouse: (warehouseId: string | null) => void;
+  // Computed
+  getLowStockItems: () => StockItem[];
+  getStockValue: () => number;
+  filteredItems: () => StockItem[];
+}
+
+export const useInventoryStore = create<InventoryStore>()((set, get) => ({
+  warehouses: [],
+  stockItems: [],
+  selectedWarehouseId: null,
+  isLoading: false,
+
+  loadWarehouses: async () => {
+    const warehouses = await inventoryRepository.getAllWarehouses();
+    set({ warehouses });
+  },
+
+  loadStockItems: async (warehouseId?: string) => {
+    set({ isLoading: true });
+    try {
+      const stockItems = warehouseId
+        ? await inventoryRepository.getStockByWarehouse(warehouseId)
+        : await inventoryRepository.getAllStockItems();
+      set({ stockItems });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  adjustStock: async (stockItemId: string, quantity: number, reason: string) => {
+    await inventoryRepository.adjustStock(stockItemId, quantity, reason);
+    const { stockItems } = get();
+    set({
+      stockItems: stockItems.map((item) =>
+        item.id === stockItemId
+          ? { ...item, current_quantity: item.current_quantity + quantity }
+          : item
+      ),
+    });
+  },
+
+  createStockItem: async (data) => {
+    const newItem = await inventoryRepository.stockItems.create(data);
+    set({ stockItems: [...get().stockItems, newItem] });
+    return newItem;
+  },
+
+  setSelectedWarehouse: (warehouseId: string | null) => {
+    set({ selectedWarehouseId: warehouseId });
+  },
+
+  getLowStockItems: () => {
+    return get().stockItems.filter(
+      (item) => item.is_active && item.current_quantity < item.min_quantity
+    );
+  },
+
+  getStockValue: () => {
+    return get().stockItems.reduce(
+      (total, item) => total + item.current_quantity * item.cost_per_unit,
+      0
+    );
+  },
+
+  filteredItems: () => {
+    const { stockItems, selectedWarehouseId } = get();
+    if (!selectedWarehouseId) return stockItems;
+    return stockItems.filter(
+      (item) => item.warehouse_id === selectedWarehouseId
+    );
+  },
+}));

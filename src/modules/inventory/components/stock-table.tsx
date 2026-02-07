@@ -1,0 +1,256 @@
+'use client';
+
+import { useState } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { StockItem } from '@/types/inventory';
+import { Warehouse } from '@/types/inventory';
+import { formatCurrency } from '@/lib/utils';
+import { Plus, Minus, Package } from 'lucide-react';
+import { EmptyState } from '@/components/shared/empty-state';
+import { toast } from 'sonner';
+
+interface StockTableProps {
+  items: StockItem[];
+  warehouses: Warehouse[];
+  onAdjustStock?: (itemId: string, quantity: number, reason: string) => Promise<void>;
+}
+
+function getStockStatus(item: StockItem): { label: string; color: string } {
+  const ratio = item.current_quantity / item.min_quantity;
+  if (ratio < 0.5) return { label: 'Krytyczny', color: 'bg-red-100 text-red-800' };
+  if (ratio < 1) return { label: 'Niski stan', color: 'bg-amber-100 text-amber-800' };
+  return { label: 'OK', color: 'bg-green-100 text-green-800' };
+}
+
+function getQuantityColor(item: StockItem): string {
+  const ratio = item.current_quantity / item.min_quantity;
+  if (ratio < 0.5) return 'text-red-600 font-bold';
+  if (ratio < 1) return 'text-amber-600 font-semibold';
+  return 'text-green-700';
+}
+
+export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps) {
+  const [adjustDialog, setAdjustDialog] = useState<StockItem | null>(null);
+  const [adjustQty, setAdjustQty] = useState(0);
+  const [adjustReason, setAdjustReason] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const warehouseMap: Record<string, string> = {};
+  warehouses.forEach((w) => {
+    warehouseMap[w.id] = w.name;
+  });
+
+  const handleAdjust = async () => {
+    if (!adjustDialog || adjustQty === 0 || !onAdjustStock) return;
+    setIsSubmitting(true);
+    try {
+      await onAdjustStock(adjustDialog.id, adjustQty, adjustReason);
+      toast.success(`Stan magazynowy zaktualizowany: ${adjustDialog.name}`);
+      setAdjustDialog(null);
+      setAdjustQty(0);
+      setAdjustReason('');
+    } catch {
+      toast.error('Nie udało się zaktualizować stanu');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (items.length === 0) {
+    return (
+      <EmptyState
+        icon={<Package className="h-6 w-6" />}
+        title="Brak pozycji magazynowych"
+        description="Nie znaleziono pozycji dla wybranego magazynu."
+      />
+    );
+  }
+
+  return (
+    <>
+      <div className="rounded-md border" data-component="stock-table">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Produkt</TableHead>
+              <TableHead className="hidden md:table-cell">Magazyn</TableHead>
+              <TableHead className="text-right">Ilość</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Min</TableHead>
+              <TableHead className="hidden sm:table-cell">Jednostka</TableHead>
+              <TableHead>Status</TableHead>
+              {onAdjustStock && <TableHead className="w-[80px]">Akcje</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => {
+              const status = getStockStatus(item);
+              const qtyColor = getQuantityColor(item);
+
+              return (
+                <TableRow key={item.id} data-id={item.id}>
+                  <TableCell className="font-medium">{item.name}</TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    {warehouseMap[item.warehouse_id] ?? '-'}
+                  </TableCell>
+                  <TableCell className={`text-right ${qtyColor}`}>
+                    {item.current_quantity}
+                  </TableCell>
+                  <TableCell className="text-right hidden sm:table-cell text-muted-foreground">
+                    {item.min_quantity}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">
+                    {item.unit}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="outline"
+                      className={`border-0 ${status.color}`}
+                      data-status={status.label}
+                    >
+                      {status.label}
+                    </Badge>
+                  </TableCell>
+                  {onAdjustStock && (
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setAdjustDialog(item);
+                            setAdjustQty(1);
+                          }}
+                          data-action="adjust-stock-plus"
+                          data-id={item.id}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => {
+                            setAdjustDialog(item);
+                            setAdjustQty(-1);
+                          }}
+                          data-action="adjust-stock-minus"
+                          data-id={item.id}
+                        >
+                          <Minus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      <Dialog
+        open={!!adjustDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAdjustDialog(null);
+            setAdjustQty(0);
+            setAdjustReason('');
+          }
+        }}
+      >
+        <DialogContent data-component="adjust-stock-dialog">
+          <DialogHeader>
+            <DialogTitle>Korekta stanu: {adjustDialog?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Aktualny stan:</span>
+              <span className="font-medium">
+                {adjustDialog?.current_quantity} {adjustDialog?.unit}
+              </span>
+            </div>
+            <div className="space-y-2">
+              <Label>Zmiana ilości</Label>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setAdjustQty((q) => q - 1)}
+                  data-action="decrease-qty"
+                >
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  value={adjustQty}
+                  onChange={(e) => setAdjustQty(Number(e.target.value))}
+                  className="text-center"
+                  data-field="adjust-quantity"
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setAdjustQty((q) => q + 1)}
+                  data-action="increase-qty"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Nowy stan:{' '}
+                <span className="font-medium">
+                  {(adjustDialog?.current_quantity ?? 0) + adjustQty}{' '}
+                  {adjustDialog?.unit}
+                </span>
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Powód korekty</Label>
+              <Input
+                placeholder="np. Dostawa, inwentaryzacja..."
+                value={adjustReason}
+                onChange={(e) => setAdjustReason(e.target.value)}
+                data-field="adjust-reason"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAdjustDialog(null)}
+              data-action="cancel-adjust"
+            >
+              Anuluj
+            </Button>
+            <Button
+              onClick={handleAdjust}
+              disabled={adjustQty === 0 || isSubmitting}
+              data-action="confirm-adjust"
+            >
+              Potwierdź korektę
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
