@@ -6,6 +6,7 @@ import { products } from './data/products';
 import { employees, workTimes } from './data/employees';
 import { orders } from './data/orders';
 import { warehouses, stockItems } from './data/inventory';
+import { batches } from './data/batches';
 import { kitchenTickets } from './data/kitchen-tickets';
 
 const STORAGE_PREFIX = 'mesopos_';
@@ -30,6 +31,7 @@ export function seedAll(): void {
   seedCollection('kitchen_tickets', kitchenTickets);
   seedCollection('warehouses', warehouses);
   seedCollection('stock_items', stockItems);
+  seedCollection('batches', batches);
 
   markAsSeeded();
   console.log('[MESOpos] Seed data loaded successfully');
