@@ -77,8 +77,9 @@ export enum LocationType {
 
 // Inventory enums
 export enum WarehouseType {
-  CENTRAL = 'central',
-  LOCAL = 'local',
+  CENTRAL = 'central',        // Kuchnia Centralna (KC)
+  POINT = 'point',            // Punkt sprzedaży (Food Truck, Kiosk)
+  STORAGE = 'storage',        // Magazyn składowy
 }
 
 export enum StorageZone {

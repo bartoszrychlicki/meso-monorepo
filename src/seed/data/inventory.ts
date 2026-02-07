@@ -30,7 +30,7 @@ export const warehouses: Warehouse[] = [
   {
     id: WAREHOUSE_IDS.FOOD_TRUCK,
     name: 'Magazyn Food Truck Mokotów',
-    type: WarehouseType.LOCAL,
+    type: WarehouseType.POINT,
     location_id: LOCATION_IDS.FOOD_TRUCK_MOKOTOW,
     is_active: true,
     created_at: '2024-01-01T00:00:00.000Z',

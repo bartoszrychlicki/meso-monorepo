@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { StockTable } from '@/modules/inventory/components/stock-table';
@@ -11,7 +12,7 @@ import { useInventoryStore } from '@/modules/inventory/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { Package, AlertTriangle, DollarSign, Plus } from 'lucide-react';
+import { Package, AlertTriangle, DollarSign, Plus, Settings } from 'lucide-react';
 
 export default function InventoryPage() {
   const {
@@ -55,13 +56,25 @@ export default function InventoryPage() {
         title="Magazyn"
         description="Stany magazynowe i alerty"
         actions={
-          <Button
-            onClick={() => setShowNewItemForm(true)}
-            data-action="add-stock-item"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nowa pozycja
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              asChild
+              data-action="manage-warehouses"
+            >
+              <Link href="/inventory/warehouses">
+                <Settings className="mr-2 h-4 w-4" />
+                Zarządzaj magazynami
+              </Link>
+            </Button>
+            <Button
+              onClick={() => setShowNewItemForm(true)}
+              data-action="add-stock-item"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nowa pozycja
+            </Button>
+          </div>
         }
       />
 
