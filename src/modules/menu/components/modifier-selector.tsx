@@ -7,6 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Plus, Trash2, GripVertical } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
@@ -108,9 +115,22 @@ export function ModifierSelector({ modifierGroups, onChange }: ModifierSelectorP
                   className="h-8 w-56 font-medium"
                   data-field="modifier-group-name"
                 />
-                <Badge variant="outline" className="text-xs">
-                  {group.type === ModifierType.SINGLE ? 'Pojedynczy' : 'Wielokrotny'}
-                </Badge>
+                <Select
+                  value={group.type}
+                  onValueChange={(v) => updateGroup(group.id, { type: v as ModifierType })}
+                >
+                  <SelectTrigger className="h-8 w-40" data-field="modifier-group-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ModifierType.SINGLE}>
+                      Pojedynczy wybór
+                    </SelectItem>
+                    <SelectItem value={ModifierType.MULTIPLE}>
+                      Wielokrotny wybór
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <Button
                 variant="ghost"
