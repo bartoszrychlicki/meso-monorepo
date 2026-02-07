@@ -34,14 +34,14 @@ interface StockTableProps {
 }
 
 function getStockStatus(item: StockItem): { label: string; color: string } {
-  const ratio = item.current_quantity / item.min_quantity;
+  const ratio = item.quantity_available / item.min_quantity;
   if (ratio < 0.5) return { label: 'Krytyczny', color: 'bg-red-100 text-red-800' };
   if (ratio < 1) return { label: 'Niski stan', color: 'bg-amber-100 text-amber-800' };
   return { label: 'OK', color: 'bg-green-100 text-green-800' };
 }
 
 function getQuantityColor(item: StockItem): string {
-  const ratio = item.current_quantity / item.min_quantity;
+  const ratio = item.quantity_available / item.min_quantity;
   if (ratio < 0.5) return 'text-red-600 font-bold';
   if (ratio < 1) return 'text-amber-600 font-semibold';
   return 'text-green-700';
@@ -111,7 +111,7 @@ export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps
                     {warehouseMap[item.warehouse_id] ?? '-'}
                   </TableCell>
                   <TableCell className={`text-right ${qtyColor}`}>
-                    {item.current_quantity}
+                    {item.quantity_available}
                   </TableCell>
                   <TableCell className="text-right hidden sm:table-cell text-muted-foreground">
                     {item.min_quantity}
@@ -185,7 +185,7 @@ export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Aktualny stan:</span>
               <span className="font-medium">
-                {adjustDialog?.current_quantity} {adjustDialog?.unit}
+                {adjustDialog?.quantity_available} {adjustDialog?.unit}
               </span>
             </div>
             <div className="space-y-2">
@@ -218,7 +218,7 @@ export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps
               <p className="text-xs text-muted-foreground">
                 Nowy stan:{' '}
                 <span className="font-medium">
-                  {(adjustDialog?.current_quantity ?? 0) + adjustQty}{' '}
+                  {(adjustDialog?.quantity_available ?? 0) + adjustQty}{' '}
                   {adjustDialog?.unit}
                 </span>
               </p>

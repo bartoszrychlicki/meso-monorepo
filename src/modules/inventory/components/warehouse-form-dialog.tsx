@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Warehouse } from '@/types/inventory';
-import { WarehouseType } from '@/types/enums';
+import { Warehouse, StorageZoneConfig } from '@/types/inventory';
+import { WarehouseType, WarehouseSubtype, StorageZone } from '@/types/enums';
 import {
   Dialog,
   DialogContent,
@@ -61,9 +61,30 @@ export function WarehouseFormDialog({
 
     setIsSaving(true);
     try {
+      // Auto-select subtype based on type (temporary logic)
+      const subtype =
+        type === WarehouseType.CENTRAL
+          ? WarehouseSubtype.RAW_MATERIALS
+          : WarehouseSubtype.OUTLET_STORAGE;
+
+      // Default zones based on subtype (temporary logic)
+      const defaultZones: StorageZoneConfig[] =
+        subtype === WarehouseSubtype.RAW_MATERIALS
+          ? [
+              { zone: StorageZone.COLD, name: 'Chłodnia', min_temp: 0, max_temp: 4 },
+              { zone: StorageZone.FROZEN, name: 'Mroźnia', min_temp: -22, max_temp: -18 },
+              { zone: StorageZone.DRY, name: 'Strefa Sucha', min_temp: 15, max_temp: 25 },
+            ]
+          : [
+              { zone: StorageZone.COLD, name: 'Chłodnia', min_temp: 0, max_temp: 4 },
+              { zone: StorageZone.AMBIENT, name: 'Pokojowa', min_temp: 18, max_temp: 22 },
+            ];
+
       await onSave({
         name,
         type,
+        subtype,
+        zones: defaultZones,
         location_id: locationId,
         is_active: isActive,
       });

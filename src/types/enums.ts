@@ -82,6 +82,12 @@ export enum WarehouseType {
   STORAGE = 'storage',        // Magazyn składowy
 }
 
+export enum WarehouseSubtype {
+  RAW_MATERIALS = 'raw_materials',     // Magazyn surowców (KC)
+  SEMI_FINISHED = 'semi_finished',     // Magazyn półproduktów (KC)
+  OUTLET_STORAGE = 'outlet_storage',   // Magazyn punktu sprzedaży
+}
+
 export enum StorageZone {
   DRY = 'dry',
   COLD = 'cold',
@@ -90,9 +96,17 @@ export enum StorageZone {
 }
 
 export enum BatchStatus {
-  ACTIVE = 'active',
-  EXPIRED = 'expired',
-  DEPLETED = 'depleted',
+  FRESH = 'fresh',           // > 50% okresu przydatności
+  WARNING = 'warning',       // 25-50% okresu przydatności
+  CRITICAL = 'critical',     // < 25% okresu przydatności
+  EXPIRED = 'expired',       // Przekroczona data przydatności
+  DEPLETED = 'depleted',     // Wyczerpana (quantity = 0)
+}
+
+export enum ProductCategory {
+  RAW_MATERIAL = 'raw_material',       // Surowce (mięso, warzywa)
+  SEMI_FINISHED = 'semi_finished',     // Półprodukty (sosy, marynaty)
+  FINISHED_GOOD = 'finished_good',     // Gotowe dania (burgery, zupy)
 }
 
 export enum StockMovementType {
@@ -102,6 +116,65 @@ export enum StockMovementType {
   WASTE = 'waste',
   ADJUSTMENT = 'adjustment',
   RETURN = 'return',
+}
+
+// Stock Transfer enums (Spec 5.6)
+export enum TransferStatus {
+  DRAFT = 'draft',                     // Zlecenie utworzone
+  PENDING = 'pending',                 // Oczekuje na kompletację
+  IN_TRANSIT = 'in_transit',           // Wysłane, w drodze
+  COMPLETED = 'completed',             // Odebrane w punkcie
+  CANCELLED = 'cancelled',             // Anulowane
+}
+
+// Wastage enums (Spec 5.7)
+export enum WastageCategory {
+  EXPIRY = 'expiry',                   // Przeterminowanie
+  DAMAGE = 'damage',                   // Uszkodzenie
+  HUMAN_ERROR = 'human_error',         // Błąd ludzki
+  THEFT = 'theft',                     // Kradzież
+  PRODUCTION = 'production',           // Produkcyjne
+  OTHER = 'other',                     // Inne
+}
+
+// Stock Count enums (Spec 5.8)
+export enum StockCountType {
+  DAILY = 'daily',                     // Dzienna (rotacyjna)
+  WEEKLY = 'weekly',                   // Tygodniowa
+  MONTHLY = 'monthly',                 // Miesięczna
+  AD_HOC = 'ad_hoc',                   // Ad-hoc (na żądanie)
+}
+
+export enum StockCountStatus {
+  DRAFT = 'draft',
+  IN_PROGRESS = 'in_progress',
+  COMPLETED = 'completed',
+  APPROVED = 'approved',
+}
+
+// Purchase Order enums (Spec 5.10 - MAG-003)
+export enum PurchaseOrderStatus {
+  DRAFT = 'draft',
+  PENDING_APPROVAL = 'pending_approval',
+  APPROVED = 'approved',
+  SENT_TO_SUPPLIER = 'sent_to_supplier',
+  PARTIALLY_RECEIVED = 'partially_received',
+  RECEIVED = 'received',
+  CANCELLED = 'cancelled',
+}
+
+// Quality Check enums (Spec 5.10 - MAG-004)
+export enum QualityCheckResult {
+  PASS = 'pass',
+  FAIL = 'fail',
+  PARTIAL = 'partial',
+}
+
+// Valuation Method enums (Spec 5.9)
+export enum ValuationMethod {
+  FIFO = 'fifo',                       // First In First Out
+  WEIGHTED_AVERAGE = 'weighted_average', // Średnia ważona
+  UNIT_COST = 'unit_cost',             // Cena jednostkowa
 }
 
 // EU 14 allergens

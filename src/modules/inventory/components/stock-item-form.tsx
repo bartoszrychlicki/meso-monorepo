@@ -18,27 +18,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Warehouse } from '@/types/inventory';
-import { StorageZone } from '@/types/enums';
+import { Warehouse, StockItem } from '@/types/inventory';
+import { StorageZone, ProductCategory } from '@/types/enums';
 import { toast } from 'sonner';
 
 interface StockItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   warehouses: Warehouse[];
-  onSubmit: (data: {
-    name: string;
-    sku: string;
-    unit: string;
-    current_quantity: number;
-    min_quantity: number;
-    max_quantity?: number;
-    warehouse_id: string;
-    storage_zone: StorageZone;
-    cost_per_unit: number;
-    supplier_id?: string;
-    is_active: boolean;
-  }) => Promise<void>;
+  onSubmit: (data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
 }
 
 const STORAGE_ZONE_LABELS: Record<StorageZone, string> = {
@@ -93,13 +81,20 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
       await onSubmit({
         name: name.trim(),
         sku: sku.trim(),
+        product_category: ProductCategory.RAW_MATERIAL, // TODO: Add UI field in future sprint
         unit,
-        current_quantity: currentQuantity,
+        purchase_unit: 'szt', // TODO: Add UI field in future sprint
+        conversion_rate: 1, // TODO: Add UI field in future sprint
+        quantity_physical: currentQuantity,
+        quantity_available: currentQuantity,
+        quantity_reserved: 0,
+        quantity_in_transit: 0,
         min_quantity: minQuantity,
         max_quantity: maxQuantity ? Number(maxQuantity) : undefined,
         warehouse_id: warehouseId,
         storage_zone: storageZone,
         cost_per_unit: costPerUnit,
+        allergens: [], // TODO: Add UI field in future sprint
         is_active: true,
       });
       toast.success(`Dodano pozycje: ${name}`);

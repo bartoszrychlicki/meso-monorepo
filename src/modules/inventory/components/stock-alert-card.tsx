@@ -23,7 +23,7 @@ export function StockAlertCard({ lowStockItems }: StockAlertCardProps) {
       <CardContent>
         <div className="space-y-2">
           {lowStockItems.map((item) => {
-            const deficit = item.min_quantity - item.current_quantity;
+            const deficit = item.min_quantity - item.quantity_available;
 
             return (
               <div
@@ -36,7 +36,7 @@ export function StockAlertCard({ lowStockItems }: StockAlertCardProps) {
                   <p className="text-sm text-muted-foreground">
                     Stan:{' '}
                     <span className="text-red-600 font-semibold">
-                      {item.current_quantity} {item.unit}
+                      {item.quantity_available} {item.unit}
                     </span>
                     {' / Min: '}
                     {item.min_quantity} {item.unit}

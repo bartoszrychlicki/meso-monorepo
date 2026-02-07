@@ -1,4 +1,5 @@
 import { Warehouse, StockItem, Batch } from '@/types/inventory';
+import { BatchStatus } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
 
 const warehouseRepo = createRepository<Warehouse>('warehouses');
@@ -18,7 +19,7 @@ export const inventoryRepository = {
 
   async getLowStockItems(): Promise<StockItem[]> {
     return stockItemRepo.findMany(
-      (item) => item.is_active && item.current_quantity < item.min_quantity
+      (item) => item.is_active && item.quantity_available < item.min_quantity
     );
   },
 
@@ -31,7 +32,8 @@ export const inventoryRepository = {
     if (!item) throw new Error('Stock item not found');
 
     return stockItemRepo.update(stockItemId, {
-      current_quantity: item.current_quantity + quantity,
+      quantity_physical: item.quantity_physical + quantity,
+      quantity_available: item.quantity_available + quantity,
     });
   },
 
@@ -41,7 +43,9 @@ export const inventoryRepository = {
 
     return batchRepo.findMany(
       (batch) =>
-        batch.status === 'active' &&
+        (batch.status === BatchStatus.FRESH ||
+          batch.status === BatchStatus.WARNING ||
+          batch.status === BatchStatus.CRITICAL) &&
         !!batch.expiry_date &&
         new Date(batch.expiry_date) <= cutoff
     );

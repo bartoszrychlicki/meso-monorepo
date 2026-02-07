@@ -106,7 +106,11 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
     set({
       stockItems: stockItems.map((item) =>
         item.id === stockItemId
-          ? { ...item, current_quantity: item.current_quantity + quantity }
+          ? {
+              ...item,
+              quantity_physical: item.quantity_physical + quantity,
+              quantity_available: item.quantity_available + quantity,
+            }
           : item
       ),
     });
@@ -124,13 +128,13 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
 
   getLowStockItems: () => {
     return get().stockItems.filter(
-      (item) => item.is_active && item.current_quantity < item.min_quantity
+      (item) => item.is_active && item.quantity_available < item.min_quantity
     );
   },
 
   getStockValue: () => {
     return get().stockItems.reduce(
-      (total, item) => total + item.current_quantity * item.cost_per_unit,
+      (total, item) => total + item.quantity_physical * item.cost_per_unit,
       0
     );
   },
