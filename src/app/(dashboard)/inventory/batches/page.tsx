@@ -9,6 +9,7 @@ import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { InventoryHelpButton } from '@/modules/inventory/components/inventory-help-dialog';
 import {
   Select,
   SelectContent,
@@ -90,6 +91,7 @@ export default function BatchesPage() {
         description="Śledzenie partii według FEFO (First Expired First Out)"
         actions={
           <div className="flex gap-2">
+            <InventoryHelpButton />
             <Button
               variant="outline"
               size="sm"

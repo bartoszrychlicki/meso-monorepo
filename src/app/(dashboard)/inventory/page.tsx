@@ -11,6 +11,7 @@ import { WarehouseSelector } from '@/modules/inventory/components/warehouse-sele
 import { ExpiringBatchesAlert } from '@/modules/inventory/components/expiring-batches-alert';
 import { LowStockAlert } from '@/modules/inventory/components/low-stock-alert';
 import { CriticalBatchesAlert } from '@/modules/inventory/components/critical-batches-alert';
+import { InventoryHelpButton } from '@/modules/inventory/components/inventory-help-dialog';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ export default function InventoryPage() {
         description="Stany magazynowe i alerty"
         actions={
           <div className="flex gap-2">
+            <InventoryHelpButton />
             <Button
               variant="outline"
               asChild

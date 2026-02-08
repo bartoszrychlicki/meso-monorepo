@@ -9,6 +9,7 @@ import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { InventoryHelpButton } from '@/modules/inventory/components/inventory-help-dialog';
 
 export default function TransfersPage() {
   const [transfers, setTransfers] = useState<StockTransfer[]>([]);
@@ -72,6 +73,7 @@ export default function TransfersPage() {
         description="Zarządzanie przesunięciami towarów między KC a punktami sprzedaży"
         actions={
           <div className="flex gap-2">
+            <InventoryHelpButton />
             <Button
               variant="outline"
               size="sm"
