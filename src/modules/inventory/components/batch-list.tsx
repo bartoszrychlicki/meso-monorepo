@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
-import { Batch } from '@/types/inventory';
+import { useMemo, useState } from 'react';
+import { Batch, StockItem } from '@/types/inventory';
 import { BatchStatus } from '@/types/enums';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { AlertTriangle, CheckCircle, XCircle, Clock, Package } from 'lucide-react';
+import { AlertTriangle, CheckCircle, XCircle, Clock, Package, Edit } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import {
   getBatchStatusColor,
@@ -22,13 +23,19 @@ import {
   getDaysUntilExpiry,
   getShelfLifePercentage,
 } from '../utils/batch-status';
+import { BatchEditDialog } from './batch-edit-dialog';
 
 interface BatchListProps {
   batches: Batch[];
   stockItemName?: string;
+  stockItems?: StockItem[];
+  onBatchUpdated?: () => void;
 }
 
-export function BatchList({ batches, stockItemName }: BatchListProps) {
+export function BatchList({ batches, stockItemName, stockItems, onBatchUpdated }: BatchListProps) {
+  const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+
   // Sort batches by expiry date (FEFO order)
   const sortedBatches = useMemo(() => {
     return [...batches].sort((a, b) => {
@@ -37,6 +44,17 @@ export function BatchList({ batches, stockItemName }: BatchListProps) {
       return new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime();
     });
   }, [batches]);
+
+  const handleEditBatch = (batch: Batch) => {
+    setEditingBatch(batch);
+    setEditDialogOpen(true);
+  };
+
+  const handleBatchUpdated = () => {
+    setEditDialogOpen(false);
+    setEditingBatch(null);
+    onBatchUpdated?.();
+  };
 
   // Group by status
   const batchesByStatus = useMemo(() => {
@@ -176,6 +194,7 @@ export function BatchList({ batches, stockItemName }: BatchListProps) {
                   <TableHead className="text-right">Ilość</TableHead>
                   <TableHead className="text-right">Wartość</TableHead>
                   <TableHead className="text-right">% przydatności</TableHead>
+                  <TableHead className="w-[100px]">Akcje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -262,6 +281,16 @@ export function BatchList({ batches, stockItemName }: BatchListProps) {
                           <div className="text-sm text-muted-foreground">N/A</div>
                         )}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleEditBatch(batch)}
+                          data-action="edit-batch"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -270,6 +299,14 @@ export function BatchList({ batches, stockItemName }: BatchListProps) {
           </div>
         </CardContent>
       </Card>
+
+      <BatchEditDialog
+        batch={editingBatch}
+        stockItem={stockItems?.find((s) => s.id === editingBatch?.stock_item_id)}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSuccess={handleBatchUpdated}
+      />
     </div>
   );
 }

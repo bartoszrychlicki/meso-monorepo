@@ -8,6 +8,9 @@ import { StockTable } from '@/modules/inventory/components/stock-table';
 import { StockAlertCard } from '@/modules/inventory/components/stock-alert-card';
 import { StockItemForm } from '@/modules/inventory/components/stock-item-form';
 import { WarehouseSelector } from '@/modules/inventory/components/warehouse-selector';
+import { ExpiringBatchesAlert } from '@/modules/inventory/components/expiring-batches-alert';
+import { LowStockAlert } from '@/modules/inventory/components/low-stock-alert';
+import { CriticalBatchesAlert } from '@/modules/inventory/components/critical-batches-alert';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Button } from '@/components/ui/button';
@@ -108,6 +111,15 @@ export default function InventoryPage() {
         onSelect={setSelectedWarehouse}
       />
 
+      {/* Critical Food Safety Alert - Full Width for Visibility */}
+      <CriticalBatchesAlert warehouseId={selectedWarehouseId ?? undefined} maxItems={5} />
+
+      {/* Alert Widgets Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ExpiringBatchesAlert warehouseId={selectedWarehouseId ?? undefined} />
+        <LowStockAlert maxItems={5} />
+      </div>
+
       <StockAlertCard lowStockItems={lowStockItems} />
 
       <StockTable
@@ -115,6 +127,9 @@ export default function InventoryPage() {
         warehouses={warehouses}
         onAdjustStock={async (itemId, quantity, reason) => {
           await adjustStock(itemId, quantity, reason);
+        }}
+        onRefresh={() => {
+          loadStockItems();
         }}
       />
 

@@ -23,14 +23,17 @@ import {
 import { StockItem } from '@/types/inventory';
 import { Warehouse } from '@/types/inventory';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Minus, Package } from 'lucide-react';
+import { Plus, Minus, Package, TruckIcon, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { toast } from 'sonner';
+import { IssueStockDialog } from './issue-stock-dialog';
+import { WastageDialog } from './wastage-dialog';
 
 interface StockTableProps {
   items: StockItem[];
   warehouses: Warehouse[];
   onAdjustStock?: (itemId: string, quantity: number, reason: string) => Promise<void>;
+  onRefresh?: () => void;
 }
 
 function getStockStatus(item: StockItem): { label: string; color: string } {
@@ -47,11 +50,13 @@ function getQuantityColor(item: StockItem): string {
   return 'text-green-700';
 }
 
-export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps) {
+export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: StockTableProps) {
   const [adjustDialog, setAdjustDialog] = useState<StockItem | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [issueStockItem, setIssueStockItem] = useState<StockItem | null>(null);
+  const [wastageItem, setWastageItem] = useState<StockItem | null>(null);
 
   const warehouseMap: Record<string, string> = {};
   warehouses.forEach((w) => {
@@ -96,7 +101,7 @@ export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps
               <TableHead className="text-right hidden sm:table-cell">Min</TableHead>
               <TableHead className="hidden sm:table-cell">Jednostka</TableHead>
               <TableHead>Status</TableHead>
-              {onAdjustStock && <TableHead className="w-[80px]">Akcje</TableHead>}
+              {onAdjustStock && <TableHead className="w-[200px]">Akcje</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -141,6 +146,7 @@ export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps
                           }}
                           data-action="adjust-stock-plus"
                           data-id={item.id}
+                          title="Zwiększ stan"
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -154,8 +160,31 @@ export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps
                           }}
                           data-action="adjust-stock-minus"
                           data-id={item.id}
+                          title="Zmniejsz stan"
                         >
                           <Minus className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setIssueStockItem(item)}
+                          data-action="issue-stock"
+                          data-id={item.id}
+                          title="Wydaj towar (FEFO)"
+                        >
+                          <TruckIcon className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7 text-red-600 hover:text-red-700"
+                          onClick={() => setWastageItem(item)}
+                          data-action="record-wastage"
+                          data-id={item.id}
+                          title="Zarejestruj stratę"
+                        >
+                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </TableCell>
@@ -251,6 +280,28 @@ export function StockTable({ items, warehouses, onAdjustStock }: StockTableProps
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Issue Stock Dialog */}
+      <IssueStockDialog
+        stockItem={issueStockItem}
+        open={!!issueStockItem}
+        onOpenChange={(open) => !open && setIssueStockItem(null)}
+        onSuccess={() => {
+          onRefresh?.();
+          setIssueStockItem(null);
+        }}
+      />
+
+      {/* Wastage Dialog */}
+      <WastageDialog
+        stockItem={wastageItem}
+        open={!!wastageItem}
+        onOpenChange={(open) => !open && setWastageItem(null)}
+        onSuccess={() => {
+          onRefresh?.();
+          setWastageItem(null);
+        }}
+      />
     </>
   );
 }

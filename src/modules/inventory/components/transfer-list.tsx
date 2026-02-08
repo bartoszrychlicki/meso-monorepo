@@ -26,13 +26,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { TransferActions } from './transfer-actions';
 
 interface TransferListProps {
   transfers: StockTransfer[];
   warehouses?: { id: string; name: string }[];
+  onTransferUpdated?: () => void;
 }
 
-export function TransferList({ transfers, warehouses = [] }: TransferListProps) {
+export function TransferList({ transfers, warehouses = [], onTransferUpdated }: TransferListProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [warehouseFilter, setWarehouseFilter] = useState<string>('all');
 
@@ -225,6 +227,7 @@ export function TransferList({ transfers, warehouses = [] }: TransferListProps) 
                   <TableHead>Status</TableHead>
                   <TableHead>Data zlecenia</TableHead>
                   <TableHead>Notatki</TableHead>
+                  <TableHead className="w-[200px]">Akcje</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -282,6 +285,12 @@ export function TransferList({ transfers, warehouses = [] }: TransferListProps) 
                           {transfer.notes}
                         </div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <TransferActions
+                        transfer={transfer}
+                        onSuccess={() => onTransferUpdated?.()}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

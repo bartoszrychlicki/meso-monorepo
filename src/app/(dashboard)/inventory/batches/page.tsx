@@ -142,7 +142,12 @@ export default function BatchesPage() {
         )}
       </div>
 
-      <BatchList batches={filteredBatches} stockItemName={selectedStockItemName} />
+      <BatchList
+        batches={filteredBatches}
+        stockItemName={selectedStockItemName}
+        stockItems={stockItems}
+        onBatchUpdated={loadData}
+      />
     </div>
   );
 }

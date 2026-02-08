@@ -97,6 +97,7 @@ export default function TransfersPage() {
       <TransferList
         transfers={transfers}
         warehouses={warehouses.map((w) => ({ id: w.id, name: w.name }))}
+        onTransferUpdated={loadData}
       />
     </div>
   );
