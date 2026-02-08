@@ -73,9 +73,9 @@ export function StockAdjustmentDialog({
     }
 
     // Check if decrease would result in negative quantity
-    if (adjustmentType === 'decrease' && quantityNumber > stockItem.quantity_available) {
+    if (adjustmentType === 'decrease' && quantityNumber > (stockItem.quantity_available ?? 0)) {
       toast.error(
-        `Nie można zmniejszyć o ${quantityNumber} ${stockItem.unit}. Dostępne: ${stockItem.quantity_available} ${stockItem.unit}`
+        `Nie można zmniejszyć o ${quantityNumber} ${stockItem.unit}. Dostępne: ${(stockItem.quantity_available ?? 0).toFixed(2)} ${stockItem.unit}`
       );
       return;
     }
@@ -103,9 +103,9 @@ export function StockAdjustmentDialog({
 
   const newQuantity =
     quantity && !isNaN(parseFloat(quantity))
-      ? stockItem.quantity_available +
+      ? (stockItem.quantity_available ?? 0) +
         (adjustmentType === 'increase' ? parseFloat(quantity) : -parseFloat(quantity))
-      : stockItem.quantity_available;
+      : (stockItem.quantity_available ?? 0);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -126,13 +126,13 @@ export function StockAdjustmentDialog({
               <div>
                 <span className="text-muted-foreground">Fizyczny:</span>{' '}
                 <span className="font-medium">
-                  {stockItem.quantity_physical.toFixed(2)} {stockItem.unit}
+                  {(stockItem.quantity_physical ?? 0).toFixed(2)} {stockItem.unit}
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Dostępny:</span>{' '}
                 <span className="font-medium">
-                  {stockItem.quantity_available.toFixed(2)} {stockItem.unit}
+                  {(stockItem.quantity_available ?? 0).toFixed(2)} {stockItem.unit}
                 </span>
               </div>
             </div>

@@ -63,9 +63,9 @@ export function IssueStockDialog({
       return;
     }
 
-    if (quantityNumber > stockItem.quantity_available) {
+    if (quantityNumber > (stockItem.quantity_available ?? 0)) {
       toast.error(
-        `Niewystarczająca ilość. Dostępne: ${stockItem.quantity_available} ${stockItem.unit}`
+        `Niewystarczająca ilość. Dostępne: ${(stockItem.quantity_available ?? 0).toFixed(2)} ${stockItem.unit}`
       );
       return;
     }
@@ -99,9 +99,9 @@ export function IssueStockDialog({
       return;
     }
 
-    if (quantityNumber > stockItem.quantity_available) {
+    if (quantityNumber > (stockItem.quantity_available ?? 0)) {
       toast.error(
-        `Niewystarczająca ilość. Dostępne: ${stockItem.quantity_available} ${stockItem.unit}`
+        `Niewystarczająca ilość. Dostępne: ${(stockItem.quantity_available ?? 0).toFixed(2)} ${stockItem.unit}`
       );
       return;
     }
@@ -152,13 +152,13 @@ export function IssueStockDialog({
               <div>
                 <span className="text-muted-foreground">Dostępne:</span>{' '}
                 <span className="font-medium">
-                  {stockItem.quantity_available.toFixed(2)} {stockItem.unit}
+                  {(stockItem.quantity_available ?? 0).toFixed(2)} {stockItem.unit}
                 </span>
               </div>
               <div>
                 <span className="text-muted-foreground">Fizyczne:</span>{' '}
                 <span className="font-medium">
-                  {stockItem.quantity_physical.toFixed(2)} {stockItem.unit}
+                  {(stockItem.quantity_physical ?? 0).toFixed(2)} {stockItem.unit}
                 </span>
               </div>
             </div>
@@ -173,7 +173,7 @@ export function IssueStockDialog({
                 type="number"
                 step="0.01"
                 min="0"
-                max={stockItem.quantity_available}
+                max={stockItem.quantity_available ?? 0}
                 placeholder="0.00"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
@@ -260,7 +260,7 @@ export function IssueStockDialog({
               isSubmitting ||
               !quantity ||
               parseFloat(quantity) <= 0 ||
-              parseFloat(quantity) > stockItem.quantity_available
+              parseFloat(quantity) > (stockItem.quantity_available ?? 0)
             }
             data-action="submit-issue-stock"
           >

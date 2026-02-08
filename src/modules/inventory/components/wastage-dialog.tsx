@@ -84,9 +84,9 @@ export function WastageDialog({
       return;
     }
 
-    if (quantityNumber > stockItem.quantity_physical) {
+    if (quantityNumber > (stockItem.quantity_physical ?? 0)) {
       toast.error(
-        `Ilość przekracza stan fizyczny. Dostępne: ${stockItem.quantity_physical} ${stockItem.unit}`
+        `Ilość przekracza stan fizyczny. Dostępne: ${(stockItem.quantity_physical ?? 0).toFixed(2)} ${stockItem.unit}`
       );
       return;
     }
@@ -141,7 +141,7 @@ export function WastageDialog({
               <div>
                 <span className="text-muted-foreground">Fizyczny:</span>{' '}
                 <span className="font-medium">
-                  {stockItem.quantity_physical.toFixed(2)} {stockItem.unit}
+                  {(stockItem.quantity_physical ?? 0).toFixed(2)} {stockItem.unit}
                 </span>
               </div>
               <div>
@@ -179,7 +179,7 @@ export function WastageDialog({
                 type="number"
                 step="0.01"
                 min="0"
-                max={stockItem.quantity_physical}
+                max={stockItem.quantity_physical ?? 0}
                 placeholder="0.00"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
@@ -245,7 +245,7 @@ export function WastageDialog({
               !quantity ||
               !reason ||
               parseFloat(quantity) <= 0 ||
-              parseFloat(quantity) > stockItem.quantity_physical
+              parseFloat(quantity) > (stockItem.quantity_physical ?? 0)
             }
             data-action="submit-wastage"
             variant="destructive"
