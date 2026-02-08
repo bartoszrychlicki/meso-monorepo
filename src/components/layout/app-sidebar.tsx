@@ -62,7 +62,7 @@ export function AppSidebar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
             M
           </div>
-          <span className="font-bold text-lg tracking-tight">MESOpos</span>
+          <span className="font-heading font-bold text-lg tracking-tight">MESOpos</span>
         </div>
       </SidebarHeader>
       <SidebarContent>

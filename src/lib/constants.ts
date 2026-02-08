@@ -1,14 +1,14 @@
 import { OrderStatus, Allergen } from '@/types/enums';
 
 export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
-  [OrderStatus.PENDING]: 'bg-gray-100 text-gray-800',
-  [OrderStatus.CONFIRMED]: 'bg-blue-100 text-blue-800',
-  [OrderStatus.ACCEPTED]: 'bg-indigo-100 text-indigo-800',
-  [OrderStatus.PREPARING]: 'bg-amber-100 text-amber-800',
-  [OrderStatus.READY]: 'bg-green-100 text-green-800',
-  [OrderStatus.OUT_FOR_DELIVERY]: 'bg-violet-100 text-violet-800',
-  [OrderStatus.DELIVERED]: 'bg-emerald-100 text-emerald-800',
-  [OrderStatus.CANCELLED]: 'bg-red-100 text-red-800',
+  [OrderStatus.PENDING]: 'bg-gray-100 text-gray-800 dark:bg-gray-500/20 dark:text-gray-300',
+  [OrderStatus.CONFIRMED]: 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300',
+  [OrderStatus.ACCEPTED]: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-500/20 dark:text-indigo-300',
+  [OrderStatus.PREPARING]: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300',
+  [OrderStatus.READY]: 'bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300',
+  [OrderStatus.OUT_FOR_DELIVERY]: 'bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300',
+  [OrderStatus.DELIVERED]: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300',
+  [OrderStatus.CANCELLED]: 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-300',
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Space_Grotesk } from 'next/font/google';
 import { Toaster } from '@/components/ui/sonner';
 import { QueryProvider } from '@/components/providers/query-provider';
 import { ThemeProvider } from '@/components/providers/theme-provider';
@@ -10,9 +10,15 @@ const inter = Inter({
   subsets: ['latin', 'latin-ext'],
 });
 
+const spaceGrotesk = Space_Grotesk({
+  variable: '--font-heading',
+  subsets: ['latin', 'latin-ext'],
+});
+
 export const metadata: Metadata = {
   title: 'MESOpos - System POS',
   description: 'System POS dla sieci gastronomicznej',
+  themeColor: '#0a0a12',
 };
 
 export default function RootLayout({
@@ -21,8 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pl">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="pl" suppressHydrationWarning>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
         <ThemeProvider>
           <QueryProvider>
             {children}

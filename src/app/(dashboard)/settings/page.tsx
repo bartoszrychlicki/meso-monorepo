@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,6 +30,7 @@ import {
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
+  const { theme: currentTheme, setTheme } = useTheme();
   const [settings, setSettings] = useState({
     // General
     companyName: 'MESO Restaurant',
@@ -58,8 +60,17 @@ export default function SettingsPage() {
     toast.success('Ustawienia zapisane pomyślnie');
   };
 
+  useEffect(() => {
+    if (currentTheme) {
+      setSettings((prev) => ({ ...prev, theme: currentTheme }));
+    }
+  }, [currentTheme]);
+
   const updateSetting = (key: string, value: any) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
+    if (key === 'theme') {
+      setTheme(value);
+    }
   };
 
   return (
