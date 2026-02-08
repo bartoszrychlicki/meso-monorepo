@@ -160,7 +160,10 @@ export const inventoryRepository = {
     let updatedCount = 0;
 
     for (const batch of allBatches) {
-      const newStatus = calculateBatchStatus(batch);
+      // Get stock item for shelf_life_after_opening check
+      const stockItem = await stockItemRepo.findById(batch.stock_item_id);
+      const newStatus = calculateBatchStatus(batch, stockItem ?? undefined);
+
       if (newStatus !== batch.status) {
         await batchRepo.update(batch.id, { status: newStatus });
         updatedCount++;
@@ -168,6 +171,34 @@ export const inventoryRepository = {
     }
 
     return updatedCount;
+  },
+
+  /**
+   * Mark batch as opened (for tracking shelf life after opening)
+   */
+  async openBatch(batchId: string, openedBy: string): Promise<Batch> {
+    const batch = await batchRepo.findById(batchId);
+    if (!batch) throw new Error('Batch not found');
+
+    if (batch.opened_date) {
+      throw new Error('Batch already marked as opened');
+    }
+
+    // Mark as opened
+    const updatedBatch = await batchRepo.update(batchId, {
+      opened_date: new Date().toISOString(),
+      opened_by: openedBy,
+    });
+
+    // Recalculate status with new opened date
+    const stockItem = await stockItemRepo.findById(batch.stock_item_id);
+    const newStatus = calculateBatchStatus(updatedBatch, stockItem ?? undefined);
+
+    if (newStatus !== updatedBatch.status) {
+      return batchRepo.update(batchId, { status: newStatus });
+    }
+
+    return updatedBatch;
   },
 
   // ==================== STOCK TRANSFERS (Sprint 3) ====================

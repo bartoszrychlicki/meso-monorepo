@@ -53,6 +53,7 @@ export interface StockItem extends BaseEntity {
   cost_per_unit: number;
   supplier_id?: string;
   allergens: Allergen[];              // NOWE (Spec 4.2, 4.3): Alergeny UE
+  shelf_life_after_opening?: number;  // NOWE: Dni przydatności PO OTWARCIU (mleko: 3, sos: 30)
   is_active: boolean;
 }
 
@@ -66,6 +67,8 @@ export interface Batch extends BaseEntity {
   cost_per_unit: number;
   received_date: string;
   expiry_date?: string;
+  opened_date?: string;               // NOWE: Data otwarcia opakowania (dla mleka, sosów, śmietany)
+  opened_by?: string;                 // NOWE: Kto otworzył
   status: BatchStatus;                // ZMIANA: FRESH, WARNING, CRITICAL, EXPIRED, DEPLETED
 }
 

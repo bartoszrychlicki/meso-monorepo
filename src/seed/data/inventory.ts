@@ -267,6 +267,7 @@ export const stockItems: StockItem[] = [
     storage_zone: StorageZone.COLD,
     cost_per_unit: 0.012, // 12 PLN/L
     allergens: [Allergen.SULPHITES],
+    shelf_life_after_opening: 30, // 30 dni po otwarciu
     is_active: true,
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',
@@ -467,6 +468,7 @@ export const stockItems: StockItem[] = [
     storage_zone: StorageZone.COLD,
     cost_per_unit: 0.003, // 3 PLN/L
     allergens: [Allergen.MILK],
+    shelf_life_after_opening: 3, // 3 dni po otwarciu
     is_active: true,
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',

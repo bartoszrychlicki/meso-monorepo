@@ -1,5 +1,38 @@
-import { Batch } from '@/types/inventory';
+import { Batch, StockItem } from '@/types/inventory';
 import { BatchStatus } from '@/types/enums';
+
+/**
+ * Calculate effective expiry date considering if batch is opened
+ *
+ * If batch is opened and stockItem has shelf_life_after_opening:
+ * - Use: opened_date + shelf_life_after_opening
+ * Otherwise:
+ * - Use: original expiry_date
+ */
+export function getEffectiveExpiryDate(
+  batch: Batch,
+  stockItem?: StockItem
+): Date | null {
+  // If batch is opened and has shelf_life_after_opening defined
+  if (
+    batch.opened_date &&
+    stockItem?.shelf_life_after_opening !== undefined
+  ) {
+    const openedDate = new Date(batch.opened_date);
+    const expiryAfterOpening = new Date(openedDate);
+    expiryAfterOpening.setDate(
+      expiryAfterOpening.getDate() + stockItem.shelf_life_after_opening
+    );
+    return expiryAfterOpening;
+  }
+
+  // Otherwise use original expiry date
+  if (batch.expiry_date) {
+    return new Date(batch.expiry_date);
+  }
+
+  return null;
+}
 
 /**
  * Calculate batch status based on % of shelf life remaining (Spec 5.5)
@@ -7,32 +40,40 @@ import { BatchStatus } from '@/types/enums';
  * FRESH (🟢)    - > 50% shelf life remaining
  * WARNING (🟡)  - 25-50% shelf life remaining
  * CRITICAL (🔴) - < 25% shelf life remaining
- * EXPIRED (⚫)  - Past expiry date
+ * EXPIRED (⚫)  - Past expiry date (or past opened expiry)
  * DEPLETED (⚪) - Quantity exhausted
+ *
+ * @param batch - The batch to check
+ * @param stockItem - Optional. If provided, will consider shelf_life_after_opening
  */
-export function calculateBatchStatus(batch: Batch): BatchStatus {
+export function calculateBatchStatus(
+  batch: Batch,
+  stockItem?: StockItem
+): BatchStatus {
   // Check if depleted first
   if (batch.quantity_current <= 0) {
     return BatchStatus.DEPLETED;
   }
 
+  // Get effective expiry date (considering if opened)
+  const effectiveExpiry = getEffectiveExpiryDate(batch, stockItem);
+
   // If no expiry date, assume FRESH (non-perishable items)
-  if (!batch.expiry_date) {
+  if (!effectiveExpiry) {
     return BatchStatus.FRESH;
   }
 
   const now = new Date();
-  const expiryDate = new Date(batch.expiry_date);
   const productionDate = new Date(batch.production_date);
 
   // Check if expired
-  if (expiryDate <= now) {
+  if (effectiveExpiry <= now) {
     return BatchStatus.EXPIRED;
   }
 
   // Calculate shelf life percentages
-  const totalShelfLife = expiryDate.getTime() - productionDate.getTime();
-  const remainingShelfLife = expiryDate.getTime() - now.getTime();
+  const totalShelfLife = effectiveExpiry.getTime() - productionDate.getTime();
+  const remainingShelfLife = effectiveExpiry.getTime() - now.getTime();
   const percentRemaining = (remainingShelfLife / totalShelfLife) * 100;
 
   // Determine status based on percentage
@@ -46,14 +87,20 @@ export function calculateBatchStatus(batch: Batch): BatchStatus {
 }
 
 /**
- * Calculate days until expiry
+ * Calculate days until expiry (considers opened_date if applicable)
+ *
+ * @param batch - The batch to check
+ * @param stockItem - Optional. If provided, will consider shelf_life_after_opening
  */
-export function getDaysUntilExpiry(batch: Batch): number | null {
-  if (!batch.expiry_date) return null;
+export function getDaysUntilExpiry(
+  batch: Batch,
+  stockItem?: StockItem
+): number | null {
+  const effectiveExpiry = getEffectiveExpiryDate(batch, stockItem);
+  if (!effectiveExpiry) return null;
 
   const now = new Date();
-  const expiryDate = new Date(batch.expiry_date);
-  const diffMs = expiryDate.getTime() - now.getTime();
+  const diffMs = effectiveExpiry.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
   return diffDays;

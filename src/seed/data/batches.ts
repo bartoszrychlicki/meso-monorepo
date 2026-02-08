@@ -235,4 +235,42 @@ export const batches: Batch[] = [
     created_at: daysAgo(1),
     updated_at: formatDate(today),
   },
+
+  // OPENED batch - Milk (shelf_life_after_opening: 3 days)
+  {
+    id: 'batch-014',
+    stock_item_id: STOCK_ITEM_IDS.MILK,
+    warehouse_id: WAREHOUSE_IDS.FOOD_TRUCK,
+    batch_number: 'MILK-FT-001',
+    production_date: daysAgo(3),
+    quantity_initial: 5000,               // 5L
+    quantity_current: 3500,               // 3.5L remaining
+    cost_per_unit: 0.003,
+    received_date: daysAgo(3),
+    expiry_date: daysFromNow(4),          // Original: expires in 4 days
+    opened_date: daysAgo(1),              // 🔓 OPENED 1 day ago!
+    opened_by: 'user-003',
+    status: BatchStatus.WARNING,          // WARNING - with opening: 2 days left (66% of 3-day after-opening)
+    created_at: daysAgo(3),
+    updated_at: daysAgo(1),
+  },
+
+  // OPENED batch - BBQ Sauce (shelf_life_after_opening: 30 days)
+  {
+    id: 'batch-015',
+    stock_item_id: STOCK_ITEM_IDS.BBQ_SAUCE,
+    warehouse_id: WAREHOUSE_IDS.FOOD_TRUCK,
+    batch_number: 'BBQ-FT-001',
+    production_date: daysAgo(10),
+    quantity_initial: 3000,               // 3L
+    quantity_current: 2200,               // 2.2L remaining
+    cost_per_unit: 0.012,
+    received_date: daysAgo(9),
+    expiry_date: daysFromNow(20),         // Original: expires in 20 days
+    opened_date: daysAgo(5),              // 🔓 OPENED 5 days ago!
+    opened_by: 'user-003',
+    status: BatchStatus.FRESH,            // FRESH - with opening: 25 days left (83% of 30-day after-opening)
+    created_at: daysAgo(9),
+    updated_at: daysAgo(5),
+  },
 ];
