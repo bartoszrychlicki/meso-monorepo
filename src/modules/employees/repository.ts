@@ -111,5 +111,28 @@ export const employeesRepository = {
     }, 0);
   },
 
+  async addManualTimeLog(
+    employeeId: string,
+    locationId: string,
+    clockIn: string,
+    clockOut: string,
+    notes?: string
+  ): Promise<WorkTime> {
+    const from = new Date(clockIn);
+    const to = new Date(clockOut);
+    const totalMinutes = Math.round((to.getTime() - from.getTime()) / 60000);
+
+    return workTimeRepo.create({
+      employee_id: employeeId,
+      location_id: locationId,
+      status: WorkTimeStatus.CLOCKED_OUT,
+      clock_in: from.toISOString(),
+      clock_out: to.toISOString(),
+      total_break_minutes: 0,
+      total_work_minutes: totalMinutes,
+      notes: notes || undefined,
+    });
+  },
+
   workTimes: workTimeRepo,
 };

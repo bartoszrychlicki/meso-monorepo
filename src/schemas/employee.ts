@@ -22,5 +22,22 @@ export const ClockInSchema = z.object({
   pin: z.string().length(4, 'PIN musi mieć 4 cyfry'),
 });
 
+export const ManualTimeLogSchema = z.object({
+  employee_id: z.string().min(1, 'Pracownik jest wymagany'),
+  date: z.string().min(1, 'Data jest wymagana'),
+  time_from: z.string().min(1, 'Godzina rozpoczęcia jest wymagana'),
+  time_to: z.string().min(1, 'Godzina zakończenia jest wymagana'),
+  notes: z.string().optional(),
+}).refine(
+  (data) => {
+    if (!data.date || !data.time_from || !data.time_to) return true;
+    const from = new Date(`${data.date}T${data.time_from}`);
+    const to = new Date(`${data.date}T${data.time_to}`);
+    return to > from;
+  },
+  { message: 'Godzina zakończenia musi być późniejsza niż rozpoczęcia', path: ['time_to'] }
+);
+
 export type CreateEmployeeInput = z.infer<typeof CreateEmployeeSchema>;
 export type ClockInInput = z.infer<typeof ClockInSchema>;
+export type ManualTimeLogInput = z.infer<typeof ManualTimeLogSchema>;

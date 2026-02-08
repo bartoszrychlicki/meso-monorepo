@@ -16,6 +16,7 @@ interface EmployeeStore {
   deactivateEmployee: (id: string) => Promise<void>;
   clockIn: (employeeId: string, locationId: string) => Promise<WorkTime>;
   clockOut: (workTimeId: string) => Promise<WorkTime>;
+  addManualTimeLog: (employeeId: string, locationId: string, clockIn: string, clockOut: string, notes?: string) => Promise<WorkTime>;
   loadActiveWorkTimes: () => Promise<void>;
   loadWorkTimeLogs: (employeeId?: string, dateRange?: [string, string]) => Promise<void>;
   // Computed
@@ -80,6 +81,19 @@ export const useEmployeeStore = create<EmployeeStore>()((set, get) => ({
     set({
       activeWorkTimes: activeWorkTimes.filter((wt) => wt.id !== workTimeId),
     });
+    return workTime;
+  },
+
+  addManualTimeLog: async (employeeId, locationId, clockIn, clockOut, notes?) => {
+    const workTime = await employeesRepository.addManualTimeLog(
+      employeeId,
+      locationId,
+      clockIn,
+      clockOut,
+      notes
+    );
+    const { workTimeLogs } = get();
+    set({ workTimeLogs: [...workTimeLogs, workTime] });
     return workTime;
   },
 

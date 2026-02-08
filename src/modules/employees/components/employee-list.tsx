@@ -25,13 +25,21 @@ import { RoleBadge } from '@/modules/users/components/role-badge';
 import { Employee } from '@/types/employee';
 import { Location } from '@/types/common';
 import { formatCurrency } from '@/lib/utils';
-import { Search, MoreHorizontal, Pencil, UserX } from 'lucide-react';
+import { Search, MoreHorizontal, Pencil, UserX, Clock, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { EmptyState } from '@/components/shared/empty-state';
 
 interface EmployeeListProps {
@@ -39,6 +47,7 @@ interface EmployeeListProps {
   locations: Location[];
   isLoading?: boolean;
   onDeactivate?: (id: string) => void;
+  onAddManualTimeLog?: (employeeId: string) => void;
 }
 
 export function EmployeeList({
@@ -46,6 +55,7 @@ export function EmployeeList({
   locations,
   isLoading = false,
   onDeactivate,
+  onAddManualTimeLog,
 }: EmployeeListProps) {
   const router = useRouter();
   const [search, setSearch] = useState('');
@@ -149,75 +159,145 @@ export function EmployeeList({
             </TableHeader>
             <TableBody>
               {filteredEmployees.map((emp) => (
-                <TableRow
-                  key={emp.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/employees/${emp.id}`)}
-                  data-id={emp.id}
-                >
-                  <TableCell className="font-medium">
-                    {emp.first_name} {emp.last_name}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground font-mono text-sm">
-                    {emp.employee_code}
-                  </TableCell>
-                  <TableCell>
-                    <RoleBadge role={emp.role} />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {locationMap[emp.location_id] ?? '-'}
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    {formatCurrency(emp.hourly_rate)}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={
-                        emp.is_active
-                          ? 'border-0 bg-green-100 text-green-800'
-                          : 'border-0 bg-gray-100 text-gray-500'
-                      }
-                      data-status={emp.is_active ? 'active' : 'inactive'}
+                <ContextMenu key={emp.id}>
+                  <ContextMenuTrigger asChild>
+                    <TableRow
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => router.push(`/employees/${emp.id}`)}
+                      data-id={emp.id}
                     >
-                      {emp.is_active ? 'Aktywny' : 'Nieaktywny'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" data-action="actions-menu">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/employees/${emp.id}`);
-                          }}
-                          data-action="edit"
+                      <TableCell className="font-medium">
+                        {emp.first_name} {emp.last_name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground font-mono text-sm">
+                        {emp.employee_code}
+                      </TableCell>
+                      <TableCell>
+                        <RoleBadge role={emp.role} />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground">
+                        {locationMap[emp.location_id] ?? '-'}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell">
+                        {formatCurrency(emp.hourly_rate)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={
+                            emp.is_active
+                              ? 'border-0 bg-green-100 text-green-800'
+                              : 'border-0 bg-gray-100 text-gray-500'
+                          }
+                          data-status={emp.is_active ? 'active' : 'inactive'}
                         >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Edytuj
-                        </DropdownMenuItem>
-                        {emp.is_active && onDeactivate && (
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeactivate(emp.id);
-                            }}
-                            className="text-destructive"
-                            data-action="deactivate"
-                          >
-                            <UserX className="mr-2 h-4 w-4" />
-                            Dezaktywuj
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+                          {emp.is_active ? 'Aktywny' : 'Nieaktywny'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" data-action="actions-menu">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/employees/${emp.id}`);
+                              }}
+                              data-action="edit"
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edytuj
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/employees/${emp.id}?tab=time`);
+                              }}
+                              data-action="view-time"
+                            >
+                              <Clock className="mr-2 h-4 w-4" />
+                              Czas pracy
+                            </DropdownMenuItem>
+                            {onAddManualTimeLog && (
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onAddManualTimeLog(emp.id);
+                                }}
+                                data-action="add-manual-timelog"
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Dodaj wpis ręcznie
+                              </DropdownMenuItem>
+                            )}
+                            {emp.is_active && onDeactivate && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDeactivate(emp.id);
+                                  }}
+                                  className="text-destructive"
+                                  data-action="deactivate"
+                                >
+                                  <UserX className="mr-2 h-4 w-4" />
+                                  Dezaktywuj
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent className="w-48">
+                    <ContextMenuItem
+                      onClick={() => router.push(`/employees/${emp.id}`)}
+                      data-action="edit"
+                      data-id={emp.id}
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edytuj
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onClick={() => router.push(`/employees/${emp.id}?tab=time`)}
+                      data-action="view-time"
+                      data-id={emp.id}
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      Czas pracy
+                    </ContextMenuItem>
+                    {onAddManualTimeLog && (
+                      <ContextMenuItem
+                        onClick={() => onAddManualTimeLog(emp.id)}
+                        data-action="add-manual-timelog"
+                        data-id={emp.id}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Dodaj wpis ręcznie
+                      </ContextMenuItem>
+                    )}
+                    {emp.is_active && onDeactivate && (
+                      <>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                          onClick={() => onDeactivate(emp.id)}
+                          className="text-destructive focus:text-destructive"
+                          data-action="deactivate"
+                          data-id={emp.id}
+                        >
+                          <UserX className="mr-2 h-4 w-4" />
+                          Dezaktywuj
+                        </ContextMenuItem>
+                      </>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
               ))}
             </TableBody>
           </Table>

@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { Button } from '@/components/ui/button';
 import { EmployeeList } from '@/modules/employees/components/employee-list';
+import { ManualTimeLogDialog } from '@/modules/employees/components/manual-timelog-dialog';
 import { useEmployeeStore } from '@/modules/employees/store';
 import { useUserStore } from '@/modules/users/store';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
@@ -31,6 +32,7 @@ export default function EmployeesPage() {
   const { locations, loadLocations } = useUserStore();
 
   const [deactivateId, setDeactivateId] = useState<string | null>(null);
+  const [manualTimeLogEmployeeId, setManualTimeLogEmployeeId] = useState<string | null>(null);
 
   useEffect(() => {
     loadEmployees();
@@ -117,6 +119,7 @@ export default function EmployeesPage() {
         locations={locations}
         isLoading={isLoading}
         onDeactivate={(id) => setDeactivateId(id)}
+        onAddManualTimeLog={(id) => setManualTimeLogEmployeeId(id)}
       />
 
       <ConfirmDialog
@@ -129,6 +132,14 @@ export default function EmployeesPage() {
         confirmLabel="Dezaktywuj"
         onConfirm={handleDeactivate}
         variant="destructive"
+      />
+
+      <ManualTimeLogDialog
+        open={!!manualTimeLogEmployeeId}
+        onOpenChange={(open) => {
+          if (!open) setManualTimeLogEmployeeId(null);
+        }}
+        preselectedEmployeeId={manualTimeLogEmployeeId ?? undefined}
       />
     </div>
   );

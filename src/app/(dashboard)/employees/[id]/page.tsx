@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmployeeForm } from '@/modules/employees/components/employee-form';
 import { TimeLogTable } from '@/modules/employees/components/time-log-table';
+import { ManualTimeLogDialog } from '@/modules/employees/components/manual-timelog-dialog';
 import { useEmployeeStore } from '@/modules/employees/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Employee } from '@/types/employee';
@@ -18,7 +19,9 @@ import { employeesRepository } from '@/modules/employees/repository';
 export default function EmployeeDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const defaultTab = searchParams.get('tab') === 'time' ? 'time' : 'data';
 
   const {
     employees,
@@ -97,7 +100,7 @@ export default function EmployeeDetailPage() {
         }
       />
 
-      <Tabs defaultValue="data">
+      <Tabs defaultValue={defaultTab}>
         <TabsList>
           <TabsTrigger value="data" data-action="tab-data">
             Dane
@@ -117,7 +120,13 @@ export default function EmployeeDetailPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="time" className="mt-6">
+        <TabsContent value="time" className="mt-6 space-y-4">
+          <div className="flex justify-end">
+            <ManualTimeLogDialog
+              preselectedEmployeeId={id}
+              onSuccess={() => loadWorkTimeLogs(id)}
+            />
+          </div>
           <TimeLogTable
             workTimes={workTimeLogs}
             employees={employees.length > 0 ? employees : employee ? [employee] : []}

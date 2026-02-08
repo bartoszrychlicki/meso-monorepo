@@ -101,6 +101,7 @@ export function TimeLogTable({
               <TableHead className="hidden sm:table-cell">Przerwa</TableHead>
               <TableHead>Godziny</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="hidden lg:table-cell">Opis</TableHead>
               <TableHead className="hidden md:table-cell text-right">Koszt</TableHead>
             </TableRow>
           </TableHeader>
@@ -150,6 +151,9 @@ export function TimeLogTable({
                     >
                       {statusConfig.label}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground text-sm max-w-[200px] truncate">
+                    {wt.notes || '-'}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-right">
                     {cost > 0 ? formatCurrency(cost) : '-'}
