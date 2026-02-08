@@ -50,6 +50,21 @@ const RecipeIngredientSchema = z.object({
   unit: z.string().min(1),
 });
 
+// Product image schema with resolution validation
+const MIN_IMAGE_WIDTH = 400;
+const MIN_IMAGE_HEIGHT = 300;
+
+export const ProductImageSchema = z.object({
+  id: z.string().min(1),
+  url: z.string().url('Nieprawidłowy URL zdjęcia'),
+  alt: z.string().optional(),
+  width: z.number().int().min(MIN_IMAGE_WIDTH, `Minimalna szerokość zdjęcia to ${MIN_IMAGE_WIDTH}px`),
+  height: z.number().int().min(MIN_IMAGE_HEIGHT, `Minimalna wysokość zdjęcia to ${MIN_IMAGE_HEIGHT}px`),
+  sort_order: z.number().int().default(0),
+});
+
+export { MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT };
+
 // NOWE: Multi-channel pricing schema
 const ProductPricingSchema = z.object({
   channel: z.nativeEnum(SalesChannel),
@@ -63,7 +78,8 @@ export const CreateProductSchema = z.object({
   category_id: z.string().min(1, 'Kategoria jest wymagana'),
   type: z.nativeEnum(ProductType).default(ProductType.SINGLE),
   price: z.number().min(0, 'Cena nie może być ujemna'),
-  image_url: z.string().optional(),
+  image_url: z.string().optional(), // @deprecated - use images[]
+  images: z.array(ProductImageSchema).min(1, 'Wymagane jest co najmniej 1 zdjęcie').max(3, 'Maksymalnie 3 zdjęcia'),
   is_available: z.boolean().default(true),
   is_featured: z.boolean().default(false),
   allergens: z.array(z.nativeEnum(Allergen)).default([]),

@@ -59,6 +59,15 @@ export interface ProductVariant extends BaseEntity {
   variant_type: VariantType; // NOWE: spec 3.3 - typ wariantu (size/version/weight)
 }
 
+export interface ProductImage {
+  id: string;
+  url: string;
+  alt?: string;
+  width: number;
+  height: number;
+  sort_order: number;
+}
+
 export interface Product extends BaseEntity {
   name: string;
   slug: string;
@@ -66,7 +75,8 @@ export interface Product extends BaseEntity {
   category_id: string;
   type: ProductType;
   price: number; // Cena bazowa (backward compatibility)
-  image_url?: string;
+  image_url?: string; // @deprecated - use images[]
+  images: ProductImage[];
   is_available: boolean; // Czy dostępny do zamówienia (tymczasowo niedostępny)
   is_featured: boolean;
   allergens: Allergen[];

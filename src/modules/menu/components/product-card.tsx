@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import { Product } from '@/types/menu';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { Clock, Star, Eye, EyeOff } from 'lucide-react';
+import { Clock, Star, Eye, EyeOff, ImageIcon } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AllergenBadges } from './allergen-badges';
+
+const PRODUCT_PLACEHOLDER_IMAGE = '/images/product-placeholder.svg';
 
 interface ProductCardProps {
   product: Product;
@@ -24,6 +27,11 @@ export function ProductCard({
   onClick,
 }: ProductCardProps) {
   const hasVariants = product.variants.length > 0;
+  const [imgError, setImgError] = useState(false);
+
+  const mainImage = product.images?.length > 0 ? product.images[0] : null;
+  const hasRealImage = mainImage && !imgError;
+  const imageCount = product.images?.length ?? 0;
 
   // Warianty przechowują modyfikacje ceny (+/- PLN), nie ceny absolutne
   const priceDisplay = hasVariants
@@ -50,19 +58,35 @@ export function ProductCard({
       data-component="product-card"
       data-id={product.id}
     >
-      {/* Gradient placeholder image */}
+      {/* Product image */}
       <button
         onClick={() => onClick(product.id)}
         className="relative h-32 w-full cursor-pointer"
         data-action="view-product"
         data-id={product.id}
       >
-        <div
-          className={cn(
-            'h-full w-full bg-gradient-to-br',
-            product.color || 'from-gray-400 to-gray-600'
-          )}
-        />
+        {hasRealImage ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={mainImage.url}
+            alt={mainImage.alt || product.name}
+            className="h-full w-full object-cover"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div
+            className={cn(
+              'h-full w-full bg-gradient-to-br',
+              product.color || 'from-gray-400 to-gray-600'
+            )}
+          >
+            <img
+              src={PRODUCT_PLACEHOLDER_IMAGE}
+              alt="Brak zdjecia"
+              className="h-full w-full object-contain opacity-40"
+            />
+          </div>
+        )}
         <div className="absolute inset-0 bg-black/10" />
 
         {/* Badges overlay */}
@@ -79,6 +103,16 @@ export function ProductCard({
             </Badge>
           )}
         </div>
+
+        {/* Image count badge */}
+        {imageCount > 1 && (
+          <div className="absolute right-2 top-2">
+            <Badge variant="secondary" className="bg-black/50 text-white text-xs hover:bg-black/50">
+              <ImageIcon className="mr-0.5 h-3 w-3" />
+              {imageCount}
+            </Badge>
+          </div>
+        )}
 
         {/* Availability indicator */}
         {!product.is_available && (
