@@ -1,7 +1,21 @@
 import { Order } from '@/types/order';
-import { OrderStatus } from '@/types/enums';
+import { OrderStatus, LoyaltyPointReason } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
 import { format } from 'date-fns';
+import { crmRepository } from '@/modules/crm/repository';
+import {
+  calculatePointsFromOrder,
+  checkTierUpgrade,
+  getTierMultiplier,
+} from '@/modules/crm/utils/loyalty-calculator';
+import { BONUS_POINTS } from '@/modules/crm/utils/loyalty-calculator';
+import { sendSMS } from '@/lib/sms/sms-provider';
+import {
+  getOrderStatusSMS,
+  isValidPhoneNumber,
+  formatPhoneForSMS,
+  smsTemplates,
+} from '@/lib/sms/templates';
 
 const baseRepo = createRepository<Order>('orders');
 
@@ -38,10 +52,174 @@ async function updateStatus(
     note,
   };
 
-  return baseRepo.update(id, {
+  const updatedOrder = await baseRepo.update(id, {
     status,
     status_history: [...order.status_history, statusEntry],
   } as Partial<Order>);
+
+  // ===== CRM INTEGRATION START =====
+  let loyaltyPointsAwarded = 0;
+
+  // Award loyalty points when order is delivered/completed
+  if (status === OrderStatus.DELIVERED && order.customer_phone) {
+    try {
+      loyaltyPointsAwarded = await awardLoyaltyPoints(updatedOrder);
+    } catch (error) {
+      console.error('Failed to award loyalty points:', error);
+      // Don't fail the order status update if loyalty fails
+    }
+  }
+
+  // Send SMS notification for order status changes
+  if (order.customer_phone) {
+    try {
+      await sendOrderStatusSMS(updatedOrder, status, loyaltyPointsAwarded || undefined);
+    } catch (error) {
+      console.error('Failed to send SMS notification:', error);
+      // Don't fail the order status update if SMS fails
+    }
+  }
+  // ===== CRM INTEGRATION END =====
+
+  return updatedOrder;
+}
+
+/**
+ * Award loyalty points for a completed order
+ *
+ * This function:
+ * 1. Finds customer by phone number
+ * 2. Calculates points based on order total and tier multiplier
+ * 3. Adds bonus points for first order
+ * 4. Creates loyalty transaction
+ * 5. Updates customer order statistics
+ * 6. Checks for tier upgrade
+ *
+ * @returns Number of points awarded
+ */
+async function awardLoyaltyPoints(order: Order): Promise<number> {
+  if (!order.customer_phone) return 0;
+
+  // Find customer by phone
+  const customer = await crmRepository.findCustomerByPhone(order.customer_phone);
+  if (!customer) {
+    console.log(`No customer found for phone: ${order.customer_phone}`);
+    return 0;
+  }
+
+  // Update order with customer_id if not already set
+  if (!order.customer_id) {
+    await baseRepo.update(order.id, { customer_id: customer.id } as Partial<Order>);
+  }
+
+  // Calculate points
+  const basePoints = calculatePointsFromOrder(order.total, customer.loyalty_tier);
+  const isFirstOrder = customer.order_history.total_orders === 0;
+  const bonusPoints = isFirstOrder ? BONUS_POINTS.FIRST_ORDER : 0;
+  const totalPoints = basePoints + bonusPoints;
+
+  // Add loyalty transaction
+  await crmRepository.addLoyaltyTransaction({
+    customer_id: customer.id,
+    amount: totalPoints,
+    reason: isFirstOrder
+      ? LoyaltyPointReason.FIRST_ORDER
+      : LoyaltyPointReason.PURCHASE,
+    description: isFirstOrder
+      ? `Pierwsze zamówienie + ${basePoints} pkt za zakup (Zamówienie #${order.order_number})`
+      : `Zakup na kwotę ${order.total.toFixed(2)} PLN (Zamówienie #${order.order_number})`,
+    related_order_id: order.id,
+    multiplier: getTierMultiplier(customer.loyalty_tier),
+    created_by: null,
+  });
+
+  // Update order statistics
+  const newTotalOrders = customer.order_history.total_orders + 1;
+  const newTotalSpent = customer.order_history.total_spent + order.total;
+
+  await crmRepository.updateOrderStats(customer.id, {
+    total_orders: newTotalOrders,
+    total_spent: newTotalSpent,
+    average_order_value: newTotalSpent / newTotalOrders,
+    last_order_date: new Date(),
+    first_order_date: customer.order_history.first_order_date || new Date(),
+  });
+
+  // Check tier upgrade
+  const upgrade = checkTierUpgrade(
+    customer.loyalty_points,
+    customer.loyalty_points + totalPoints
+  );
+
+  if (upgrade?.upgraded) {
+    console.log(
+      `🎉 Customer ${customer.first_name} ${customer.last_name} upgraded from ${upgrade.oldTier} to ${upgrade.newTier}!`
+    );
+    // TODO Phase 4 (SMS): Send congratulations SMS
+  }
+
+  console.log(
+    `✅ Awarded ${totalPoints} loyalty points to ${customer.first_name} ${customer.last_name} (Order #${order.order_number})`
+  );
+
+  return totalPoints;
+}
+
+/**
+ * Send SMS notification for order status change
+ *
+ * Only sends SMS if:
+ * - Customer has a valid phone number
+ * - Customer has given marketing consent (for non-critical updates)
+ * - Status change warrants a notification
+ */
+async function sendOrderStatusSMS(
+  order: Order,
+  status: OrderStatus,
+  loyaltyPoints?: number
+): Promise<void> {
+  if (!order.customer_phone) return;
+
+  // Validate phone number
+  if (!isValidPhoneNumber(order.customer_phone)) {
+    console.warn(`Invalid phone number for SMS: ${order.customer_phone}`);
+    return;
+  }
+
+  // Get customer to check marketing consent
+  const customer = await crmRepository.findCustomerByPhone(order.customer_phone);
+
+  // For critical statuses (accepted, ready, out_for_delivery), always send
+  // For other statuses, only send if customer has marketing consent
+  const criticalStatuses = [
+    OrderStatus.ACCEPTED,
+    OrderStatus.READY,
+    OrderStatus.OUT_FOR_DELIVERY,
+  ];
+  const isCritical = criticalStatuses.includes(status);
+
+  if (!isCritical && (!customer || !customer.marketing_consent)) {
+    console.log(`Skipping SMS notification (no marketing consent) for order #${order.order_number}`);
+    return;
+  }
+
+  // Get SMS message template
+  const message = getOrderStatusSMS(order, status, loyaltyPoints);
+  if (!message) {
+    return; // No SMS template for this status
+  }
+
+  // Format phone number
+  const formattedPhone = formatPhoneForSMS(order.customer_phone);
+
+  // Send SMS
+  const result = await sendSMS(formattedPhone, message, 'MESOpos');
+
+  if (result.success) {
+    console.log(`📱 SMS sent to ${formattedPhone} for order #${order.order_number} (${status})`);
+  } else {
+    console.error(`❌ Failed to send SMS: ${result.error}`);
+  }
 }
 
 async function getActiveOrders(): Promise<Order[]> {
@@ -104,4 +282,5 @@ export const ordersRepository = {
   getActiveOrders,
   getTodaysOrders,
   generateOrderNumber,
+  awardLoyaltyPoints,
 };

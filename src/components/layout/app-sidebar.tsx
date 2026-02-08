@@ -9,6 +9,7 @@ import {
   UtensilsCrossed,
   Warehouse,
   Users,
+  UserCheck,
   Settings,
   ExternalLink,
 } from 'lucide-react';
@@ -32,6 +33,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   UtensilsCrossed,
   Warehouse,
   Users,
+  UserCheck,
   Settings,
 };
 
@@ -40,6 +42,7 @@ const mainNavItems = [
   { title: 'Zamówienia', href: '/orders', icon: 'ShoppingCart' },
   { title: 'Menu', href: '/menu', icon: 'UtensilsCrossed' },
   { title: 'Magazyn', href: '/inventory', icon: 'Warehouse' },
+  { title: 'Klienci', href: '/crm', icon: 'UserCheck' },
   { title: 'Pracownicy', href: '/employees', icon: 'Users' },
 ];
 

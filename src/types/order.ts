@@ -41,6 +41,7 @@ export interface Order extends BaseEntity {
   channel: OrderChannel;
   source: OrderSource;
   location_id: string;
+  customer_id?: string;           // CRM customer ID for loyalty points
   customer_name?: string;
   customer_phone?: string;
   delivery_address?: Address;

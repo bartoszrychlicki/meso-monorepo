@@ -230,3 +230,43 @@ export enum PromotionType {
   BUNDLE = 'bundle',               // Zestaw (Burger + frytki + napój)
   HAPPY_HOUR = 'happy_hour',       // Happy Hour (czasowe zniżki)
 }
+
+// CRM and Loyalty enums
+export enum LoyaltyTier {
+  BRONZE = 'bronze',
+  SILVER = 'silver',
+  GOLD = 'gold',
+}
+
+export enum RFMSegment {
+  CHAMPIONS = 'champions',
+  LOYAL_CUSTOMERS = 'loyal_customers',
+  POTENTIAL_LOYALISTS = 'potential_loyalists',
+  NEW_CUSTOMERS = 'new_customers',
+  AT_RISK = 'at_risk',
+  LOST = 'lost',
+  UNCATEGORIZED = 'uncategorized',
+}
+
+export enum CouponDiscountType {
+  PERCENTAGE = 'percentage',
+  FIXED_AMOUNT = 'fixed_amount',
+  FREE_DELIVERY = 'free_delivery',
+  FREE_ITEM = 'free_item',
+}
+
+export enum LoyaltyPointReason {
+  PURCHASE = 'purchase',
+  FIRST_ORDER = 'first_order',
+  BIRTHDAY = 'birthday',
+  REFERRAL = 'referral',
+  REDEMPTION = 'redemption',
+  MANUAL_ADJUSTMENT = 'manual_adjustment',
+}
+
+export enum CustomerSource {
+  MOBILE_APP = 'mobile_app',
+  POS_TERMINAL = 'pos_terminal',
+  WEBSITE = 'website',
+  MANUAL_IMPORT = 'manual_import',
+}
