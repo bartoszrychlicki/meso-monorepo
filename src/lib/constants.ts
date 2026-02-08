@@ -44,15 +44,16 @@ export interface NavItem {
   href: string;
   icon: string;
   separator?: boolean;
+  external?: boolean;
 }
 
 export const NAV_ITEMS: NavItem[] = [
   { title: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
   { title: 'Zamówienia', href: '/orders', icon: 'ShoppingCart' },
-  { title: 'Kuchnia KDS', href: '/kitchen', icon: 'ChefHat' },
   { title: 'Menu', href: '/menu', icon: 'UtensilsCrossed' },
   { title: 'Magazyn', href: '/inventory', icon: 'Warehouse' },
   { title: 'Pracownicy', href: '/employees', icon: 'Users' },
+  { title: 'Kuchnia KDS', href: '/kitchen', icon: 'ChefHat', separator: true, external: true },
   { title: 'Ustawienia', href: '/settings', icon: 'Settings', separator: true },
 ];
 

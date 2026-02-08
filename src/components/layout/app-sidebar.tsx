@@ -10,6 +10,7 @@ import {
   Warehouse,
   Users,
   Settings,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -37,7 +38,6 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
 const mainNavItems = [
   { title: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
   { title: 'Zamówienia', href: '/orders', icon: 'ShoppingCart' },
-  { title: 'Kuchnia KDS', href: '/kitchen', icon: 'ChefHat' },
   { title: 'Menu', href: '/menu', icon: 'UtensilsCrossed' },
   { title: 'Magazyn', href: '/inventory', icon: 'Warehouse' },
   { title: 'Pracownicy', href: '/employees', icon: 'Users' },
@@ -88,6 +88,27 @@ export function AppSidebar() {
                   </SidebarMenuItem>
                 );
               })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarSeparator />
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname.startsWith('/kitchen')}
+                  data-action="navigate"
+                  data-id="/kitchen"
+                >
+                  <a href="/kitchen" target="_blank" rel="noopener noreferrer">
+                    <ChefHat className="h-4 w-4" />
+                    <span>Kuchnia KDS</span>
+                    <ExternalLink className="ml-auto h-3 w-3 text-muted-foreground" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
