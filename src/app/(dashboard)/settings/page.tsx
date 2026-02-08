@@ -21,13 +21,13 @@ import {
   Building2,
   MapPin,
   Receipt,
-  Globe,
   Plug,
   Save,
-  Bell,
   Palette,
+  Key,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ApiKeysManager } from '@/modules/settings/components/api-keys-manager';
 
 export default function SettingsPage() {
   const { theme: currentTheme, setTheme } = useTheme();
@@ -87,7 +87,7 @@ export default function SettingsPage() {
       />
 
       <Tabs defaultValue="general" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-6 lg:w-auto">
           <TabsTrigger value="general" className="gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Ogólne</span>
@@ -103,6 +103,10 @@ export default function SettingsPage() {
           <TabsTrigger value="appearance" className="gap-2">
             <Palette className="h-4 w-4" />
             <span className="hidden sm:inline">Wygląd</span>
+          </TabsTrigger>
+          <TabsTrigger value="api-keys" className="gap-2">
+            <Key className="h-4 w-4" />
+            <span className="hidden sm:inline">Klucze API</span>
           </TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2">
             <Plug className="h-4 w-4" />
@@ -367,6 +371,11 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* API Keys */}
+        <TabsContent value="api-keys" className="space-y-4">
+          <ApiKeysManager />
         </TabsContent>
 
         {/* Integrations */}
