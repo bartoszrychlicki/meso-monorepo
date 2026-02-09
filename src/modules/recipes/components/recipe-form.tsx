@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CreateRecipeSchema, CreateRecipeInput } from '@/schemas/recipe';
@@ -33,13 +33,268 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Trash2, Save, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, Save, X, Search } from 'lucide-react';
+
+interface IngredientChecklistProps {
+  stockItems: StockItem[];
+  form: any;
+  append: (value: any) => void;
+  remove: (index: number) => void;
+  ingredientSearch: string;
+  setIngredientSearch: (value: string) => void;
+  estimatedCost: number;
+  onSaveIngredients?: (ingredients: { stock_item_id: string; quantity: number; unit: string }[]) => Promise<void>;
+  isSavingIngredients: boolean;
+  setIsSavingIngredients: (value: boolean) => void;
+  watchedIngredients: any[];
+}
+
+function IngredientChecklist({
+  stockItems,
+  form,
+  append,
+  remove,
+  ingredientSearch,
+  setIngredientSearch,
+  estimatedCost,
+  onSaveIngredients,
+  isSavingIngredients,
+  setIsSavingIngredients,
+  watchedIngredients,
+}: IngredientChecklistProps) {
+  const selectedIds = useMemo(() => {
+    return new Set(
+      (watchedIngredients || [])
+        .map((ing: any) => ing.stock_item_id)
+        .filter(Boolean)
+    );
+  }, [watchedIngredients]);
+
+  const searchLower = ingredientSearch.toLowerCase();
+
+  const selectedItems = stockItems.filter((s) => selectedIds.has(s.id));
+  const availableItems = stockItems
+    .filter((s) => !selectedIds.has(s.id))
+    .filter((s) => !searchLower || s.name.toLowerCase().includes(searchLower));
+
+  const filteredSelectedItems = selectedItems.filter(
+    (s) => !searchLower || s.name.toLowerCase().includes(searchLower)
+  );
+
+  const handleToggle = (stockItem: StockItem, checked: boolean) => {
+    if (checked) {
+      append({ stock_item_id: stockItem.id, quantity: 1, unit: stockItem.unit });
+    } else {
+      const idx = (watchedIngredients || []).findIndex(
+        (ing: any) => ing.stock_item_id === stockItem.id
+      );
+      if (idx >= 0) remove(idx);
+    }
+  };
+
+  const handleSaveIngredients = async () => {
+    if (!onSaveIngredients) return;
+    setIsSavingIngredients(true);
+    try {
+      const ingredients = (watchedIngredients || [])
+        .filter((ing: any) => ing.stock_item_id && ing.quantity > 0)
+        .map((ing: any) => ({
+          stock_item_id: ing.stock_item_id,
+          quantity: ing.quantity,
+          unit: ing.unit,
+        }));
+      await onSaveIngredients(ingredients);
+    } finally {
+      setIsSavingIngredients(false);
+    }
+  };
+
+  const formatCostPerUnit = (item: StockItem) => {
+    return `${item.cost_per_unit.toFixed(3)} PLN/${item.unit}`;
+  };
+
+  return (
+    <Card data-component="ingredient-checklist">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            Skladniki (BOM)
+            {selectedIds.size > 0 && (
+              <Badge variant="secondary" data-value={`selected-${selectedIds.size}`}>
+                {selectedIds.size}
+              </Badge>
+            )}
+          </CardTitle>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Szukaj skladnika..."
+            value={ingredientSearch}
+            onChange={(e) => setIngredientSearch(e.target.value)}
+            className="pl-9"
+            data-field="ingredient-search"
+          />
+        </div>
+
+        <div className="max-h-[400px] overflow-y-auto space-y-1">
+          {/* Selected items */}
+          {filteredSelectedItems.length > 0 && (
+            <>
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b">
+                Wybrane ({selectedIds.size})
+              </div>
+              {filteredSelectedItems.map((stockItem) => {
+                const fieldIndex = (watchedIngredients || []).findIndex(
+                  (ing: any) => ing.stock_item_id === stockItem.id
+                );
+                if (fieldIndex < 0) return null;
+                return (
+                  <div
+                    key={stockItem.id}
+                    className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50"
+                    data-ingredient-id={stockItem.id}
+                  >
+                    <Checkbox
+                      checked={true}
+                      onCheckedChange={() => handleToggle(stockItem, false)}
+                      data-action={`toggle-ingredient-${stockItem.id}`}
+                      aria-label={`Odznacz ${stockItem.name}`}
+                    />
+                    <span className="text-sm font-medium min-w-[140px] truncate">
+                      {stockItem.name}
+                    </span>
+                    <div className="flex items-center gap-2 ml-auto">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        className="w-20 h-8 text-sm"
+                        value={watchedIngredients[fieldIndex]?.quantity ?? 0}
+                        onChange={(e) =>
+                          form.setValue(
+                            `ingredients.${fieldIndex}.quantity`,
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                        data-field={`quantity-${stockItem.id}`}
+                      />
+                      <Select
+                        value={watchedIngredients[fieldIndex]?.unit || stockItem.unit}
+                        onValueChange={(val) =>
+                          form.setValue(`ingredients.${fieldIndex}.unit`, val)
+                        }
+                      >
+                        <SelectTrigger className="w-20 h-8 text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="g">g</SelectItem>
+                          <SelectItem value="kg">kg</SelectItem>
+                          <SelectItem value="ml">ml</SelectItem>
+                          <SelectItem value="l">l</SelectItem>
+                          <SelectItem value="szt">szt</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => handleToggle(stockItem, false)}
+                        data-action={`remove-ingredient-${stockItem.id}`}
+                        aria-label={`Usun ${stockItem.name}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {/* Available items */}
+          {availableItems.length > 0 && (
+            <>
+              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b mt-2">
+                Dostepne
+              </div>
+              {availableItems.map((stockItem) => (
+                <div
+                  key={stockItem.id}
+                  className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50 cursor-pointer"
+                  data-stock-item-id={stockItem.id}
+                  onClick={() => handleToggle(stockItem, true)}
+                >
+                  <Checkbox
+                    checked={false}
+                    onCheckedChange={() => handleToggle(stockItem, true)}
+                    data-action={`toggle-ingredient-${stockItem.id}`}
+                    aria-label={`Zaznacz ${stockItem.name}`}
+                  />
+                  <span className="text-sm min-w-[140px] truncate">
+                    {stockItem.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {formatCostPerUnit(stockItem)}
+                  </span>
+                </div>
+              ))}
+            </>
+          )}
+
+          {availableItems.length === 0 && filteredSelectedItems.length === 0 && (
+            <div className="text-sm text-muted-foreground text-center py-4">
+              {ingredientSearch
+                ? 'Brak skladnikow pasujacych do wyszukiwania'
+                : 'Brak dostepnych skladnikow'}
+            </div>
+          )}
+        </div>
+
+        {/* Estimated Cost + Save button */}
+        <div className="flex items-center justify-between pt-3 border-t">
+          <div className="text-sm">
+            {estimatedCost > 0 && (
+              <>
+                <span className="text-muted-foreground mr-2">Szacowany koszt:</span>
+                <span className="font-bold" data-field="estimated-cost">
+                  {estimatedCost.toFixed(2)} zl
+                </span>
+              </>
+            )}
+          </div>
+          {onSaveIngredients && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSaveIngredients}
+              disabled={isSavingIngredients}
+              data-action="save-ingredients"
+            >
+              <Save className="mr-1 h-4 w-4" />
+              {isSavingIngredients ? 'Zapisywanie...' : 'Zapisz skladniki'}
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 interface RecipeFormProps {
   defaultValues?: Partial<CreateRecipeInput>;
   onSubmit: (data: CreateRecipeInput) => Promise<void>;
   onCancel?: () => void;
   isLoading?: boolean;
+  onSaveIngredients?: (ingredients: { stock_item_id: string; quantity: number; unit: string }[]) => Promise<void>;
 }
 
 export function RecipeForm({
@@ -47,8 +302,11 @@ export function RecipeForm({
   onSubmit,
   onCancel,
   isLoading = false,
+  onSaveIngredients,
 }: RecipeFormProps) {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [ingredientSearch, setIngredientSearch] = useState('');
+  const [isSavingIngredients, setIsSavingIngredients] = useState(false);
 
   useEffect(() => {
     inventoryRepository.getAllStockItems().then(setStockItems);
@@ -62,9 +320,7 @@ export function RecipeForm({
       product_id: defaultValues?.product_id || crypto.randomUUID(),
       product_category:
         defaultValues?.product_category || ProductCategory.FINISHED_GOOD,
-      ingredients: defaultValues?.ingredients || [
-        { stock_item_id: '', quantity: 0, unit: 'g' },
-      ],
+      ingredients: defaultValues?.ingredients || [],
       yield_quantity: defaultValues?.yield_quantity || 1,
       yield_unit: defaultValues?.yield_unit || 'szt',
       preparation_time_minutes:
@@ -250,166 +506,20 @@ export function RecipeForm({
           />
         </div>
 
-        {/* Ingredients */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">
-                Skladniki (BOM)
-              </CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  append({ stock_item_id: '', quantity: 0, unit: 'g' })
-                }
-                data-action="add-ingredient"
-              >
-                <Plus className="mr-1 h-4 w-4" />
-                Dodaj skladnik
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {fields.map((field, index) => (
-              <div
-                key={field.id}
-                className="grid grid-cols-12 gap-2 items-end"
-                data-ingredient-index={index}
-              >
-                {/* Stock Item Select */}
-                <div className="col-span-5">
-                  <FormField
-                    control={form.control}
-                    name={`ingredients.${index}.stock_item_id`}
-                    render={({ field: f }) => (
-                      <FormItem>
-                        {index === 0 && (
-                          <FormLabel className="text-xs">
-                            Skladnik
-                          </FormLabel>
-                        )}
-                        <Select
-                          onValueChange={f.onChange}
-                          value={f.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger
-                              data-field={`ingredient-${index}`}
-                            >
-                              <SelectValue placeholder="Wybierz..." />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {stockItems.map((item) => (
-                              <SelectItem key={item.id} value={item.id}>
-                                {item.name} ({item.unit})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Quantity */}
-                <div className="col-span-3">
-                  <FormField
-                    control={form.control}
-                    name={`ingredients.${index}.quantity`}
-                    render={({ field: f }) => (
-                      <FormItem>
-                        {index === 0 && (
-                          <FormLabel className="text-xs">Ilosc</FormLabel>
-                        )}
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            data-field={`quantity-${index}`}
-                            {...f}
-                            onChange={(e) =>
-                              f.onChange(
-                                parseFloat(e.target.value) || 0
-                              )
-                            }
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Unit */}
-                <div className="col-span-2">
-                  <FormField
-                    control={form.control}
-                    name={`ingredients.${index}.unit`}
-                    render={({ field: f }) => (
-                      <FormItem>
-                        {index === 0 && (
-                          <FormLabel className="text-xs">
-                            Jedn.
-                          </FormLabel>
-                        )}
-                        <Select
-                          onValueChange={f.onChange}
-                          value={f.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="g">g</SelectItem>
-                            <SelectItem value="kg">kg</SelectItem>
-                            <SelectItem value="ml">ml</SelectItem>
-                            <SelectItem value="l">l</SelectItem>
-                            <SelectItem value="szt">szt</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-
-                {/* Remove button */}
-                <div className="col-span-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => remove(index)}
-                    disabled={fields.length <= 1}
-                    className="text-destructive hover:text-destructive"
-                    data-action={`remove-ingredient-${index}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            {/* Estimated Cost */}
-            {estimatedCost > 0 && (
-              <div className="flex justify-end pt-3 border-t text-sm">
-                <span className="text-muted-foreground mr-2">
-                  Szacowany koszt:
-                </span>
-                <span className="font-bold" data-field="estimated-cost">
-                  {estimatedCost.toFixed(2)} zl
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Ingredients Checklist */}
+        <IngredientChecklist
+          stockItems={stockItems}
+          form={form}
+          append={append}
+          remove={remove}
+          ingredientSearch={ingredientSearch}
+          setIngredientSearch={setIngredientSearch}
+          estimatedCost={estimatedCost}
+          onSaveIngredients={onSaveIngredients}
+          isSavingIngredients={isSavingIngredients}
+          setIsSavingIngredients={setIsSavingIngredients}
+          watchedIngredients={watchedIngredients}
+        />
 
         {/* Instructions */}
         <FormField

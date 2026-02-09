@@ -83,7 +83,8 @@ export interface Product extends BaseEntity {
   nutritional_info?: NutritionalInfo;
   variants: ProductVariant[];
   modifier_groups: ModifierGroup[];
-  ingredients: RecipeIngredient[];
+  ingredients: RecipeIngredient[]; // @deprecated - use recipe_id → Recipe
+  recipe_id?: string; // Reference to Recipe (BOM) - replaces inline ingredients
   preparation_time_minutes?: number;
   sort_order: number;
   color?: string;
@@ -104,14 +105,7 @@ export interface RecipeIngredient {
   unit: string;
 }
 
-export interface Recipe extends BaseEntity {
-  product_id: string;
-  variant_id?: string;
-  ingredients: RecipeIngredient[];
-  instructions?: string;
-  yield_quantity: number;
-  yield_unit: string;
-}
+// Recipe type moved to @/types/recipe.ts — use Recipe from there
 
 // Promotion types (spec 3.5, 3.6 MENU-006, MENU-007)
 export interface PromotionConditions {

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { Product, Category, ModifierGroup, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
+import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { Allergen, ProductType, VariantType, SalesChannel } from '@/types/enums';
 import { generateSKU } from '@/modules/menu/utils/sku-generator';
@@ -39,10 +40,9 @@ import {
   AlertCircle,
   GripVertical,
   Link,
+  ExternalLink,
 } from 'lucide-react';
 import { ModifierSelector } from './modifier-selector';
-import { IngredientSelector } from './ingredient-selector';
-import { calculateFoodCost } from '../utils/food-cost';
 import { formatCurrency } from '@/lib/utils';
 import Image from 'next/image';
 
@@ -52,7 +52,6 @@ const STEPS = [
   { label: 'Warianty', icon: Layers },
   { label: 'Modyfikatory', icon: Settings2 },
   { label: 'Alergeny', icon: ShieldAlert },
-  { label: 'Skladniki', icon: Beaker },
   { label: 'Dostepnosc', icon: MapPin },
 ];
 
@@ -63,6 +62,7 @@ interface ProductFormProps {
   product?: Product | null;
   categories: Category[];
   stockItems: StockItem[];
+  recipes: Recipe[];
   onSubmit: (data: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
@@ -71,7 +71,8 @@ interface ProductFormProps {
 export function ProductForm({
   product,
   categories,
-  stockItems,
+  stockItems: _stockItems,
+  recipes,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -108,7 +109,14 @@ export function ProductForm({
     product?.allergens ?? []
   );
 
-  // Ingredients
+  // Recipe (BOM)
+  const [recipeId, setRecipeId] = useState<string>(product?.recipe_id ?? '');
+  const selectedRecipe = useMemo(
+    () => recipes.find((r) => r.id === recipeId) ?? null,
+    [recipes, recipeId]
+  );
+
+  // Ingredients (legacy, kept for backward compatibility)
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>(
     product?.ingredients ?? []
   );
@@ -263,6 +271,7 @@ export function ProductForm({
       nutritional_info: { calories, protein, carbs, fat },
       variants,
       modifier_groups: modifierGroups,
+      recipe_id: recipeId || undefined,
       ingredients,
       preparation_time_minutes: prepTime,
       sort_order: product?.sort_order ?? 99,
@@ -399,6 +408,82 @@ export function ProductForm({
                   rows={3}
                   data-field="product-description"
                 />
+              </div>
+
+              {/* Recipe (BOM) picker */}
+              <div className="space-y-2" data-component="recipe-picker">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="recipe">Receptura (BOM)</Label>
+                  <a
+                    href="/recipes/new"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    data-action="create-recipe"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Dodaj nowa recepture
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+                <Select value={recipeId} onValueChange={setRecipeId}>
+                  <SelectTrigger data-field="recipe-id">
+                    <SelectValue placeholder="Wybierz recepture..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {recipes
+                      .filter((r) => r.is_active)
+                      .map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.name} ({formatCurrency(r.cost_per_unit)}/szt)
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                {selectedRecipe && (
+                  <div className="flex items-center gap-3 rounded-lg border bg-muted/50 px-3 py-2 text-sm">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Beaker className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-medium truncate">{selectedRecipe.name}</span>
+                        <span className="text-muted-foreground">
+                          &middot; {selectedRecipe.ingredients.length} skladnikow
+                        </span>
+                      </div>
+                      {selectedRecipe.allergens.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1 ml-5">
+                          {selectedRecipe.allergens.map((a) => (
+                            <Badge key={a} variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {ALLERGEN_LABELS[a]}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="font-medium">{formatCurrency(selectedRecipe.cost_per_unit)}</div>
+                      {price > 0 && (
+                        <div className={cn(
+                          'text-xs font-medium',
+                          (selectedRecipe.cost_per_unit / price) * 100 < 25 ? 'text-green-600' :
+                          (selectedRecipe.cost_per_unit / price) * 100 < 35 ? 'text-yellow-600' : 'text-red-600'
+                        )}>
+                          {((selectedRecipe.cost_per_unit / price) * 100).toFixed(1)}% food cost
+                        </div>
+                      )}
+                    </div>
+                    <a
+                      href={`/recipes/${selectedRecipe.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-primary shrink-0"
+                      data-action="view-recipe"
+                      title="Szczegoly receptury"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center gap-6">
@@ -775,18 +860,8 @@ export function ProductForm({
             </div>
           )}
 
-          {/* Step 6: Ingredients */}
+          {/* Step 6: Availability */}
           {step === 5 && (
-            <IngredientSelector
-              ingredients={ingredients}
-              onChange={setIngredients}
-              stockItems={stockItems}
-              productPrice={price}
-            />
-          )}
-
-          {/* Step 7: Availability */}
-          {step === 6 && (
             <div className="space-y-4">
               <div>
                 <h3 className="font-medium">Dostepnosc</h3>
@@ -845,25 +920,25 @@ export function ProductForm({
                       <dd className="font-medium">{selectedAllergens.length}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Skladniki:</dt>
-                      <dd className="font-medium">{ingredients.length}</dd>
+                      <dt className="text-muted-foreground">Receptura:</dt>
+                      <dd className="font-medium">{selectedRecipe?.name ?? 'Brak'}</dd>
                     </div>
-                    {ingredients.length > 0 && price > 0 && (() => {
-                      const fc = calculateFoodCost(ingredients, stockItems, price);
+                    {selectedRecipe && price > 0 && (() => {
+                      const costPct = (selectedRecipe.cost_per_unit / price) * 100;
                       return (
                         <>
                           <div className="flex justify-between">
                             <dt className="text-muted-foreground">Food cost:</dt>
-                            <dd className="font-medium">{formatCurrency(fc.totalCost)}</dd>
+                            <dd className="font-medium">{formatCurrency(selectedRecipe.cost_per_unit)}</dd>
                           </div>
                           <div className="flex justify-between">
                             <dt className="text-muted-foreground">Food cost %:</dt>
                             <dd className={cn(
                               'font-medium',
-                              fc.costPercentage < 25 ? 'text-green-600' :
-                              fc.costPercentage < 35 ? 'text-yellow-600' : 'text-red-600'
+                              costPct < 25 ? 'text-green-600' :
+                              costPct < 35 ? 'text-yellow-600' : 'text-red-600'
                             )}>
-                              {fc.costPercentage.toFixed(1)}%
+                              {costPct.toFixed(1)}%
                             </dd>
                           </div>
                         </>

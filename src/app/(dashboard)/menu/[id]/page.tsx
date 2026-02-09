@@ -8,6 +8,7 @@ import { ArrowLeft, Trash2 } from 'lucide-react';
 import { useProduct } from '@/modules/menu/hooks';
 import { useMenuStore } from '@/modules/menu/store';
 import { useInventoryStore } from '@/modules/inventory/store';
+import { useRecipesStore } from '@/modules/recipes/store';
 import { ProductForm } from '@/modules/menu/components/product-form';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
@@ -26,10 +27,15 @@ export default function EditProductPage() {
 
   const stockItems = useInventoryStore((s) => s.stockItems);
   const loadStockItems = useInventoryStore((s) => s.loadStockItems);
+  const recipes = useRecipesStore((s) => s.recipes);
+  const loadRecipes = useRecipesStore((s) => s.loadRecipes);
 
   useEffect(() => {
     if (stockItems.length === 0) {
       loadStockItems();
+    }
+    if (recipes.length === 0) {
+      loadRecipes();
     }
   }, []);
 
@@ -117,6 +123,7 @@ export default function EditProductPage() {
           product={product}
           categories={categories}
           stockItems={stockItems}
+          recipes={recipes}
           onSubmit={handleSubmit}
           onCancel={() => router.push('/menu')}
           isSubmitting={isSubmitting}

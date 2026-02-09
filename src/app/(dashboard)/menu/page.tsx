@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useMenu } from '@/modules/menu/hooks';
 import { useInventoryStore } from '@/modules/inventory/store';
+import { useRecipesStore } from '@/modules/recipes/store';
 import { CategoryList } from '@/modules/menu/components/category-list';
 import { CategoryFormDialog } from '@/modules/menu/components/category-form-dialog';
 import { MenuGrid } from '@/modules/menu/components/menu-grid';
@@ -33,10 +34,15 @@ export default function MenuPage() {
 
   const stockItems = useInventoryStore((s) => s.stockItems);
   const loadStockItems = useInventoryStore((s) => s.loadStockItems);
+  const recipes = useRecipesStore((s) => s.recipes);
+  const loadRecipes = useRecipesStore((s) => s.loadRecipes);
 
   useEffect(() => {
     if (stockItems.length === 0) {
       loadStockItems();
+    }
+    if (recipes.length === 0) {
+      loadRecipes();
     }
   }, []);
 
@@ -138,6 +144,7 @@ export default function MenuPage() {
             products={products}
             categories={categories}
             stockItems={stockItems}
+            recipes={recipes}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onToggleAvailability={toggleProductAvailability}

@@ -13,6 +13,23 @@ import { LOCATION_IDS } from './locations';
 import { generateSKU } from '@/modules/menu/utils/sku-generator';
 import { createDefaultPricing } from '@/modules/menu/utils/pricing';
 
+// Recipe IDs (mirrored from recipes.ts to avoid circular dependency)
+const RECIPE_IDS = {
+  CHEESEBURGER: '77777777-7777-7777-7777-777777770002',
+  BACON_BURGER: '77777777-7777-7777-7777-777777770004',
+  TRUFFLE_BURGER: '77777777-7777-7777-7777-777777770005',
+  DOUBLE_SMASH: '77777777-7777-7777-7777-777777770006',
+  FRIES: '77777777-7777-7777-7777-777777770003',
+  CAESAR_SALAD: '77777777-7777-7777-7777-777777770007',
+  CHICKEN_SALAD: '77777777-7777-7777-7777-777777770008',
+  COLA: '77777777-7777-7777-7777-777777770009',
+  LEMONADE: '77777777-7777-7777-7777-777777770010',
+  WATER: '77777777-7777-7777-7777-777777770011',
+  LATTE: '77777777-7777-7777-7777-777777770012',
+  BROWNIE: '77777777-7777-7777-7777-777777770013',
+  ICE_CREAM: '77777777-7777-7777-7777-777777770014',
+} as const;
+
 // Fixed UUIDs for cross-referencing in other seed modules
 export const PRODUCT_IDS = {
   CHEESEBURGER: '44444444-4444-4444-4444-444444444001',
@@ -202,6 +219,7 @@ export const products: Product[] = [
       { id: '44444444-4444-4444-4444-444444440102', name: 'Sredni', price: 0, is_available: true, sort_order: 2, variant_type: VariantType.SIZE, created_at: now, updated_at: now },
       { id: '44444444-4444-4444-4444-444444440103', name: 'Duzy', price: 5, is_available: true, sort_order: 3, variant_type: VariantType.SIZE, created_at: now, updated_at: now },
     ],
+    recipe_id: RECIPE_IDS.CHEESEBURGER,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.BEEF, stock_item_name: 'Wolowina mielona', quantity: 150, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.BUNS, stock_item_name: 'Bulki burgerowe', quantity: 1, unit: 'szt' },
@@ -238,6 +256,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 680, protein: 35, carbs: 44, fat: 38, fiber: 2 },
     variants: [],
     modifier_groups: [burgerExtrasGroup, saucesGroup],
+    recipe_id: RECIPE_IDS.BACON_BURGER,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.BEEF, stock_item_name: 'Wolowina mielona', quantity: 150, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.BUNS, stock_item_name: 'Bulki burgerowe', quantity: 1, unit: 'szt' },
@@ -301,6 +320,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 720, protein: 32, carbs: 46, fat: 42, fiber: 3 },
     variants: [],
     modifier_groups: [burgerExtrasGroup, saucesGroup],
+    recipe_id: RECIPE_IDS.TRUFFLE_BURGER,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.BEEF, stock_item_name: 'Wolowina mielona', quantity: 180, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.BUNS, stock_item_name: 'Bulki burgerowe', quantity: 1, unit: 'szt' },
@@ -334,6 +354,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 780, protein: 42, carbs: 40, fat: 45, fiber: 2 },
     variants: [],
     modifier_groups: [burgerExtrasGroup, saucesGroup],
+    recipe_id: RECIPE_IDS.DOUBLE_SMASH,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.BEEF, stock_item_name: 'Wolowina mielona', quantity: 300, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.BUNS, stock_item_name: 'Bulki burgerowe', quantity: 1, unit: 'szt' },
@@ -369,6 +390,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 340, protein: 4, carbs: 44, fat: 16, fiber: 4 },
     variants: [],
     modifier_groups: [saucesGroup],
+    recipe_id: RECIPE_IDS.FRIES,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.POTATOES, stock_item_name: 'Ziemniaki', quantity: 250, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.OIL, stock_item_name: 'Olej do frytownicy', quantity: 50, unit: 'ml' },
@@ -458,6 +480,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 380, protein: 22, carbs: 18, fat: 24, fiber: 4 },
     variants: [],
     modifier_groups: [],
+    recipe_id: RECIPE_IDS.CAESAR_SALAD,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.LETTUCE, stock_item_name: 'Salata', quantity: 150, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.CHICKEN, stock_item_name: 'Kurczak', quantity: 100, unit: 'g' },
@@ -490,6 +513,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 420, protein: 32, carbs: 16, fat: 26, fiber: 5 },
     variants: [],
     modifier_groups: [],
+    recipe_id: RECIPE_IDS.CHICKEN_SALAD,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.CHICKEN, stock_item_name: 'Kurczak', quantity: 150, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.LETTUCE, stock_item_name: 'Salata', quantity: 100, unit: 'g' },
@@ -524,6 +548,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 210, protein: 0, carbs: 54, fat: 0, fiber: 0 },
     variants: [],
     modifier_groups: [],
+    recipe_id: RECIPE_IDS.COLA,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.COLA, stock_item_name: 'Cola 0.5l', quantity: 1, unit: 'szt' },
     ],
@@ -554,6 +579,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 120, protein: 0, carbs: 30, fat: 0, fiber: 0 },
     variants: [],
     modifier_groups: [drinkSizeGroup],
+    recipe_id: RECIPE_IDS.LEMONADE,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.LEMONS, stock_item_name: 'Cytryny', quantity: 100, unit: 'g' },
     ],
@@ -584,6 +610,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
     variants: [],
     modifier_groups: [],
+    recipe_id: RECIPE_IDS.WATER,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.WATER, stock_item_name: 'Woda 0.5l', quantity: 1, unit: 'szt' },
     ],
@@ -614,6 +641,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 190, protein: 8, carbs: 18, fat: 8, fiber: 0 },
     variants: [],
     modifier_groups: [],
+    recipe_id: RECIPE_IDS.LATTE,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.MILK, stock_item_name: 'Mleko', quantity: 250, unit: 'ml' },
     ],
@@ -646,6 +674,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 480, protein: 6, carbs: 58, fat: 26, fiber: 3 },
     variants: [],
     modifier_groups: [],
+    recipe_id: RECIPE_IDS.BROWNIE,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.CHOCOLATE, stock_item_name: 'Czekolada', quantity: 80, unit: 'g' },
       { stock_item_id: STOCK_ITEM_IDS.BUTTER, stock_item_name: 'Maslo', quantity: 50, unit: 'g' },
@@ -677,6 +706,7 @@ export const products: Product[] = [
     nutritional_info: { calories: 320, protein: 6, carbs: 36, fat: 18, fiber: 0 },
     variants: [],
     modifier_groups: [],
+    recipe_id: RECIPE_IDS.ICE_CREAM,
     ingredients: [
       { stock_item_id: STOCK_ITEM_IDS.ICE_CREAM, stock_item_name: 'Lody waniliowe', quantity: 150, unit: 'ml' },
     ],

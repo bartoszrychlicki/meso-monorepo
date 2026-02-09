@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { Product, Category } from '@/types/menu';
+import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { Input } from '@/components/ui/input';
 import { Search, UtensilsCrossed } from 'lucide-react';
@@ -14,6 +15,7 @@ interface MenuGridProps {
   products: Product[];
   categories: Category[];
   stockItems: StockItem[];
+  recipes: Recipe[];
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onToggleAvailability: (id: string) => void;
@@ -25,6 +27,7 @@ export function MenuGrid({
   products,
   categories,
   stockItems,
+  recipes,
   searchQuery,
   onSearchChange,
   onToggleAvailability,
@@ -33,17 +36,40 @@ export function MenuGrid({
 }: MenuGridProps) {
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
 
+  const recipeMap = useMemo(
+    () => new Map(recipes.map((r) => [r.id, r])),
+    [recipes]
+  );
+
   const foodCostMap = useMemo(() => {
     const map = new Map<string, FoodCostResult>();
-    if (stockItems.length === 0) return map;
     for (const product of products) {
+      // Prefer recipe-based cost
+      if (product.recipe_id) {
+        const recipe = recipeMap.get(product.recipe_id);
+        if (recipe) {
+          const costPercentage = product.price > 0
+            ? (recipe.cost_per_unit / product.price) * 100
+            : 0;
+          map.set(product.id, {
+            totalCost: recipe.cost_per_unit,
+            costPercentage,
+            ingredientCosts: recipe.ingredients.map((ing) => ({
+              stock_item_id: ing.stock_item_id,
+              cost: ing.quantity * (ing.cost_per_unit ?? 0),
+            })),
+          });
+          continue;
+        }
+      }
+      // Fallback to inline ingredients
       const ingredients = product.ingredients ?? [];
-      if (ingredients.length > 0) {
+      if (ingredients.length > 0 && stockItems.length > 0) {
         map.set(product.id, calculateFoodCost(ingredients, stockItems, product.price));
       }
     }
     return map;
-  }, [products, stockItems]);
+  }, [products, stockItems, recipeMap]);
 
   if (isLoading) {
     return (
