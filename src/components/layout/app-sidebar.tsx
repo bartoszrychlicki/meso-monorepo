@@ -41,6 +41,7 @@ const mainNavItems = [
   { title: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
   { title: 'Zamówienia', href: '/orders', icon: 'ShoppingCart' },
   { title: 'Menu', href: '/menu', icon: 'UtensilsCrossed' },
+  { title: 'Receptury', href: '/recipes', icon: 'ChefHat' },
   { title: 'Magazyn', href: '/inventory', icon: 'Warehouse' },
   { title: 'Klienci', href: '/crm', icon: 'UserCheck' },
   { title: 'Pracownicy', href: '/employees', icon: 'Users' },
