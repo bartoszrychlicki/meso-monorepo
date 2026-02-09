@@ -13,23 +13,28 @@
 | **Menu** | 5/5 ✅ | 0/3 ❌ | Częściowy | 63% |
 | **Receptury** | 0/5 ❌ | 0/2 ❌ | **BRAK** | 0% |
 | **Magazyn** | 12/12 ✅ | 0/2 ❌ | Pełny P0 | 86% |
-| **Zamówienia/KDS** | 1/10 ❌ | 0/3 ❌ | **CZĘŚCIOWY** | 8% |
+| **Zamówienia/KDS** | 10/10 ✅ | 0/3 ❌ | **Pełny P0** | 77% |
 | **CRM** | 4/4 ✅ | 0/6 ❌ | Pełny P0 | 90% |
-| **Raportowanie** | 0/7 ❌ | 0/2 ❌ | **BRAK** | 0% |
+| **Raportowanie** | 2/7 ⚠️ | 0/2 ❌ | **Podstawy** | 29% |
 | **Pracownicy** | 6/6 ✅ | 0/5 ❌ | Pełny P0 | 55% |
-| **Integracje** | 0/6 ❌ | 0/2 ❌ | **BRAK** | 0% |
-| **RAZEM** | **28/54** | **0/25** | - | **36%** |
+| **Integracje** | 3/6 ⚠️ | 0/2 ❌ | **Częściowy** | 50% |
+| **RAZEM** | **42/54** | **0/25** | - | **65%** |
 
 **Kluczowe Wnioski:**
-- ✅ **Gotowe do MVP:** Menu (podstawy), Magazyn (pełny P0), Pracownicy (podstawy), **CRM (pełny P0)** ⭐
-- ❌ **Blokujące MVP:** Zamówienia/KDS (8%), Receptury (0%), Raportowanie (0%), Integracje (0%)
-- ⚠️ **Krytyczny brak:** System zamówień i Kitchen Display System (KDS)
+- ✅ **Gotowe do MVP:** Menu (podstawy), Magazyn (pełny P0), Pracownicy (podstawy), **CRM (pełny P0)**, **Zamówienia/KDS (pełny P0)** ⭐⭐
+- ⚠️ **Częściowe:** Integracje (50%), Raportowanie (29%)
+- ❌ **Blokuje MVP:** Receptury/BOM (0%) - jedyny krytyczny brak!
 
-**AKTUALIZACJA 2024-02-08 (18:00):**
-- ✅ Moduł CRM zaktualizowany do 90% (Sprint 1-4 ukończony)
-- ✅ Wszystkie funkcje P0 CRM są zaimplementowane i działają
-- ✅ Integracja z zamówieniami (loyalty points) działa
-- ✅ System SMS (mock provider) gotowy
+**AKTUALIZACJA 2024-02-08 (19:30):**
+- ✅ Moduł CRM: 90% (Sprint 1-4 ukończony)
+- ✅ Moduł Orders/KDS: 77% (wszystkie P0 funkcje gotowe!)
+  - Kitchen Display System (3 kolumny, real-time polling)
+  - REST API v1 (8 endpoints)
+  - Order management UI (lista, formularz, szczegóły)
+  - 7 komponentów Orders (~410 linii KDS, 767 linii API)
+- ✅ Integracje: 50% (REST API, API keys, brak WebSocket/Stripe)
+- ✅ Raportowanie: 29% (Dashboard KPIs, brak szczegółowych raportów)
+- ❌ **JEDYNY BLOKER MVP: Receptury/BOM (0%)**
 
 ---
 
