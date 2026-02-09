@@ -12,6 +12,7 @@ import { wastageRecords } from './data/wastage';
 import { stockCounts } from './data/stock-counts';
 import { kitchenTickets } from './data/kitchen-tickets';
 import { customers } from './data/customers';
+import { recipes } from './data/recipes';
 
 const STORAGE_PREFIX = 'mesopos_';
 
@@ -32,6 +33,7 @@ export function seedAll(): void {
   seedCollection('employees', employees);
   seedCollection('work_times', workTimes);
   seedCollection('customers', customers);
+  seedCollection('recipes', recipes);
   seedCollection('orders', orders);
   seedCollection('kitchen_tickets', kitchenTickets);
   seedCollection('warehouses', warehouses);
