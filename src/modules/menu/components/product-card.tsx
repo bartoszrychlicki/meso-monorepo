@@ -61,7 +61,7 @@ export function ProductCard({
       {/* Product image */}
       <button
         onClick={() => onClick(product.id)}
-        className="relative h-32 w-full cursor-pointer"
+        className="relative h-40 w-full cursor-pointer"
         data-action="view-product"
         data-id={product.id}
       >
@@ -125,14 +125,14 @@ export function ProductCard({
       </button>
 
       {/* Content */}
-      <div className="flex flex-1 flex-col p-3">
+      <div className="flex flex-1 flex-col p-4">
         <div className="mb-1 flex items-start justify-between gap-2">
           <button
             onClick={() => onClick(product.id)}
             className="text-left transition-colors hover:text-primary"
             data-action="view-product"
           >
-            <h3 className="font-semibold leading-tight text-sm">{product.name}</h3>
+            <h3 className="font-semibold leading-tight text-base">{product.name}</h3>
           </button>
         </div>
 
@@ -160,7 +160,7 @@ export function ProductCard({
             {foodCost && foodCost.totalCost > 0 && (
               <span
                 className={cn(
-                  'ml-2 text-xs font-medium',
+                  'ml-2 text-sm font-semibold',
                   foodCost.costPercentage < 25
                     ? 'text-green-600'
                     : foodCost.costPercentage < 35
