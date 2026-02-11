@@ -98,7 +98,11 @@ export const useRecipesStore = create<RecipesStore>((set, get) => ({
     try {
       const recipe = await recipesRepository.createRecipeWithCalculation({
         ...data,
+        description: data.description ?? null,
+        instructions: data.instructions ?? null,
         last_updated_by: null,
+        is_active: true,
+        created_by: data.created_by || 'system',
       });
 
       set({
@@ -166,7 +170,7 @@ export const useRecipesStore = create<RecipesStore>((set, get) => ({
     try {
       await recipesRepository.recipes.update(id, {
         is_active: false,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
       });
       await get().loadRecipes();
     } catch (error) {

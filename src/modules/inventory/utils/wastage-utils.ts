@@ -64,9 +64,11 @@ export function getWastageCategoryLabel(category: WastageCategory): string {
   const labels: Record<WastageCategory, string> = {
     [WastageCategory.EXPIRY]: 'Przeterminowanie',
     [WastageCategory.DAMAGE]: 'Uszkodzenie',
+    [WastageCategory.SPOILAGE]: 'Zepsucie',
     [WastageCategory.HUMAN_ERROR]: 'Błąd ludzki',
     [WastageCategory.THEFT]: 'Kradzież',
     [WastageCategory.PRODUCTION]: 'Produkcyjne',
+    [WastageCategory.PRODUCTION_ERROR]: 'Błąd produkcji',
     [WastageCategory.OTHER]: 'Inne',
   };
   return labels[category];
@@ -79,9 +81,11 @@ export function getWastageCategoryIcon(category: WastageCategory): string {
   const icons: Record<WastageCategory, string> = {
     [WastageCategory.EXPIRY]: '📅',
     [WastageCategory.DAMAGE]: '💥',
+    [WastageCategory.SPOILAGE]: '🦠',
     [WastageCategory.HUMAN_ERROR]: '👤',
     [WastageCategory.THEFT]: '🚨',
     [WastageCategory.PRODUCTION]: '🏭',
+    [WastageCategory.PRODUCTION_ERROR]: '⚠️',
     [WastageCategory.OTHER]: '❓',
   };
   return icons[category];
@@ -94,9 +98,11 @@ export function getWastageCategoryColor(category: WastageCategory): string {
   const colors: Record<WastageCategory, string> = {
     [WastageCategory.EXPIRY]: 'text-red-600 bg-red-50',
     [WastageCategory.DAMAGE]: 'text-orange-600 bg-orange-50',
+    [WastageCategory.SPOILAGE]: 'text-green-600 bg-green-50',
     [WastageCategory.HUMAN_ERROR]: 'text-yellow-600 bg-yellow-50',
     [WastageCategory.THEFT]: 'text-purple-600 bg-purple-50',
     [WastageCategory.PRODUCTION]: 'text-blue-600 bg-blue-50',
+    [WastageCategory.PRODUCTION_ERROR]: 'text-red-600 bg-red-50',
     [WastageCategory.OTHER]: 'text-gray-600 bg-gray-50',
   };
   return colors[category];

@@ -22,8 +22,8 @@ export const customers: Customer[] = [
     last_name: 'Kowalska',
     email: 'anna.kowalska@example.com',
     phone: '+48 501 234 567',
-    birth_date: new Date('1990-05-15'),
-    registration_date: new Date('2024-01-01'),
+    birth_date: new Date('1990-05-15').toISOString(),
+    registration_date: new Date('2024-01-01').toISOString(),
     source: CustomerSource.MOBILE_APP,
     marketing_consent: true,
 
@@ -48,7 +48,7 @@ export const customers: Customer[] = [
         city: 'Warszawa',
         is_default: true,
         delivery_instructions: 'Dzwonek na dole, 2 piętro',
-        created_at: new Date('2024-01-01'),
+        created_at: new Date('2024-01-01').toISOString(),
       },
     ],
 
@@ -62,14 +62,14 @@ export const customers: Customer[] = [
       total_orders: 12,
       total_spent: 450.0,
       average_order_value: 37.5,
-      last_order_date: new Date('2024-02-01'),
-      first_order_date: new Date('2024-01-05'),
+      last_order_date: new Date('2024-02-01').toISOString(),
+      first_order_date: new Date('2024-01-05').toISOString(),
     },
 
     notes: null,
     is_active: true,
-    created_at: new Date('2024-01-01'),
-    updated_at: new Date('2024-02-01'),
+    created_at: new Date('2024-01-01').toISOString(),
+    updated_at: new Date('2024-02-01').toISOString(),
   },
 
   {
@@ -78,8 +78,8 @@ export const customers: Customer[] = [
     last_name: 'Kowalski',
     email: 'jan.kowalski@example.com',
     phone: '+48 502 234 567',
-    birth_date: new Date('1988-03-22'),
-    registration_date: new Date('2024-01-15'),
+    birth_date: new Date('1988-03-22').toISOString(),
+    registration_date: new Date('2024-01-15').toISOString(),
     source: CustomerSource.POS_TERMINAL,
     marketing_consent: false,
 
@@ -100,14 +100,14 @@ export const customers: Customer[] = [
       total_orders: 5,
       total_spent: 215.0,
       average_order_value: 43.0,
-      last_order_date: new Date('2024-01-30'),
-      first_order_date: new Date('2024-01-15'),
+      last_order_date: new Date('2024-01-30').toISOString(),
+      first_order_date: new Date('2024-01-15').toISOString(),
     },
 
     notes: 'Zawsze zamawia z dodatkiem ostrego sosu',
     is_active: true,
-    created_at: new Date('2024-01-15'),
-    updated_at: new Date('2024-01-30'),
+    created_at: new Date('2024-01-15').toISOString(),
+    updated_at: new Date('2024-01-30').toISOString(),
   },
 
   {
@@ -116,8 +116,8 @@ export const customers: Customer[] = [
     last_name: 'Nowak',
     email: 'piotr.nowak@example.com',
     phone: '+48 503 345 678',
-    birth_date: new Date('1985-08-20'),
-    registration_date: new Date('2023-10-01'),
+    birth_date: new Date('1985-08-20').toISOString(),
+    registration_date: new Date('2023-10-01').toISOString(),
     source: CustomerSource.POS_TERMINAL,
     marketing_consent: true,
 
@@ -142,7 +142,7 @@ export const customers: Customer[] = [
         city: 'Warszawa',
         is_default: true,
         delivery_instructions: 'Recepcja, 1 piętro',
-        created_at: new Date('2023-10-01'),
+        created_at: new Date('2023-10-01').toISOString(),
       },
     ],
 
@@ -156,14 +156,14 @@ export const customers: Customer[] = [
       total_orders: 35,
       total_spent: 1250.0,
       average_order_value: 35.71,
-      last_order_date: new Date('2024-01-28'),
-      first_order_date: new Date('2023-10-05'),
+      last_order_date: new Date('2024-01-28').toISOString(),
+      first_order_date: new Date('2023-10-05').toISOString(),
     },
 
     notes: 'Stały klient, preferuje burgery ostrzejsze',
     is_active: true,
-    created_at: new Date('2023-10-01'),
-    updated_at: new Date('2024-01-28'),
+    created_at: new Date('2023-10-01').toISOString(),
+    updated_at: new Date('2024-01-28').toISOString(),
   },
 
   {
@@ -172,8 +172,8 @@ export const customers: Customer[] = [
     last_name: 'Wiśniewska',
     email: 'maria.wisniewska@example.com',
     phone: '+48 504 456 789',
-    birth_date: new Date('1978-12-10'),
-    registration_date: new Date('2023-06-01'),
+    birth_date: new Date('1978-12-10').toISOString(),
+    registration_date: new Date('2023-06-01').toISOString(),
     source: CustomerSource.MOBILE_APP,
     marketing_consent: true,
 
@@ -198,7 +198,7 @@ export const customers: Customer[] = [
         city: 'Warszawa',
         is_default: true,
         delivery_instructions: 'Domofon - Wiśniewska',
-        created_at: new Date('2023-06-01'),
+        created_at: new Date('2023-06-01').toISOString(),
       },
       {
         id: 'addr-004',
@@ -211,7 +211,7 @@ export const customers: Customer[] = [
         city: 'Warszawa',
         is_default: false,
         delivery_instructions: 'Ochrona przy wejściu',
-        created_at: new Date('2023-07-15'),
+        created_at: new Date('2023-07-15').toISOString(),
       },
     ],
 
@@ -225,14 +225,14 @@ export const customers: Customer[] = [
       total_orders: 78,
       total_spent: 3200.0,
       average_order_value: 41.03,
-      last_order_date: new Date('2024-02-05'),
-      first_order_date: new Date('2023-06-08'),
+      last_order_date: new Date('2024-02-05').toISOString(),
+      first_order_date: new Date('2023-06-08').toISOString(),
     },
 
     notes: 'VIP - zawsze pyta o nowości w menu',
     is_active: true,
-    created_at: new Date('2023-06-01'),
-    updated_at: new Date('2024-02-05'),
+    created_at: new Date('2023-06-01').toISOString(),
+    updated_at: new Date('2024-02-05').toISOString(),
   },
 
   {
@@ -242,7 +242,7 @@ export const customers: Customer[] = [
     email: null,
     phone: '+48 505 567 890',
     birth_date: null,
-    registration_date: new Date('2024-02-06'),
+    registration_date: new Date('2024-02-06').toISOString(),
     source: CustomerSource.POS_TERMINAL,
     marketing_consent: false,
 
@@ -269,7 +269,7 @@ export const customers: Customer[] = [
 
     notes: null,
     is_active: true,
-    created_at: new Date('2024-02-06'),
-    updated_at: new Date('2024-02-06'),
+    created_at: new Date('2024-02-06').toISOString(),
+    updated_at: new Date('2024-02-06').toISOString(),
   },
 ];

@@ -92,8 +92,8 @@ export const crmRepository = {
         return lastOrder && new Date(lastOrder) >= cutoffDate;
       })
       .sort((a, b) => {
-        const dateA = a.order_history.last_order_date?.getTime() ?? 0;
-        const dateB = b.order_history.last_order_date?.getTime() ?? 0;
+        const dateA = a.order_history.last_order_date ? new Date(a.order_history.last_order_date).getTime() : 0;
+        const dateB = b.order_history.last_order_date ? new Date(b.order_history.last_order_date).getTime() : 0;
         return dateB - dateA;
       });
   },
@@ -115,7 +115,6 @@ export const crmRepository = {
     // Create transaction record
     const transaction = await loyaltyRepo.create({
       ...data,
-      created_at: new Date(),
     });
 
     // Update customer points
@@ -130,7 +129,7 @@ export const crmRepository = {
     await customersRepo.update(customer.id, {
       loyalty_points: newPoints,
       loyalty_tier: newTier,
-      updated_at: new Date(),
+      updated_at: new Date().toISOString(),
     });
 
     return transaction;
@@ -150,7 +149,7 @@ export const crmRepository = {
   ): Promise<void> {
     await customersRepo.update(customerId, {
       order_history: stats,
-      updated_at: new Date(),
+      updated_at: new Date().toISOString(),
     });
   },
 
@@ -167,7 +166,7 @@ export const crmRepository = {
       (t) => t.customer_id === customerId
     );
     return transactions.sort(
-      (a, b) => b.created_at.getTime() - a.created_at.getTime()
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
   },
 

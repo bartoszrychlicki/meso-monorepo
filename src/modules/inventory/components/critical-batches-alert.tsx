@@ -25,6 +25,7 @@ interface CriticalBatchesAlertProps {
 interface BatchWithItem extends Batch {
   stockItemName?: string;
   stockItemSku?: string;
+  unit?: string;
 }
 
 export function CriticalBatchesAlert({ warehouseId, maxItems = 10 }: CriticalBatchesAlertProps) {
@@ -55,6 +56,7 @@ export function CriticalBatchesAlert({ warehouseId, maxItems = 10 }: CriticalBat
               ...batch,
               stockItemName: stockItem?.name,
               stockItemSku: stockItem?.sku,
+              unit: stockItem?.unit,
             };
           });
 

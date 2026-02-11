@@ -131,9 +131,11 @@ export enum TransferStatus {
 export enum WastageCategory {
   EXPIRY = 'expiry',                   // Przeterminowanie
   DAMAGE = 'damage',                   // Uszkodzenie
+  SPOILAGE = 'spoilage',               // Zepsucie
   HUMAN_ERROR = 'human_error',         // Błąd ludzki
   THEFT = 'theft',                     // Kradzież
   PRODUCTION = 'production',           // Produkcyjne
+  PRODUCTION_ERROR = 'production_error', // Błąd produkcji
   OTHER = 'other',                     // Inne
 }
 

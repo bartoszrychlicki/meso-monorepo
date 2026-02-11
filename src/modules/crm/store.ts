@@ -82,8 +82,13 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
   createCustomer: async (data: CreateCustomerInput) => {
     set({ isLoading: true, error: null });
     try {
+      // Exclude addresses as they need metadata fields - handle separately if needed
+      const { addresses, ...customerData } = data;
       const customer = await crmRepository.customers.create({
-        ...data,
+        ...customerData,
+        email: data.email ?? null,
+        addresses: [], // Initialize empty, addresses should be added via separate method
+        preferences: data.preferences ?? {},
         // Default values for new customer
         loyalty_points: 0,
         loyalty_tier: LoyaltyTier.BRONZE,
@@ -92,7 +97,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
         rfm_frequency_score: null,
         rfm_monetary_score: null,
         rfm_last_calculated: null,
-        registration_date: new Date(),
+        registration_date: new Date().toISOString(),
         order_history: {
           total_orders: 0,
           total_spent: 0,
@@ -101,10 +106,8 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
           first_order_date: null,
         },
         is_active: true,
-        created_at: new Date(),
-        updated_at: new Date(),
-        // Convert string dates to Date objects
-        birth_date: data.birth_date ? new Date(data.birth_date) : null,
+        birth_date: data.birth_date || null,
+        notes: data.notes ?? null,
       });
 
       set({ customers: [...get().customers, customer], isLoading: false });
@@ -128,11 +131,11 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
   updateCustomer: async (id: string, data: UpdateCustomerInput) => {
     set({ isLoading: true, error: null });
     try {
+      // Exclude addresses from update as they need metadata fields
+      const { addresses, ...updateData } = data;
       await crmRepository.customers.update(id, {
-        ...data,
-        updated_at: new Date(),
-        // Convert string dates to Date objects if present
-        birth_date: data.birth_date ? new Date(data.birth_date) : undefined,
+        ...updateData,
+        updated_at: new Date().toISOString(),
       });
       await get().loadCustomers();
     } catch (error) {
@@ -155,7 +158,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
     try {
       await crmRepository.customers.update(id, {
         is_active: false,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
       });
       await get().loadCustomers();
     } catch (error) {
@@ -222,8 +225,8 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
 
     // Sort by last order date (most recent first)
     return filtered.sort((a, b) => {
-      const dateA = a.order_history.last_order_date?.getTime() ?? 0;
-      const dateB = b.order_history.last_order_date?.getTime() ?? 0;
+      const dateA = a.order_history.last_order_date ? new Date(a.order_history.last_order_date).getTime() : 0;
+      const dateB = b.order_history.last_order_date ? new Date(b.order_history.last_order_date).getTime() : 0;
       return dateB - dateA;
     });
   },

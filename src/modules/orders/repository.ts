@@ -131,6 +131,7 @@ async function awardLoyaltyPoints(order: Order): Promise<number> {
     related_order_id: order.id,
     multiplier: getTierMultiplier(customer.loyalty_tier),
     created_by: null,
+    updated_at: new Date().toISOString(),
   });
 
   // Update order statistics
@@ -141,8 +142,8 @@ async function awardLoyaltyPoints(order: Order): Promise<number> {
     total_orders: newTotalOrders,
     total_spent: newTotalSpent,
     average_order_value: newTotalSpent / newTotalOrders,
-    last_order_date: new Date(),
-    first_order_date: customer.order_history.first_order_date || new Date(),
+    last_order_date: new Date().toISOString(),
+    first_order_date: customer.order_history.first_order_date || new Date().toISOString(),
   });
 
   // Check tier upgrade

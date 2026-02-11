@@ -69,7 +69,7 @@ export default function RecipeDetailPage() {
     try {
       await recipesRepository.recipes.update(recipe.id, {
         is_active: false,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
       });
       toast({
         title: 'Receptura usunieta',

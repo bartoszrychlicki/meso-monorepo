@@ -19,11 +19,13 @@ import Link from 'next/link';
 interface ExpiringBatchesAlertProps {
   daysAhead?: number;
   maxItems?: number;
+  warehouseId?: string;
 }
 
 export function ExpiringBatchesAlert({
   daysAhead = 7,
   maxItems = 5,
+  warehouseId,
 }: ExpiringBatchesAlertProps) {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [stockItems, setStockItems] = useState<Map<string, StockItem>>(new Map());

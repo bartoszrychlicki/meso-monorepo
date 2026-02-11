@@ -120,7 +120,7 @@ export function WastageDialog({
   if (!stockItem) return null;
 
   const quantityNumber = quantity && !isNaN(parseFloat(quantity)) ? parseFloat(quantity) : 0;
-  const estimatedValue = quantityNumber * (stockItem.unit_cost || 0);
+  const estimatedValue = quantityNumber * (stockItem.cost_per_unit || 0);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -147,7 +147,7 @@ export function WastageDialog({
               <div>
                 <span className="text-muted-foreground">Koszt jednostkowy:</span>{' '}
                 <span className="font-medium">
-                  {formatCurrency(stockItem.unit_cost || 0)}
+                  {formatCurrency(stockItem.cost_per_unit || 0)}
                 </span>
               </div>
             </div>

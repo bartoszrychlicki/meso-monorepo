@@ -22,7 +22,7 @@ export interface CustomerAddress {
   city: string;
   is_default: boolean;
   delivery_instructions: string | null;
-  created_at: Date;
+  created_at: string;
 }
 
 /**
@@ -43,8 +43,8 @@ export interface CustomerOrderHistory {
   total_orders: number;
   total_spent: number;
   average_order_value: number;
-  last_order_date: Date | null;
-  first_order_date: Date | null;
+  last_order_date: string | null;
+  first_order_date: string | null;
 }
 
 /**
@@ -58,10 +58,10 @@ export interface Customer extends BaseEntity {
   last_name: string;
   email: string | null;              // Optional for walk-in customers
   phone: string;                     // Required (alternative key)
-  birth_date: Date | null;           // For birthday bonuses
+  birth_date: string | null;         // For birthday bonuses
 
   // Registration
-  registration_date: Date;
+  registration_date: string;
   source: CustomerSource;
   marketing_consent: boolean;        // GDPR compliance
 
@@ -74,7 +74,7 @@ export interface Customer extends BaseEntity {
   rfm_recency_score: number | null;  // 1-5
   rfm_frequency_score: number | null;
   rfm_monetary_score: number | null;
-  rfm_last_calculated: Date | null;
+  rfm_last_calculated: string | null;
 
   // Delivery addresses
   addresses: CustomerAddress[];

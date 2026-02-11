@@ -206,8 +206,6 @@ export const recipesRepository = {
       food_cost_percentage: null,
       version: 1,
       is_active: true,
-      created_at: new Date(),
-      updated_at: new Date(),
     });
 
     // Calculate allergens and costs
@@ -220,7 +218,7 @@ export const recipesRepository = {
       total_cost: costBreakdown.total_cost,
       cost_per_unit: costBreakdown.cost_per_unit,
       food_cost_percentage: costBreakdown.food_cost_percentage,
-      updated_at: new Date(),
+      updated_at: new Date().toISOString(),
     });
 
     // Create version history
@@ -232,8 +230,6 @@ export const recipesRepository = {
       cost_per_unit: costBreakdown.cost_per_unit,
       changed_by: data.created_by,
       change_notes: 'Initial version',
-      created_at: new Date(),
-      updated_at: new Date(),
     });
 
     return updatedRecipe;
@@ -268,7 +264,7 @@ export const recipesRepository = {
       ...data,
       version: newVersion,
       last_updated_by: changedBy,
-      updated_at: new Date(),
+      updated_at: new Date().toISOString(),
     });
 
     // Recalculate if ingredients changed
@@ -281,7 +277,7 @@ export const recipesRepository = {
         total_cost: costBreakdown.total_cost,
         cost_per_unit: costBreakdown.cost_per_unit,
         food_cost_percentage: costBreakdown.food_cost_percentage,
-        updated_at: new Date(),
+        updated_at: new Date().toISOString(),
       });
     }
 
@@ -294,8 +290,6 @@ export const recipesRepository = {
       cost_per_unit: updatedRecipe.cost_per_unit,
       changed_by: changedBy,
       change_notes: changeNotes ?? null,
-      created_at: new Date(),
-      updated_at: new Date(),
     });
 
     return updatedRecipe;
@@ -326,11 +320,7 @@ export const recipesRepository = {
   async logIngredientUsage(
     data: Omit<IngredientUsageLog, 'id' | 'created_at' | 'updated_at'>
   ): Promise<IngredientUsageLog> {
-    return usageLogsRepo.create({
-      ...data,
-      created_at: new Date(),
-      updated_at: new Date(),
-    });
+    return usageLogsRepo.create(data);
   },
 
   /**
@@ -371,7 +361,7 @@ export const recipesRepository = {
       (r) =>
         r.is_active &&
         (r.name.toLowerCase().includes(lowerQuery) ||
-          r.description?.toLowerCase().includes(lowerQuery))
+          (r.description?.toLowerCase().includes(lowerQuery) ?? false))
     );
   },
 

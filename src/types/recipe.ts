@@ -13,7 +13,7 @@ import { BaseEntity } from './common';
  * Represents a single ingredient in a recipe with quantity and unit
  */
 export interface RecipeIngredient {
-  id: string;
+  id?: string;
   stock_item_id: string; // Reference to StockItem
   quantity: number; // Amount needed
   unit: string; // Unit of measurement (g, ml, szt)
