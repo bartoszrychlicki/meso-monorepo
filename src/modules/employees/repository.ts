@@ -1,10 +1,9 @@
 import { Employee, WorkTime } from '@/types/employee';
 import { WorkTimeStatus } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
-import { LocalStorageRepository } from '@/lib/data/localStorage-backend';
 
-const employeeRepo = new LocalStorageRepository<Employee>('employees');
-const workTimeRepo = new LocalStorageRepository<WorkTime>('work_times');
+const employeeRepo = createRepository<Employee>('employees');
+const workTimeRepo = createRepository<WorkTime>('work_times');
 
 export const employeesRepository = {
   findAll: employeeRepo.findAll.bind(employeeRepo),
@@ -14,8 +13,8 @@ export const employeesRepository = {
   update: employeeRepo.update.bind(employeeRepo),
   delete: employeeRepo.delete.bind(employeeRepo),
   count: employeeRepo.count.bind(employeeRepo),
-  bulkCreate: employeeRepo.bulkCreate.bind(employeeRepo),
-  clear: employeeRepo.clear.bind(employeeRepo),
+  bulkCreate: employeeRepo.bulkCreate?.bind(employeeRepo),
+  clear: employeeRepo.clear?.bind(employeeRepo),
 
   async findActive(): Promise<Employee[]> {
     return employeeRepo.findMany((e) => e.is_active);

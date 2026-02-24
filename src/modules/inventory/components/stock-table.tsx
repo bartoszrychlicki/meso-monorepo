@@ -21,47 +21,36 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { StockItem } from '@/types/inventory';
-import { Warehouse } from '@/types/inventory';
+import { AllergenBadges } from '@/modules/menu/components/allergen-badges';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Minus, Package, TruckIcon, Trash2 } from 'lucide-react';
+import { Plus, Minus, Package } from 'lucide-react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { toast } from 'sonner';
-import { IssueStockDialog } from './issue-stock-dialog';
-import { WastageDialog } from './wastage-dialog';
 
 interface StockTableProps {
   items: StockItem[];
-  warehouses: Warehouse[];
   onAdjustStock?: (itemId: string, quantity: number, reason: string) => Promise<void>;
-  onRefresh?: () => void;
 }
 
 function getStockStatus(item: StockItem): { label: string; color: string } {
-  const ratio = item.quantity_available / item.min_quantity;
+  const ratio = item.quantity / item.min_quantity;
   if (ratio < 0.5) return { label: 'Krytyczny', color: 'bg-red-100 text-red-800' };
   if (ratio < 1) return { label: 'Niski stan', color: 'bg-amber-100 text-amber-800' };
   return { label: 'OK', color: 'bg-green-100 text-green-800' };
 }
 
 function getQuantityColor(item: StockItem): string {
-  const ratio = item.quantity_available / item.min_quantity;
+  const ratio = item.quantity / item.min_quantity;
   if (ratio < 0.5) return 'text-red-600 font-bold';
   if (ratio < 1) return 'text-amber-600 font-semibold';
   return 'text-green-700';
 }
 
-export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: StockTableProps) {
+export function StockTable({ items, onAdjustStock }: StockTableProps) {
   const [adjustDialog, setAdjustDialog] = useState<StockItem | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [issueStockItem, setIssueStockItem] = useState<StockItem | null>(null);
-  const [wastageItem, setWastageItem] = useState<StockItem | null>(null);
-
-  const warehouseMap: Record<string, string> = {};
-  warehouses.forEach((w) => {
-    warehouseMap[w.id] = w.name;
-  });
 
   const handleAdjust = async () => {
     if (!adjustDialog || adjustQty === 0 || !onAdjustStock) return;
@@ -73,7 +62,7 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
       setAdjustQty(0);
       setAdjustReason('');
     } catch {
-      toast.error('Nie udało się zaktualizować stanu');
+      toast.error('Nie udalo sie zaktualizowac stanu');
     } finally {
       setIsSubmitting(false);
     }
@@ -84,7 +73,7 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
       <EmptyState
         icon={<Package className="h-6 w-6" />}
         title="Brak pozycji magazynowych"
-        description="Nie znaleziono pozycji dla wybranego magazynu."
+        description="Dodaj pierwsza pozycje aby rozpoczac."
       />
     );
   }
@@ -95,13 +84,15 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Produkt</TableHead>
-              <TableHead className="hidden md:table-cell">Magazyn</TableHead>
-              <TableHead className="text-right">Ilość</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Min</TableHead>
+              <TableHead>Nazwa</TableHead>
+              <TableHead className="hidden md:table-cell">SKU</TableHead>
               <TableHead className="hidden sm:table-cell">Jednostka</TableHead>
+              <TableHead className="text-right">Ilosc</TableHead>
+              <TableHead className="text-right hidden sm:table-cell">Min</TableHead>
+              <TableHead className="text-right hidden md:table-cell">Koszt/jedn.</TableHead>
+              <TableHead className="hidden lg:table-cell">Alergeny</TableHead>
               <TableHead>Status</TableHead>
-              {onAdjustStock && <TableHead className="w-[200px]">Akcje</TableHead>}
+              {onAdjustStock && <TableHead className="w-[100px]">Akcje</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -113,16 +104,22 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
                 <TableRow key={item.id} data-id={item.id}>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {warehouseMap[item.warehouse_id] ?? '-'}
+                    {item.sku}
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-muted-foreground">
+                    {item.unit}
                   </TableCell>
                   <TableCell className={`text-right ${qtyColor}`}>
-                    {item.quantity_available}
+                    {item.quantity}
                   </TableCell>
                   <TableCell className="text-right hidden sm:table-cell text-muted-foreground">
                     {item.min_quantity}
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell text-muted-foreground">
-                    {item.unit}
+                  <TableCell className="text-right hidden md:table-cell text-muted-foreground">
+                    {formatCurrency(item.cost_per_unit)}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <AllergenBadges allergens={item.allergens} />
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -146,7 +143,7 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
                           }}
                           data-action="adjust-stock-plus"
                           data-id={item.id}
-                          title="Zwiększ stan"
+                          title="Zwieksz stan"
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -163,28 +160,6 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
                           title="Zmniejsz stan"
                         >
                           <Minus className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => setIssueStockItem(item)}
-                          data-action="issue-stock"
-                          data-id={item.id}
-                          title="Wydaj towar (FEFO)"
-                        >
-                          <TruckIcon className="h-3 w-3" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7 text-red-600 hover:text-red-700"
-                          onClick={() => setWastageItem(item)}
-                          data-action="record-wastage"
-                          data-id={item.id}
-                          title="Zarejestruj stratę"
-                        >
-                          <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
                     </TableCell>
@@ -214,11 +189,11 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Aktualny stan:</span>
               <span className="font-medium">
-                {adjustDialog?.quantity_available} {adjustDialog?.unit}
+                {adjustDialog?.quantity} {adjustDialog?.unit}
               </span>
             </div>
             <div className="space-y-2">
-              <Label>Zmiana ilości</Label>
+              <Label>Zmiana ilosci</Label>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -247,13 +222,13 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
               <p className="text-xs text-muted-foreground">
                 Nowy stan:{' '}
                 <span className="font-medium">
-                  {(adjustDialog?.quantity_available ?? 0) + adjustQty}{' '}
+                  {(adjustDialog?.quantity ?? 0) + adjustQty}{' '}
                   {adjustDialog?.unit}
                 </span>
               </p>
             </div>
             <div className="space-y-2">
-              <Label>Powód korekty</Label>
+              <Label>Powod korekty</Label>
               <Input
                 placeholder="np. Dostawa, inwentaryzacja..."
                 value={adjustReason}
@@ -275,33 +250,11 @@ export function StockTable({ items, warehouses, onAdjustStock, onRefresh }: Stoc
               disabled={adjustQty === 0 || isSubmitting}
               data-action="confirm-adjust"
             >
-              Potwierdź korektę
+              Potwierdz korekte
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Issue Stock Dialog */}
-      <IssueStockDialog
-        stockItem={issueStockItem}
-        open={!!issueStockItem}
-        onOpenChange={(open) => !open && setIssueStockItem(null)}
-        onSuccess={() => {
-          onRefresh?.();
-          setIssueStockItem(null);
-        }}
-      />
-
-      {/* Wastage Dialog */}
-      <WastageDialog
-        stockItem={wastageItem}
-        open={!!wastageItem}
-        onOpenChange={(open) => !open && setWastageItem(null)}
-        onSuccess={() => {
-          onRefresh?.();
-          setWastageItem(null);
-        }}
-      />
     </>
   );
 }

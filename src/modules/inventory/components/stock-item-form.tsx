@@ -18,48 +18,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Warehouse, StockItem } from '@/types/inventory';
-import { StorageZone, ProductCategory } from '@/types/enums';
+import { StockItem } from '@/types/inventory';
+import { ProductCategory, Allergen } from '@/types/enums';
+import { ALLERGEN_LABELS } from '@/lib/constants';
 import { toast } from 'sonner';
 
 interface StockItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  warehouses: Warehouse[];
   onSubmit: (data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
 }
 
-const STORAGE_ZONE_LABELS: Record<StorageZone, string> = {
-  [StorageZone.DRY]: 'Suchy',
-  [StorageZone.COLD]: 'Chlodnia',
-  [StorageZone.FROZEN]: 'Mroznia',
-  [StorageZone.AMBIENT]: 'Temperatura pokojowa',
+const UNIT_OPTIONS = ['kg', 'g', 'szt', 'l', 'ml', 'op'];
+
+const CATEGORY_LABELS: Record<ProductCategory, string> = {
+  [ProductCategory.RAW_MATERIAL]: 'Surowiec',
+  [ProductCategory.SEMI_FINISHED]: 'Polprodukt',
+  [ProductCategory.FINISHED_GOOD]: 'Gotowy produkt',
 };
 
-const UNIT_OPTIONS = ['kg', 'szt', 'l', 'op', 'but'];
-
-export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: StockItemFormProps) {
+export function StockItemForm({ open, onOpenChange, onSubmit }: StockItemFormProps) {
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
-  const [unit, setUnit] = useState('szt');
-  const [currentQuantity, setCurrentQuantity] = useState(0);
+  const [unit, setUnit] = useState('kg');
+  const [category, setCategory] = useState<ProductCategory>(ProductCategory.RAW_MATERIAL);
+  const [quantity, setQuantity] = useState(0);
   const [minQuantity, setMinQuantity] = useState(0);
-  const [maxQuantity, setMaxQuantity] = useState('');
-  const [warehouseId, setWarehouseId] = useState('');
-  const [storageZone, setStorageZone] = useState<StorageZone>(StorageZone.AMBIENT);
   const [costPerUnit, setCostPerUnit] = useState(0);
+  const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
     setName('');
     setSku('');
-    setUnit('szt');
-    setCurrentQuantity(0);
+    setUnit('kg');
+    setCategory(ProductCategory.RAW_MATERIAL);
+    setQuantity(0);
     setMinQuantity(0);
-    setMaxQuantity('');
-    setWarehouseId('');
-    setStorageZone(StorageZone.AMBIENT);
     setCostPerUnit(0);
+    setSelectedAllergens([]);
+  };
+
+  const toggleAllergen = (allergen: Allergen) => {
+    setSelectedAllergens((prev) =>
+      prev.includes(allergen)
+        ? prev.filter((a) => a !== allergen)
+        : [...prev, allergen]
+    );
   };
 
   const handleSubmit = async () => {
@@ -71,30 +76,18 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
       toast.error('Podaj SKU');
       return;
     }
-    if (!warehouseId) {
-      toast.error('Wybierz magazyn');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       await onSubmit({
         name: name.trim(),
         sku: sku.trim(),
-        product_category: ProductCategory.RAW_MATERIAL, // TODO: Add UI field in future sprint
+        product_category: category,
         unit,
-        purchase_unit: 'szt', // TODO: Add UI field in future sprint
-        conversion_rate: 1, // TODO: Add UI field in future sprint
-        quantity_physical: currentQuantity,
-        quantity_available: currentQuantity,
-        quantity_reserved: 0,
-        quantity_in_transit: 0,
+        quantity,
         min_quantity: minQuantity,
-        max_quantity: maxQuantity ? Number(maxQuantity) : undefined,
-        warehouse_id: warehouseId,
-        storage_zone: storageZone,
         cost_per_unit: costPerUnit,
-        allergens: [], // TODO: Add UI field in future sprint
+        allergens: selectedAllergens,
         is_active: true,
       });
       toast.success(`Dodano pozycje: ${name}`);
@@ -145,38 +138,20 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="stock-warehouse">Magazyn *</Label>
-              <Select value={warehouseId} onValueChange={setWarehouseId}>
-                <SelectTrigger id="stock-warehouse" data-field="warehouse">
-                  <SelectValue placeholder="Wybierz magazyn" />
-                </SelectTrigger>
-                <SelectContent>
-                  {warehouses.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-zone">Strefa</Label>
-              <Select value={storageZone} onValueChange={(v) => setStorageZone(v as StorageZone)}>
-                <SelectTrigger id="stock-zone" data-field="storage-zone">
+              <Label htmlFor="stock-category">Kategoria</Label>
+              <Select value={category} onValueChange={(v) => setCategory(v as ProductCategory)}>
+                <SelectTrigger id="stock-category" data-field="category">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.values(StorageZone).map((zone) => (
-                    <SelectItem key={zone} value={zone}>
-                      {STORAGE_ZONE_LABELS[zone]}
+                  {Object.values(ProductCategory).map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {CATEGORY_LABELS[cat]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="stock-unit">Jednostka</Label>
               <Select value={unit} onValueChange={setUnit}>
@@ -192,15 +167,29 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="stock-quantity">Ilosc poczatkowa</Label>
+              <Label htmlFor="stock-quantity">Ilosc</Label>
               <Input
                 id="stock-quantity"
                 type="number"
                 min={0}
-                value={currentQuantity}
-                onChange={(e) => setCurrentQuantity(Number(e.target.value))}
-                data-field="current-quantity"
+                value={quantity}
+                onChange={(e) => setQuantity(Number(e.target.value))}
+                data-field="quantity"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stock-min">Stan minimalny</Label>
+              <Input
+                id="stock-min"
+                type="number"
+                min={0}
+                value={minQuantity}
+                onChange={(e) => setMinQuantity(Number(e.target.value))}
+                data-field="min-quantity"
               />
             </div>
             <div className="space-y-2">
@@ -217,29 +206,23 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="stock-min">Stan minimalny</Label>
-              <Input
-                id="stock-min"
-                type="number"
-                min={0}
-                value={minQuantity}
-                onChange={(e) => setMinQuantity(Number(e.target.value))}
-                data-field="min-quantity"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-max">Stan maksymalny</Label>
-              <Input
-                id="stock-max"
-                type="number"
-                min={0}
-                placeholder="Opcjonalnie"
-                value={maxQuantity}
-                onChange={(e) => setMaxQuantity(e.target.value)}
-                data-field="max-quantity"
-              />
+          <div className="space-y-2">
+            <Label>Alergeny</Label>
+            <div className="flex flex-wrap gap-2">
+              {Object.values(Allergen).map((allergen) => (
+                <Button
+                  key={allergen}
+                  type="button"
+                  variant={selectedAllergens.includes(allergen) ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => toggleAllergen(allergen)}
+                  data-field={`allergen-${allergen}`}
+                  data-value={selectedAllergens.includes(allergen) ? 'selected' : 'unselected'}
+                >
+                  {ALLERGEN_LABELS[allergen]}
+                </Button>
+              ))}
             </div>
           </div>
         </div>

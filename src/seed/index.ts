@@ -5,11 +5,7 @@ import { categories } from './data/categories';
 import { products } from './data/products';
 import { employees, workTimes } from './data/employees';
 import { orders } from './data/orders';
-import { warehouses, stockItems } from './data/inventory';
-import { batches } from './data/batches';
-import { stockTransfers } from './data/transfers';
-import { wastageRecords } from './data/wastage';
-import { stockCounts } from './data/stock-counts';
+import { stockItems } from './data/inventory';
 import { kitchenTickets } from './data/kitchen-tickets';
 import { customers } from './data/customers';
 import { recipes } from './data/recipes';
@@ -36,12 +32,7 @@ export function seedAll(): void {
   seedCollection('recipes', recipes);
   seedCollection('orders', orders);
   seedCollection('kitchen_tickets', kitchenTickets);
-  seedCollection('warehouses', warehouses);
   seedCollection('stock_items', stockItems);
-  seedCollection('batches', batches);
-  seedCollection('stock_transfers', stockTransfers);
-  seedCollection('wastage_records', wastageRecords);
-  seedCollection('stock_counts', stockCounts);
 
   markAsSeeded();
   console.log('[MESOpos] Seed data loaded successfully');
