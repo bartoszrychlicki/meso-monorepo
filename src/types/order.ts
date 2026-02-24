@@ -56,4 +56,7 @@ export interface Order extends BaseEntity {
   status_history: OrderStatusEntry[];
   assigned_to?: string;
   estimated_ready_at?: string;
+  external_order_id?: string;     // ID from external system (e.g. delivery app)
+  external_channel?: string;      // External system identifier
+  metadata?: Record<string, unknown>; // Additional data from external systems
 }

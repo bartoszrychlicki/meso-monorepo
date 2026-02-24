@@ -8,7 +8,7 @@ import {
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
 import { CreateOrderSchema } from '@/schemas/order';
-import { OrderStatus, PaymentStatus } from '@/types/enums';
+import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
 
 /**
  * GET /api/v1/orders
@@ -101,6 +101,17 @@ export async function POST(request: NextRequest) {
 
   const input = validation.data;
   const now = new Date().toISOString();
+
+  // Idempotency check: if external_order_id provided, check for duplicate
+  if (input.external_order_id) {
+    const existing = await ordersRepository.findMany(
+      (o) => o.external_order_id === input.external_order_id
+    );
+    if (existing.length > 0) {
+      return apiSuccess(existing[0]);
+    }
+  }
+
   const orderNumber = await ordersRepository.generateOrderNumber();
 
   // Calculate totals from items
@@ -122,29 +133,49 @@ export async function POST(request: NextRequest) {
   const discount = input.discount ?? 0;
   const total = Math.round((subtotal + tax - discount) * 100) / 100;
 
+  // Delivery app orders with pre-paid status start as CONFIRMED
+  const isDeliveryPrePaid =
+    input.channel === OrderChannel.DELIVERY_APP &&
+    input.payment_status === PaymentStatus.PAID;
+
+  const initialStatus = isDeliveryPrePaid
+    ? OrderStatus.CONFIRMED
+    : OrderStatus.PENDING;
+  const initialPaymentStatus = isDeliveryPrePaid
+    ? PaymentStatus.PAID
+    : PaymentStatus.PENDING;
+  const statusNote = isDeliveryPrePaid
+    ? 'Zamówienie z delivery app (opłacone)'
+    : 'Zamówienie utworzone przez API';
+
   const order = await ordersRepository.create({
     order_number: orderNumber,
-    status: OrderStatus.PENDING,
+    status: initialStatus,
     channel: input.channel,
     source: input.source,
     location_id: input.location_id,
+    customer_id: input.customer_id,
     customer_name: input.customer_name,
     customer_phone: input.customer_phone,
+    delivery_address: input.delivery_address,
     items,
     subtotal,
     tax,
     discount,
     total,
     payment_method: input.payment_method,
-    payment_status: PaymentStatus.PENDING,
+    payment_status: initialPaymentStatus,
     notes: input.notes,
     status_history: [
       {
-        status: OrderStatus.PENDING,
+        status: initialStatus,
         timestamp: now,
-        note: 'Zamówienie utworzone przez API',
+        note: statusNote,
       },
     ],
+    external_order_id: input.external_order_id,
+    external_channel: input.external_channel,
+    metadata: input.metadata,
   });
 
   return apiCreated(order);

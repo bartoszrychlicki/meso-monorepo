@@ -8,7 +8,9 @@ import {
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
 import { UpdateOrderStatusSchema } from '@/schemas/order';
-import { OrderStatus } from '@/types/enums';
+import { OrderChannel, OrderStatus } from '@/types/enums';
+import { dispatchWebhook } from '@/lib/webhooks/dispatcher';
+import { OrderStatusChangedData } from '@/lib/webhooks/types';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -68,5 +70,28 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const updated = await ordersRepository.updateStatus(id, newStatus, note);
+
+  // Dispatch webhook for delivery app orders
+  if (updated.channel === OrderChannel.DELIVERY_APP) {
+    const webhookData: OrderStatusChangedData = {
+      pos_order_id: updated.id,
+      external_order_id: updated.external_order_id,
+      status: newStatus,
+      previous_status: order.status,
+      note,
+      estimated_ready_at: updated.estimated_ready_at,
+    };
+
+    const event =
+      newStatus === OrderStatus.CANCELLED
+        ? 'order.cancelled' as const
+        : 'order.status_changed' as const;
+
+    // Fire and forget - don't block status update response
+    dispatchWebhook(event, webhookData as unknown as Record<string, unknown>).catch(
+      (err) => console.error('Webhook dispatch failed:', err)
+    );
+  }
+
   return apiSuccess(updated);
 }

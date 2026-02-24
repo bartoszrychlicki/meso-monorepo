@@ -8,10 +8,17 @@ import {
 } from '@/lib/api/response';
 import { productsRepository } from '@/modules/menu/repository';
 import { CreateProductSchema } from '@/schemas/menu';
+import { Product } from '@/types/menu';
+import { SalesChannel } from '@/types/enums';
 
 /**
  * GET /api/v1/menu/products
  * List products with optional filtering and pagination.
+ *
+ * Query params:
+ *   ?channel=delivery     - filter products with pricing for this channel
+ *   ?updated_since=ISO    - filter products updated after this date
+ *   ?include=modifiers,variants,pricing - control response fields
  */
 export async function GET(request: NextRequest) {
   const auth = await authorizeRequest(request, 'menu:read');
@@ -23,6 +30,9 @@ export async function GET(request: NextRequest) {
   const categoryId = searchParams.get('category_id');
   const search = searchParams.get('search');
   const isAvailable = searchParams.get('is_available');
+  const channel = searchParams.get('channel');
+  const updatedSince = searchParams.get('updated_since');
+  const include = searchParams.get('include');
 
   const filters: Record<string, unknown> = {};
   if (categoryId) filters.category_id = categoryId;
@@ -38,27 +48,66 @@ export async function GET(request: NextRequest) {
     filters: Object.keys(filters).length > 0 ? filters : undefined,
   });
 
+  // Filter by channel - only products with pricing for this channel
+  if (channel && Object.values(SalesChannel).includes(channel as SalesChannel)) {
+    const filtered = result.data.filter(
+      (p) => p.pricing?.some((pr) => pr.channel === channel)
+    );
+    result = { ...result, data: filtered, total: filtered.length };
+  }
+
+  // Filter by updated_since
+  if (updatedSince) {
+    const sinceDate = new Date(updatedSince).toISOString();
+    const filtered = result.data.filter((p) => p.updated_at >= sinceDate);
+    result = { ...result, data: filtered, total: filtered.length };
+  }
+
   // Apply text search on top of filters if provided
   if (search) {
     const lowerSearch = search.toLowerCase();
-    result = {
-      ...result,
-      data: result.data.filter(
-        (p) =>
-          p.name.toLowerCase().includes(lowerSearch) ||
-          (p.description?.toLowerCase().includes(lowerSearch) ?? false) ||
-          p.sku?.toLowerCase().includes(lowerSearch)
-      ),
-      total: result.data.filter(
-        (p) =>
-          p.name.toLowerCase().includes(lowerSearch) ||
-          (p.description?.toLowerCase().includes(lowerSearch) ?? false) ||
-          p.sku?.toLowerCase().includes(lowerSearch)
-      ).length,
-    };
+    const filtered = result.data.filter(
+      (p) =>
+        p.name.toLowerCase().includes(lowerSearch) ||
+        (p.description?.toLowerCase().includes(lowerSearch) ?? false) ||
+        p.sku?.toLowerCase().includes(lowerSearch)
+    );
+    result = { ...result, data: filtered, total: filtered.length };
   }
 
-  return apiSuccess(result.data, {
+  // Apply include filter to control response fields
+  let responseData: Partial<Product>[] = result.data;
+  if (include) {
+    const includeFields = new Set(include.split(',').map((s) => s.trim()));
+    responseData = result.data.map((p) => {
+      const base: Partial<Product> = {
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        description: p.description,
+        category_id: p.category_id,
+        type: p.type,
+        price: p.price,
+        images: p.images,
+        is_available: p.is_available,
+        is_active: p.is_active,
+        allergens: p.allergens,
+        nutritional_info: p.nutritional_info,
+        preparation_time_minutes: p.preparation_time_minutes,
+        sort_order: p.sort_order,
+        sku: p.sku,
+        tax_rate: p.tax_rate,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+      };
+      if (includeFields.has('modifiers')) base.modifier_groups = p.modifier_groups;
+      if (includeFields.has('variants')) base.variants = p.variants;
+      if (includeFields.has('pricing')) base.pricing = p.pricing;
+      return base;
+    });
+  }
+
+  return apiSuccess(responseData, {
     total: result.total,
     page: result.page,
     per_page: result.per_page,
