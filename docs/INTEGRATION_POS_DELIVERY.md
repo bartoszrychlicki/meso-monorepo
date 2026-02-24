@@ -14,9 +14,55 @@ MESOpos (POS) i meso_delivery (customer-facing delivery app) to dwa osobne syste
 
 ---
 
-## Faza A: POS API - rozszerzenie dla delivery (Meso-pos)
+## Status implementacji
 
-### A1. Rozszerzenie typu Order i schematu
+> Ostatnia aktualizacja: 2026-02-24
+
+### Faza A: POS API - rozszerzenie dla delivery (Meso-pos repo)
+
+- [x] **A1** - Rozszerzenie typu Order i CreateOrderSchema (`external_order_id`, `external_channel`, `metadata`, `delivery_address`, `payment_status`, `customer_id`)
+- [x] **A2** - Rozszerzenie POST /api/v1/orders - kanal `delivery_app` z pre-paid CONFIRMED, idempotentnosc via `external_order_id`
+- [x] **A3** - Rozszerzenie GET /api/v1/menu/products (`?channel`, `?updated_since`, `?include`)
+- [x] **A4** - Nowy endpoint GET /api/v1/menu/sync-status (SHA-256 hash)
+- [x] **A5** - Webhook system (`types.ts`, `dispatcher.ts` z HMAC-SHA256 + retry, `registry.ts`) + CRUD API `/api/v1/webhooks`
+- [x] **A6** - Dispatch webhooka przy zmianie statusu zamowien `delivery_app`
+- [x] **A7** - CORS middleware (`src/middleware.ts`) dla `/api/v1/*`
+- [x] **A8** - Permission `webhooks:manage` w `ApiKeyPermission`
+
+### Faza B: Delivery - POS client i submission zamowien (meso_delivery repo)
+
+- [ ] **B1** - Migracja DB (pos_order_id, pos_sync_status, pos_*_id kolumny)
+- [ ] **B2** - Tabela retry queue (pos_submission_queue, webhook_deliveries)
+- [ ] **B3** - POS API client (src/lib/pos-client.ts)
+- [ ] **B4** - Order mapper delivery -> POS
+- [ ] **B5** - Modyfikacja P24 webhook handlera (POS submission po platnosci)
+- [ ] **B6** - Cron: retry POS submissions
+- [ ] **B7** - Anulowanie zamowien z delivery -> POS
+
+### Faza C: Status updates POS -> Delivery (meso_delivery repo)
+
+- [ ] **C1** - Webhook receiver w delivery
+- [ ] **C2** - Status mapping POS -> delivery
+
+### Faza D: Menu sync POS -> Delivery (meso_delivery repo)
+
+- [ ] **D1** - Product mapper POS -> delivery
+- [ ] **D2** - Sync service (syncMenu, syncSingleProduct)
+- [ ] **D3** - Cron: periodic menu sync (co 15 min)
+- [ ] **D4** - Rozszerzenie delivery alergenow (6 brakujacych EU)
+
+### Faza E: Error handling i hardening (oba repozytoria)
+
+- [ ] **E1** - Price discrepancy (422 PRICE_MISMATCH)
+- [ ] **E2** - POS downtime resilience (retry queue + UI statusy)
+- [ ] **E3** - Idempotentnosc (external_order_id + webhook delivery_id)
+- [ ] **E4** - Konfiguracja env vars (POS + delivery)
+
+---
+
+## Faza A: POS API - rozszerzenie dla delivery (Meso-pos) -- ZAIMPLEMENTOWANA
+
+### A1. Rozszerzenie typu Order i schematu -- DONE
 
 **Plik: `src/types/order.ts`**
 - Dodaj do `Order`: `external_order_id?: string`, `external_channel?: string`, `metadata?: Record<string, unknown>`
@@ -30,7 +76,7 @@ MESOpos (POS) i meso_delivery (customer-facing delivery app) to dwa osobne syste
   - `customer_id: z.string().optional()`
   - `metadata: z.record(z.unknown()).optional()`
 
-### A2. Rozszerzenie POST /api/v1/orders
+### A2. Rozszerzenie POST /api/v1/orders -- DONE
 
 **Plik: `src/app/api/v1/orders/route.ts`**
 - Gdy `channel === DELIVERY_APP` i `payment_status === PAID`:
@@ -40,20 +86,20 @@ MESOpos (POS) i meso_delivery (customer-facing delivery app) to dwa osobne syste
   - Zapisz `delivery_address` z inputu
 - Zwroc w response: `id` (pos_order_id), `order_number`
 
-### A3. Rozszerzenie GET /api/v1/menu/products
+### A3. Rozszerzenie GET /api/v1/menu/products -- DONE
 
 **Plik: `src/app/api/v1/menu/products/route.ts`**
 - Dodaj query param `?channel=delivery` - filtruj produkty ktore maja `pricing[]` z kanalem `delivery`
 - Dodaj `?updated_since=ISO_DATE` - filtruj po `updated_at`
 - Dodaj `?include=modifiers,variants,pricing` - kontroluj co jest w response
 
-### A4. Nowy endpoint: GET /api/v1/menu/sync-status
+### A4. Nowy endpoint: GET /api/v1/menu/sync-status -- DONE
 
 **Nowy plik: `src/app/api/v1/menu/sync-status/route.ts`**
 - Zwraca: `{ last_updated, product_count, category_count, sync_hash }` (hash SHA-256 z JSON wszystkich produktow)
 - Permission: `menu:read`
 
-### A5. Webhook system
+### A5. Webhook system -- DONE
 
 **Nowy katalog: `src/lib/webhooks/`**
 - `types.ts` - `WebhookPayload`, `WebhookEvent`, `WebhookSubscription`
@@ -88,24 +134,24 @@ MESOpos (POS) i meso_delivery (customer-facing delivery app) to dwa osobne syste
 
 **Headers:** `X-POS-Signature` (HMAC-SHA256), `X-POS-Event`, `X-POS-Delivery-Id`
 
-### A6. Dodaj dispatch webhooka do updateStatus
+### A6. Dodaj dispatch webhooka do updateStatus -- DONE
 
 **Plik: `src/modules/orders/repository.ts`**
 - W `updateStatus()`: po zapisie, jezeli `order.channel === OrderChannel.DELIVERY_APP`, wywolaj `dispatchWebhook('order.status_changed', ...)`
 
-### A7. CORS dla delivery app
+### A7. CORS dla delivery app -- DONE
 
-**Plik: `next.config.ts`**
-- Dodaj CORS headers dla `/api/v1/*` routes (lub middleware) - `Access-Control-Allow-Origin` z delivery app URL
+**Plik: `src/middleware.ts`** _(zaimplementowano jako Next.js middleware zamiast next.config.ts)_
+- CORS headers dla `/api/v1/*` routes - `Access-Control-Allow-Origin` z delivery app URL
 
-### A8. Dodaj permission `webhooks:manage`
+### A8. Dodaj permission `webhooks:manage` -- DONE
 
 **Plik: `src/types/api-key.ts`**
 - Dodaj `'webhooks:manage'` do `ApiKeyPermission`
 
 ---
 
-## Faza B: Delivery - POS client i submission zamowien (meso_delivery)
+## Faza B: Delivery - POS client i submission zamowien (meso_delivery) -- TODO (meso_delivery repo)
 
 ### B1. Migracja DB - nowe kolumny
 
@@ -216,7 +262,7 @@ Mapowanie:
 
 ---
 
-## Faza C: Status updates POS -> Delivery (webhooks)
+## Faza C: Status updates POS -> Delivery (webhooks) -- TODO (meso_delivery repo)
 
 ### C1. Webhook receiver w delivery
 
@@ -252,7 +298,7 @@ cancelled            cancelled              "Zamowienie anulowane"
 
 ---
 
-## Faza D: Menu sync POS -> Delivery
+## Faza D: Menu sync POS -> Delivery -- TODO (meso_delivery repo)
 
 ### D1. Product mapper (POS -> delivery)
 
@@ -306,7 +352,7 @@ Mapowanie:
 
 ---
 
-## Faza E: Error handling i hardening
+## Faza E: Error handling i hardening -- TODO (oba repozytoria)
 
 ### E1. Price discrepancy
 - POS w POST /orders waliduje ceny z aktualnego katalogu
@@ -377,11 +423,11 @@ Delivery DB -> Customer: Supabase Realtime ("Smacznego!")
 
 ## Kolejnosc implementacji
 
-1. **Faza A** (POS-side) - rozszerzenie API
-2. **Faza B** (Delivery-side) - POS client + order submission
-3. **Faza C** (Both) - webhooks dla status updates
-4. **Faza D** (Both) - menu sync
-5. **Faza E** (Both) - hardening, error handling, idempotentnosc
+1. **Faza A** (POS-side) - rozszerzenie API -- DONE
+2. **Faza B** (Delivery-side) - POS client + order submission -- TODO
+3. **Faza C** (Both) - webhooks dla status updates -- TODO
+4. **Faza D** (Both) - menu sync -- TODO
+5. **Faza E** (Both) - hardening, error handling, idempotentnosc -- TODO
 
 ---
 
