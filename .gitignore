@@ -60,3 +60,6 @@ dump.rdb
 
 # Docker
 docker-compose.override.yml
+
+# Worktrees
+.worktrees/
