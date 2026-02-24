@@ -20,6 +20,7 @@ const ApiKeyPermissionSchema = z.enum([
   'orders:read',
   'orders:write',
   'orders:status',
+  'webhooks:manage',
 ]);
 
 const CreateApiKeySchema = z.object({

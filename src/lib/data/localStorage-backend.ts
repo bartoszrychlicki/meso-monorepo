@@ -3,6 +3,16 @@ import { BaseRepository, QueryOptions } from './base-repository';
 
 const STORAGE_PREFIX = 'mesopos_';
 
+// Server-side in-memory store - attached to globalThis to survive module re-evaluation
+// in Next.js dev mode where modules can be re-imported per request
+const globalForStore = globalThis as typeof globalThis & {
+  __mesopos_server_store?: Map<string, string>;
+};
+if (!globalForStore.__mesopos_server_store) {
+  globalForStore.__mesopos_server_store = new Map<string, string>();
+}
+const serverStore = globalForStore.__mesopos_server_store;
+
 export class LocalStorageRepository<T extends BaseEntity> extends BaseRepository<T> {
   private collectionName: string;
   private storageKey: string;
@@ -14,18 +24,26 @@ export class LocalStorageRepository<T extends BaseEntity> extends BaseRepository
   }
 
   private getAll(): T[] {
-    if (typeof window === 'undefined') return [];
-    try {
-      const data = localStorage.getItem(this.storageKey);
-      return data ? JSON.parse(data) : [];
-    } catch {
-      return [];
+    if (typeof window !== 'undefined') {
+      try {
+        const data = localStorage.getItem(this.storageKey);
+        return data ? JSON.parse(data) : [];
+      } catch {
+        return [];
+      }
     }
+    // Server-side: use in-memory store
+    const data = serverStore.get(this.storageKey);
+    return data ? JSON.parse(data) : [];
   }
 
   private saveAll(items: T[]): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(this.storageKey, JSON.stringify(items));
+    const serialized = JSON.stringify(items);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(this.storageKey, serialized);
+    }
+    // Always save to server store (for API routes)
+    serverStore.set(this.storageKey, serialized);
   }
 
   private matchesFilter(item: T, filter: Partial<T>): boolean {
@@ -152,7 +170,9 @@ export class LocalStorageRepository<T extends BaseEntity> extends BaseRepository
 
   // Utility: clear collection
   async clear(): Promise<void> {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem(this.storageKey);
+    serverStore.delete(this.storageKey);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(this.storageKey);
+    }
   }
 }
