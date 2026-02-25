@@ -18,18 +18,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StockItem } from '@/types/inventory';
-import { ProductCategory, Allergen } from '@/types/enums';
+import { StockItem, Warehouse } from '@/types/inventory';
+import { ProductCategory, Allergen, VatRate, ConsumptionType } from '@/types/enums';
 import { ALLERGEN_LABELS } from '@/lib/constants';
+import { UNIT_OPTIONS } from '@/lib/constants/inventory';
 import { toast } from 'sonner';
 
 interface StockItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  warehouses: Warehouse[];
+  onSubmit: (
+    data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>,
+    warehouseId: string,
+    quantity: number,
+    minQuantity: number
+  ) => Promise<void>;
 }
-
-const UNIT_OPTIONS = ['kg', 'g', 'szt', 'l', 'ml', 'op'];
 
 const CATEGORY_LABELS: Record<ProductCategory, string> = {
   [ProductCategory.RAW_MATERIAL]: 'Surowiec',
@@ -37,15 +42,16 @@ const CATEGORY_LABELS: Record<ProductCategory, string> = {
   [ProductCategory.FINISHED_GOOD]: 'Gotowy produkt',
 };
 
-export function StockItemForm({ open, onOpenChange, onSubmit }: StockItemFormProps) {
+export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: StockItemFormProps) {
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [unit, setUnit] = useState('kg');
   const [category, setCategory] = useState<ProductCategory>(ProductCategory.RAW_MATERIAL);
-  const [quantity, setQuantity] = useState(0);
-  const [minQuantity, setMinQuantity] = useState(0);
   const [costPerUnit, setCostPerUnit] = useState(0);
   const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>([]);
+  const [warehouseId, setWarehouseId] = useState('');
+  const [quantity, setQuantity] = useState(0);
+  const [minQuantity, setMinQuantity] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
@@ -53,10 +59,11 @@ export function StockItemForm({ open, onOpenChange, onSubmit }: StockItemFormPro
     setSku('');
     setUnit('kg');
     setCategory(ProductCategory.RAW_MATERIAL);
-    setQuantity(0);
-    setMinQuantity(0);
     setCostPerUnit(0);
     setSelectedAllergens([]);
+    setWarehouseId('');
+    setQuantity(0);
+    setMinQuantity(0);
   };
 
   const toggleAllergen = (allergen: Allergen) => {
@@ -76,20 +83,32 @@ export function StockItemForm({ open, onOpenChange, onSubmit }: StockItemFormPro
       toast.error('Podaj SKU');
       return;
     }
+    if (!warehouseId) {
+      toast.error('Wybierz magazyn');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      await onSubmit({
-        name: name.trim(),
-        sku: sku.trim(),
-        product_category: category,
-        unit,
+      await onSubmit(
+        {
+          name: name.trim(),
+          sku: sku.trim(),
+          product_category: category,
+          unit,
+          cost_per_unit: costPerUnit,
+          allergens: selectedAllergens,
+          is_active: true,
+          vat_rate: VatRate.PTU_B,
+          consumption_type: ConsumptionType.PRODUCT,
+          shelf_life_days: 0,
+          default_min_quantity: minQuantity,
+          storage_location: null,
+        },
+        warehouseId,
         quantity,
-        min_quantity: minQuantity,
-        cost_per_unit: costPerUnit,
-        allergens: selectedAllergens,
-        is_active: true,
-      });
+        minQuantity
+      );
       toast.success(`Dodano pozycje: ${name}`);
       resetForm();
       onOpenChange(false);
@@ -160,8 +179,8 @@ export function StockItemForm({ open, onOpenChange, onSubmit }: StockItemFormPro
                 </SelectTrigger>
                 <SelectContent>
                   {UNIT_OPTIONS.map((u) => (
-                    <SelectItem key={u} value={u}>
-                      {u}
+                    <SelectItem key={u.value} value={u.value}>
+                      {u.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -169,40 +188,59 @@ export function StockItemForm({ open, onOpenChange, onSubmit }: StockItemFormPro
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="stock-cost">Koszt/jedn. (PLN)</Label>
+            <Input
+              id="stock-cost"
+              type="number"
+              min={0}
+              step={0.01}
+              value={costPerUnit}
+              onChange={(e) => setCostPerUnit(Number(e.target.value))}
+              data-field="cost-per-unit"
+            />
+          </div>
+
+          <div className="border-t pt-4 space-y-4">
+            <p className="text-sm font-medium">Przypisanie do magazynu *</p>
             <div className="space-y-2">
-              <Label htmlFor="stock-quantity">Ilosc</Label>
-              <Input
-                id="stock-quantity"
-                type="number"
-                min={0}
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
-                data-field="quantity"
-              />
+              <Label htmlFor="stock-warehouse">Magazyn</Label>
+              <Select value={warehouseId} onValueChange={setWarehouseId}>
+                <SelectTrigger id="stock-warehouse" data-field="warehouse">
+                  <SelectValue placeholder="Wybierz magazyn..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-min">Stan minimalny</Label>
-              <Input
-                id="stock-min"
-                type="number"
-                min={0}
-                value={minQuantity}
-                onChange={(e) => setMinQuantity(Number(e.target.value))}
-                data-field="min-quantity"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-cost">Koszt/jedn. (PLN)</Label>
-              <Input
-                id="stock-cost"
-                type="number"
-                min={0}
-                step={0.01}
-                value={costPerUnit}
-                onChange={(e) => setCostPerUnit(Number(e.target.value))}
-                data-field="cost-per-unit"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="stock-quantity">Ilosc poczatkowa</Label>
+                <Input
+                  id="stock-quantity"
+                  type="number"
+                  min={0}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  data-field="quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stock-min">Stan minimalny</Label>
+                <Input
+                  id="stock-min"
+                  type="number"
+                  min={0}
+                  value={minQuantity}
+                  onChange={(e) => setMinQuantity(Number(e.target.value))}
+                  data-field="min-quantity"
+                />
+              </div>
             </div>
           </div>
 

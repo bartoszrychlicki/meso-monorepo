@@ -1,37 +1,70 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { StockTable } from '@/modules/inventory/components/stock-table';
 import { StockItemForm } from '@/modules/inventory/components/stock-item-form';
+import { TransferDialog } from '@/modules/inventory/components/transfer-dialog';
+import { WarehouseManager } from '@/modules/inventory/components/warehouse-manager';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { Package, AlertTriangle, DollarSign, Plus } from 'lucide-react';
+import { Package, AlertTriangle, DollarSign, Plus, ArrowLeftRight, Settings } from 'lucide-react';
 
 export default function InventoryPage() {
   const {
-    stockItems,
+    warehouses,
+    warehouseStockItems,
     isLoading,
-    loadStockItems,
+    loadAll,
     adjustStock,
     createStockItem,
-    getLowStockItems,
-    getStockValue,
+    assignToWarehouse,
+    transferStock,
+    createWarehouse,
+    updateWarehouse,
+    deleteWarehouse,
+    selectedWarehouseId,
+    setSelectedWarehouse,
   } = useInventoryStore();
 
   const [showNewItemForm, setShowNewItemForm] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [showWarehouseManager, setShowWarehouseManager] = useState(false);
 
   useEffect(() => {
-    loadStockItems();
-  }, [loadStockItems]);
+    loadAll();
+  }, [loadAll]);
 
-  const lowStockItems = getLowStockItems();
-  const stockValue = getStockValue();
+  const currentItems = useMemo(() => {
+    if (!selectedWarehouseId) return warehouseStockItems;
+    return warehouseStockItems.filter((item) => item.warehouse_id === selectedWarehouseId);
+  }, [warehouseStockItems, selectedWarehouseId]);
 
-  if (isLoading && stockItems.length === 0) {
+  const lowStockItems = useMemo(() => {
+    return currentItems.filter((item) => item.is_active && item.quantity < item.min_quantity);
+  }, [currentItems]);
+
+  const stockValue = useMemo(() => {
+    return currentItems.reduce((total, item) => total + item.quantity * item.cost_per_unit, 0);
+  }, [currentItems]);
+
+  const warehouseStockCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of warehouseStockItems) {
+      counts[item.warehouse_id] = (counts[item.warehouse_id] ?? 0) + 1;
+    }
+    return counts;
+  }, [warehouseStockItems]);
+
+  const handleTabChange = (value: string) => {
+    setSelectedWarehouse(value === 'all' ? null : value);
+  };
+
+  if (isLoading && warehouseStockItems.length === 0) {
     return (
       <div className="space-y-6" data-page="inventory">
         <PageHeader title="Magazyn" description="Stany magazynowe" />
@@ -46,13 +79,31 @@ export default function InventoryPage() {
         title="Magazyn"
         description="Stany magazynowe"
         actions={
-          <Button
-            onClick={() => setShowNewItemForm(true)}
-            data-action="add-stock-item"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nowa pozycja
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowWarehouseManager(true)}
+              data-action="manage-warehouses"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Zarzadzaj magazynami
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowTransferDialog(true)}
+              data-action="transfer-stock"
+            >
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Transfer
+            </Button>
+            <Button
+              onClick={() => setShowNewItemForm(true)}
+              data-action="add-stock-item"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nowa pozycja
+            </Button>
+          </div>
         }
       />
 
@@ -60,7 +111,7 @@ export default function InventoryPage() {
         <KpiCard
           icon={<Package className="h-5 w-5" />}
           label="Pozycji lacznie"
-          value={stockItems.length}
+          value={currentItems.length}
           className="bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/20 dark:to-sky-950/20"
         />
         <KpiCard
@@ -80,19 +131,69 @@ export default function InventoryPage() {
         />
       </div>
 
-      <StockTable
-        items={stockItems}
-        onAdjustStock={async (itemId, quantity, reason) => {
-          await adjustStock(itemId, quantity, reason);
-        }}
-      />
+      <Tabs
+        value={selectedWarehouseId ?? 'all'}
+        onValueChange={handleTabChange}
+        data-component="warehouse-tabs"
+      >
+        <TabsList>
+          <TabsTrigger value="all" data-value="all">
+            Wszystkie
+          </TabsTrigger>
+          {warehouses.map((w) => (
+            <TabsTrigger key={w.id} value={w.id} data-value={w.id}>
+              {w.name}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="all">
+          <StockTable
+            items={currentItems}
+            showWarehouseColumn
+            onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
+              await adjustStock(warehouseId, stockItemId, quantity, reason);
+            }}
+          />
+        </TabsContent>
+        {warehouses.map((w) => (
+          <TabsContent key={w.id} value={w.id}>
+            <StockTable
+              items={currentItems}
+              onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
+                await adjustStock(warehouseId, stockItemId, quantity, reason);
+              }}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
 
       <StockItemForm
         open={showNewItemForm}
         onOpenChange={setShowNewItemForm}
-        onSubmit={async (data) => {
-          await createStockItem(data);
+        warehouses={warehouses}
+        onSubmit={async (data, warehouseId, quantity, minQuantity) => {
+          const newItem = await createStockItem(data);
+          await assignToWarehouse(warehouseId, newItem.id, quantity, minQuantity);
         }}
+      />
+
+      <TransferDialog
+        open={showTransferDialog}
+        onOpenChange={setShowTransferDialog}
+        warehouses={warehouses}
+        warehouseStockItems={warehouseStockItems}
+        onTransfer={transferStock}
+      />
+
+      <WarehouseManager
+        open={showWarehouseManager}
+        onOpenChange={setShowWarehouseManager}
+        warehouses={warehouses}
+        warehouseStockItemCounts={warehouseStockCounts}
+        onCreateWarehouse={createWarehouse}
+        onUpdateWarehouse={updateWarehouse}
+        onDeleteWarehouse={deleteWarehouse}
       />
     </div>
   );
