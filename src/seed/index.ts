@@ -19,6 +19,8 @@ function seedCollection(name: string, data: unknown[]): void {
 
 export function seedAll(): void {
   if (typeof window === 'undefined') return;
+  // Skip localStorage seeding when using Supabase (data is in PostgreSQL)
+  if (process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase') return;
   if (isSeeded()) return;
 
   // Seed in dependency order

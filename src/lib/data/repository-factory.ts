@@ -1,6 +1,7 @@
 import { BaseEntity } from '@/types/common';
 import { BaseRepository } from './base-repository';
 import { LocalStorageRepository } from './localStorage-backend';
+import { SupabaseRepository } from './supabase-repository';
 
 type BackendType = 'localStorage' | 'supabase';
 
@@ -20,8 +21,7 @@ export function createRepository<T extends BaseEntity>(
     case 'localStorage':
       return new LocalStorageRepository<T>(collectionName);
     case 'supabase':
-      // Future: return new SupabaseRepository<T>(collectionName);
-      throw new Error('Supabase backend not yet implemented');
+      return new SupabaseRepository<T>(collectionName);
     default:
       return new LocalStorageRepository<T>(collectionName);
   }
