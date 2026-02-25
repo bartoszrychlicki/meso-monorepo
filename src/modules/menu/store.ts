@@ -8,6 +8,7 @@ import {
   modifierGroupsRepository,
   toggleAvailability,
 } from './repository';
+import { deleteAllProductImages } from '@/lib/supabase/storage';
 
 interface MenuStore {
   products: Product[];
@@ -75,6 +76,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
   },
 
   deleteProduct: async (id) => {
+    await deleteAllProductImages(id);
     await productsRepository.delete(id);
     set((state) => ({
       products: state.products.filter((p) => p.id !== id),
