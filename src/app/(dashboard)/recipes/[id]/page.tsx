@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Recipe } from '@/types/recipe';
+import { Recipe, RecipeVersion } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { recipesRepository } from '@/modules/recipes/repository';
 import { inventoryRepository } from '@/modules/inventory/repository';
@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   Clock,
   DollarSign,
+  History,
   Package,
   Pencil,
   Trash2,
@@ -33,17 +34,20 @@ export default function RecipeDetailPage() {
   const { toast } = useToast();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [versions, setVersions] = useState<RecipeVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [recipeData, items] = await Promise.all([
+        const [recipeData, items, versionsData] = await Promise.all([
           recipesRepository.recipes.findById(params.id as string),
           inventoryRepository.getAllStockItems(),
+          recipesRepository.getRecipeVersions(params.id as string),
         ]);
         setRecipe(recipeData ?? null);
         setStockItems(items);
+        setVersions(versionsData);
       } catch {
         // ignore
       } finally {
@@ -132,6 +136,12 @@ export default function RecipeDetailPage() {
               <Button variant="outline" size="sm">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Lista
+              </Button>
+            </Link>
+            <Link href={`/recipes/${recipe.id}/edit`}>
+              <Button variant="outline" size="sm" data-action="edit-recipe">
+                <Pencil className="mr-2 h-4 w-4" />
+                Edytuj
               </Button>
             </Link>
             <Button
@@ -299,6 +309,57 @@ export default function RecipeDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Version History */}
+      {versions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5" />
+              Historia zmian ({versions.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {versions.map((v) => (
+                <div
+                  key={v.id}
+                  className="flex items-start gap-4 py-3 border-b last:border-0"
+                  data-version={v.version}
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-bold">
+                    v{v.version}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="font-medium">{v.changed_by}</span>
+                      <span className="text-muted-foreground">
+                        {new Date(v.created_at).toLocaleDateString('pl-PL', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    {v.change_notes && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {v.change_notes}
+                      </p>
+                    )}
+                    <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                      <span>{v.ingredients.length} skladnikow</span>
+                      <span>Koszt: {v.total_cost.toFixed(2)} zl</span>
+                      <span>{v.cost_per_unit.toFixed(2)} zl/szt</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
