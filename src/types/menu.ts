@@ -66,6 +66,7 @@ export interface ProductImage {
   width: number;
   height: number;
   sort_order: number;
+  storage_path?: string; // Path in Supabase Storage for deletion
 }
 
 export interface Product extends BaseEntity {
