@@ -177,7 +177,7 @@ CREATE TABLE public.crm_loyalty_transactions (
   description TEXT,
   related_order_id UUID,
   multiplier NUMERIC(3,2) NOT NULL DEFAULT 1,
-  created_by UUID,
+  created_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -199,7 +199,7 @@ CREATE TABLE public.crm_coupons (
   customer_segment TEXT,
   trigger_scenario TEXT NOT NULL DEFAULT 'manual',
   is_active BOOLEAN NOT NULL DEFAULT true,
-  created_by UUID,
+  created_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -225,8 +225,8 @@ CREATE TABLE public.recipes_recipes (
   food_cost_percentage NUMERIC(5,2),
   version INTEGER NOT NULL DEFAULT 1,
   is_active BOOLEAN NOT NULL DEFAULT true,
-  created_by UUID,
-  last_updated_by UUID,
+  created_by TEXT,
+  last_updated_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -238,7 +238,7 @@ CREATE TABLE public.recipes_recipe_versions (
   ingredients JSONB NOT NULL DEFAULT '[]',
   total_cost NUMERIC(10,4) NOT NULL DEFAULT 0,
   cost_per_unit NUMERIC(10,4) NOT NULL DEFAULT 0,
-  changed_by UUID,
+  changed_by TEXT,
   change_notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -251,7 +251,7 @@ CREATE TABLE public.recipes_ingredient_usage_logs (
   quantity_produced NUMERIC(10,2) NOT NULL,
   ingredients_used JSONB NOT NULL DEFAULT '[]',
   total_cost NUMERIC(10,4) NOT NULL DEFAULT 0,
-  produced_by UUID,
+  produced_by TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -328,7 +328,7 @@ CREATE TABLE public.integrations_api_keys (
   is_active BOOLEAN NOT NULL DEFAULT true,
   last_used_at TIMESTAMPTZ,
   expires_at TIMESTAMPTZ,
-  created_by UUID,
+  created_by TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
