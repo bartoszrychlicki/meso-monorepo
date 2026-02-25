@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { Product, Category, ModifierGroup, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
 import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { Allergen, ProductType, VariantType, SalesChannel } from '@/types/enums';
 import { generateSKU } from '@/modules/menu/utils/sku-generator';
 import { createDefaultPricing } from '@/modules/menu/utils/pricing';
-import { MIN_IMAGE_WIDTH, MIN_IMAGE_HEIGHT } from '@/schemas/menu';
 import { ALLERGEN_LABELS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,14 +36,11 @@ import {
   ShieldAlert,
   MapPin,
   Beaker,
-  AlertCircle,
-  GripVertical,
-  Link,
   ExternalLink,
 } from 'lucide-react';
+import { ImageUploader } from './image-uploader';
 import { ModifierSelector } from './modifier-selector';
 import { formatCurrency } from '@/lib/utils';
-import Image from 'next/image';
 
 const STEPS = [
   { label: 'Podstawowe', icon: Info },
@@ -54,9 +50,6 @@ const STEPS = [
   { label: 'Alergeny', icon: ShieldAlert },
   { label: 'Dostepnosc', icon: MapPin },
 ];
-
-const PRODUCT_PLACEHOLDER_IMAGE = '/images/product-placeholder.svg';
-const MAX_IMAGES = 3;
 
 interface ProductFormProps {
   product?: Product | null;
@@ -78,6 +71,7 @@ export function ProductForm({
   isSubmitting = false,
 }: ProductFormProps) {
   const [step, setStep] = useState(0);
+  const [productId] = useState(() => product?.id ?? crypto.randomUUID());
 
   // Form state
   const [name, setName] = useState(product?.name ?? '');
@@ -92,9 +86,6 @@ export function ProductForm({
 
   // Images
   const [images, setImages] = useState<ProductImage[]>(product?.images ?? []);
-  const [imageUrl, setImageUrl] = useState('');
-  const [imageError, setImageError] = useState<string | null>(null);
-  const [isLoadingImage, setIsLoadingImage] = useState(false);
 
   // Variants
   const [variants, setVariants] = useState<ProductVariant[]>(product?.variants ?? []);
@@ -137,86 +128,6 @@ export function ProductForm({
           .replace(/\s+/g, '-')
       );
     }
-  };
-
-  // Image handling
-  const validateAndAddImage = useCallback(async () => {
-    if (!imageUrl.trim()) return;
-
-    setImageError(null);
-    setIsLoadingImage(true);
-
-    if (images.length >= MAX_IMAGES) {
-      setImageError(`Maksymalnie ${MAX_IMAGES} zdjecia`);
-      setIsLoadingImage(false);
-      return;
-    }
-
-    try {
-      new URL(imageUrl);
-    } catch {
-      setImageError('Nieprawidlowy URL');
-      setIsLoadingImage(false);
-      return;
-    }
-
-    // Check if URL already added
-    if (images.some((img) => img.url === imageUrl)) {
-      setImageError('To zdjecie jest juz dodane');
-      setIsLoadingImage(false);
-      return;
-    }
-
-    // Load image to validate resolution
-    try {
-      const dimensions = await getImageDimensions(imageUrl);
-
-      if (dimensions.width < MIN_IMAGE_WIDTH || dimensions.height < MIN_IMAGE_HEIGHT) {
-        setImageError(
-          `Zdjecie jest za male (${dimensions.width}x${dimensions.height}px). Minimalna rozdzielczosc to ${MIN_IMAGE_WIDTH}x${MIN_IMAGE_HEIGHT}px`
-        );
-        setIsLoadingImage(false);
-        return;
-      }
-
-      const newImage: ProductImage = {
-        id: crypto.randomUUID(),
-        url: imageUrl,
-        alt: name || 'Zdjecie produktu',
-        width: dimensions.width,
-        height: dimensions.height,
-        sort_order: images.length,
-      };
-
-      setImages((prev) => [...prev, newImage]);
-      setImageUrl('');
-      setImageError(null);
-    } catch {
-      setImageError('Nie udalo sie zaladowac zdjecia. Sprawdz URL.');
-    } finally {
-      setIsLoadingImage(false);
-    }
-  }, [imageUrl, images, name]);
-
-  const removeImage = (imageId: string) => {
-    setImages((prev) =>
-      prev
-        .filter((img) => img.id !== imageId)
-        .map((img, idx) => ({ ...img, sort_order: idx }))
-    );
-  };
-
-  const moveImage = (imageId: string, direction: 'up' | 'down') => {
-    setImages((prev) => {
-      const idx = prev.findIndex((img) => img.id === imageId);
-      if (idx < 0) return prev;
-      const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-      if (newIdx < 0 || newIdx >= prev.length) return prev;
-
-      const updated = [...prev];
-      [updated[idx], updated[newIdx]] = [updated[newIdx], updated[idx]];
-      return updated.map((img, i) => ({ ...img, sort_order: i }));
-    });
   };
 
   const toggleAllergen = (allergen: Allergen) => {
@@ -288,7 +199,7 @@ export function ProductForm({
 
   const canGoNext = () => {
     if (step === 0) return name.length > 0 && categoryId.length > 0 && price > 0;
-    if (step === 1) return images.length >= 1;
+    if (step === 1) return true;
     return true;
   };
 
@@ -566,156 +477,11 @@ export function ProductForm({
 
           {/* Step 2: Images */}
           {step === 1 && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium">Zdjecia produktu *</h3>
-                <p className="text-sm text-muted-foreground">
-                  Dodaj od 1 do {MAX_IMAGES} zdjec produktu (min. rozdzielczosc: {MIN_IMAGE_WIDTH}x{MIN_IMAGE_HEIGHT}px). Pierwsze zdjecie bedzie glownym.
-                </p>
-              </div>
-
-              {/* Add image via URL */}
-              <div className="space-y-2">
-                <Label htmlFor="image-url">URL zdjecia</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Link className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="image-url"
-                      value={imageUrl}
-                      onChange={(e) => {
-                        setImageUrl(e.target.value);
-                        setImageError(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          validateAndAddImage();
-                        }
-                      }}
-                      placeholder="https://example.com/zdjecie.jpg"
-                      className="pl-9"
-                      disabled={images.length >= MAX_IMAGES || isLoadingImage}
-                      data-field="product-image-url"
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={validateAndAddImage}
-                    disabled={!imageUrl.trim() || images.length >= MAX_IMAGES || isLoadingImage}
-                    data-action="add-image"
-                  >
-                    {isLoadingImage ? (
-                      <span className="animate-pulse">Ladowanie...</span>
-                    ) : (
-                      <>
-                        <Plus className="mr-1 h-4 w-4" />
-                        Dodaj
-                      </>
-                    )}
-                  </Button>
-                </div>
-                {imageError && (
-                  <div className="flex items-center gap-1.5 text-sm text-destructive" role="alert">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    {imageError}
-                  </div>
-                )}
-              </div>
-
-              {/* Image list */}
-              {images.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-lg border border-dashed p-8 text-center">
-                  <img
-                    src={PRODUCT_PLACEHOLDER_IMAGE}
-                    alt="Placeholder"
-                    className="mb-3 h-24 w-32 rounded opacity-60"
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Brak zdjec. Dodaj co najmniej 1 zdjecie produktu.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {images.map((img, idx) => (
-                    <div
-                      key={img.id}
-                      className={cn(
-                        'flex items-center gap-3 rounded-lg border p-3',
-                        idx === 0 && 'border-primary/30 bg-primary/5'
-                      )}
-                      data-id={img.id}
-                    >
-                      <div className="flex flex-col gap-0.5">
-                        <button
-                          type="button"
-                          onClick={() => moveImage(img.id, 'up')}
-                          disabled={idx === 0}
-                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                          data-action="move-image-up"
-                        >
-                          <ChevronLeft className="h-3.5 w-3.5 rotate-90" />
-                        </button>
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
-                        <button
-                          type="button"
-                          onClick={() => moveImage(img.id, 'down')}
-                          disabled={idx === images.length - 1}
-                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                          data-action="move-image-down"
-                        >
-                          <ChevronRight className="h-3.5 w-3.5 rotate-90" />
-                        </button>
-                      </div>
-
-                      <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded border bg-muted">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={img.url}
-                          alt={img.alt || 'Zdjecie produktu'}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          {idx === 0 && (
-                            <Badge variant="default" className="text-xs">Glowne</Badge>
-                          )}
-                          <span className="text-xs text-muted-foreground">
-                            {img.width}x{img.height}px
-                          </span>
-                        </div>
-                        <p className="mt-0.5 truncate text-xs text-muted-foreground" title={img.url}>
-                          {img.url}
-                        </p>
-                      </div>
-
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeImage(img.id)}
-                        className="text-muted-foreground hover:text-destructive shrink-0"
-                        data-action="remove-image"
-                        data-id={img.id}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Image count indicator */}
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{images.length}/{MAX_IMAGES} zdjec</span>
-                {images.length < 1 && (
-                  <span className="text-destructive">Wymagane co najmniej 1 zdjecie</span>
-                )}
-              </div>
-            </div>
+            <ImageUploader
+              productId={productId}
+              images={images}
+              onChange={setImages}
+            />
           )}
 
           {/* Step 3: Variants */}
@@ -975,7 +741,7 @@ export function ProductForm({
         ) : (
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !name || !categoryId || price <= 0 || images.length < 1}
+            disabled={isSubmitting || !name || !categoryId || price <= 0}
             data-action="submit-product"
           >
             {isSubmitting ? 'Zapisywanie...' : product ? 'Zapisz zmiany' : 'Dodaj produkt'}
@@ -984,15 +750,4 @@ export function ProductForm({
       </div>
     </div>
   );
-}
-
-/** Load an image from URL and return its natural dimensions */
-function getImageDimensions(url: string): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const img = new window.Image();
-    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.crossOrigin = 'anonymous';
-    img.src = url;
-  });
 }
