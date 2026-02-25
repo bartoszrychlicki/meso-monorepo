@@ -13,6 +13,7 @@ import { ComponentsTab } from '@/modules/inventory/components/components-tab';
 import { UsageTab } from '@/modules/inventory/components/usage-tab';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 export default function StockItemDetailPage() {
   const params = useParams();
@@ -29,6 +30,8 @@ export default function StockItemDetailPage() {
     loadUsage,
     updateStockItem,
   } = useInventoryStore();
+
+  useBreadcrumbLabel(id, currentStockItem?.name);
 
   useEffect(() => {
     loadStockItemDetail(id);

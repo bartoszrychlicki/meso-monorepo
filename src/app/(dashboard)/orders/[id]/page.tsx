@@ -12,6 +12,7 @@ import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
+import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 export default function OrderDetailPage({
   params,
@@ -20,6 +21,7 @@ export default function OrderDetailPage({
 }) {
   const { id } = use(params);
   const { order, isLoading, refresh } = useOrder(id);
+  useBreadcrumbLabel(id, order?.order_number);
   const { updateOrderStatus, cancelOrder } = useOrdersStore();
 
   const handleStatusChange = async (

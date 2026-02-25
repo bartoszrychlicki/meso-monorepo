@@ -27,12 +27,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
+import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 export default function RecipeDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  useBreadcrumbLabel(params.id as string, recipe?.name);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [versions, setVersions] = useState<RecipeVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);

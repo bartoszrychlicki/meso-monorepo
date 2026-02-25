@@ -32,6 +32,7 @@ import { UpdateCustomerInput } from '@/schemas/crm';
 import { useToast } from '@/hooks/use-toast';
 import { LoyaltyTransaction } from '@/types/crm';
 import { formatCurrency } from '@/lib/utils';
+import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 /**
  * Customer Detail Page
@@ -45,6 +46,7 @@ export default function CustomerDetailPage() {
   const { toast } = useToast();
 
   const [customer, setCustomer] = useState<any>(null);
+  useBreadcrumbLabel(customerId, customer ? `${customer.first_name} ${customer.last_name}` : undefined);
   const [loyaltyHistory, setLoyaltyHistory] = useState<LoyaltyTransaction[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

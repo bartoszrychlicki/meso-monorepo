@@ -23,6 +23,7 @@ import { CreateRecipeInput } from '@/schemas/recipe';
 import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 export default function EditRecipePage() {
   const params = useParams();
@@ -31,6 +32,7 @@ export default function EditRecipePage() {
   const { toast } = useToast();
 
   const [recipe, setRecipe] = useState<Recipe | null>(null);
+  useBreadcrumbLabel(params.id as string, recipe?.name);
   const [isLoading, setIsLoading] = useState(true);
 
   // Change reason dialog state

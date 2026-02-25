@@ -14,12 +14,14 @@ import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Product } from '@/types/menu';
 import { toast } from 'sonner';
+import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
   const productId = params.id as string;
   const { product, isLoading } = useProduct(productId);
+  useBreadcrumbLabel(productId, product?.name);
   const categories = useMenuStore((s) => s.categories);
   const updateProduct = useMenuStore((s) => s.updateProduct);
   const deleteProduct = useMenuStore((s) => s.deleteProduct);

@@ -15,6 +15,7 @@ import type { CreateEmployeeInput } from '@/schemas/employee';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { employeesRepository } from '@/modules/employees/repository';
+import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 export default function EmployeeDetailPage() {
   const router = useRouter();
@@ -34,6 +35,8 @@ export default function EmployeeDetailPage() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useBreadcrumbLabel(id, employee ? `${employee.first_name} ${employee.last_name}` : undefined);
 
   useEffect(() => {
     const load = async () => {

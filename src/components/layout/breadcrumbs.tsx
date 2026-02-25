@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight, Home } from 'lucide-react';
+import { useBreadcrumbLabels } from './breadcrumb-context';
 
 const routeLabels: Record<string, string> = {
   dashboard: 'Dashboard',
@@ -16,10 +17,14 @@ const routeLabels: Record<string, string> = {
   'time-tracking': 'Czas pracy',
   login: 'Logowanie',
   'clock-in': 'Rejestracja',
+  recipes: 'Receptury',
+  crm: 'Klienci',
+  edit: 'Edytuj',
 };
 
 export function Breadcrumbs() {
   const pathname = usePathname();
+  const dynamicLabels = useBreadcrumbLabels();
   const segments = pathname.split('/').filter(Boolean);
 
   if (segments.length === 0) return null;
@@ -41,7 +46,7 @@ export function Breadcrumbs() {
       {segments.map((segment, index) => {
         const href = '/' + segments.slice(0, index + 1).join('/');
         const isLast = index === segments.length - 1;
-        const label = routeLabels[segment] || segment;
+        const label = routeLabels[segment] || dynamicLabels[segment] || segment;
 
         return (
           <span key={href} className="flex items-center gap-1.5">
