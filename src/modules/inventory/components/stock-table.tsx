@@ -23,7 +23,7 @@ import {
 import { WarehouseStockItem } from '@/types/inventory';
 import { AllergenBadges } from '@/modules/menu/components/allergen-badges';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Minus, Package } from 'lucide-react';
+import { Plus, Minus, Package, Pencil } from 'lucide-react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -95,7 +95,7 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockT
               <TableHead className="text-right hidden md:table-cell">Koszt/jedn.</TableHead>
               <TableHead className="hidden lg:table-cell">Alergeny</TableHead>
               <TableHead>Status</TableHead>
-              {onAdjustStock && <TableHead className="w-[100px]">Akcje</TableHead>}
+              <TableHead className="w-[120px]">Akcje</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -147,40 +147,54 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockT
                       {status.label}
                     </Badge>
                   </TableCell>
-                  {onAdjustStock && (
-                    <TableCell>
-                      <div className="flex gap-1">
+                  <TableCell>
+                    <div className="flex gap-1">
+                      <Link href={`/inventory/${item.id}`}>
                         <Button
                           variant="outline"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => {
-                            setAdjustDialog(item);
-                            setAdjustQty(1);
-                          }}
-                          data-action="adjust-stock-plus"
+                          data-action="edit-stock-item"
                           data-id={item.id}
-                          title="Zwieksz stan"
+                          title="Edytuj pozycje"
                         >
-                          <Plus className="h-3 w-3" />
+                          <Pencil className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => {
-                            setAdjustDialog(item);
-                            setAdjustQty(-1);
-                          }}
-                          data-action="adjust-stock-minus"
-                          data-id={item.id}
-                          title="Zmniejsz stan"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  )}
+                      </Link>
+                      {onAdjustStock && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setAdjustDialog(item);
+                              setAdjustQty(1);
+                            }}
+                            data-action="adjust-stock-plus"
+                            data-id={item.id}
+                            title="Zwieksz stan"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => {
+                              setAdjustDialog(item);
+                              setAdjustQty(-1);
+                            }}
+                            data-action="adjust-stock-minus"
+                            data-id={item.id}
+                            title="Zmniejsz stan"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
                 </TableRow>
               );
             })}
