@@ -20,7 +20,7 @@ interface MenuStore {
 
   // Actions
   loadAll: () => Promise<void>;
-  createProduct: (data: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => Promise<Product>;
+  createProduct: (data: Omit<Product, 'created_at' | 'updated_at'>) => Promise<Product>;
   updateProduct: (id: string, data: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   toggleProductAvailability: (id: string) => Promise<void>;

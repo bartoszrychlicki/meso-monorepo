@@ -39,7 +39,7 @@ export default function EditProductPage() {
     }
   }, []);
 
-  const handleSubmit = async (data: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+  const handleSubmit = async (data: Omit<Product, 'created_at' | 'updated_at'>) => {
     setIsSubmitting(true);
     try {
       await updateProduct(productId, data);

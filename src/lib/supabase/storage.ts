@@ -79,7 +79,11 @@ export async function deleteAllProductImages(productId: string): Promise<void> {
     .from(BUCKET)
     .list(productId);
 
-  if (listError || !files || files.length === 0) return;
+  if (listError) {
+    console.error('[Storage] List failed for cleanup:', listError.message);
+    return;
+  }
+  if (!files || files.length === 0) return;
 
   const paths = files.map((f: { name: string }) => `${productId}/${f.name}`);
   const { error } = await supabase.storage.from(BUCKET).remove(paths);

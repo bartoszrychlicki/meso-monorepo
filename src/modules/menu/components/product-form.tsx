@@ -56,7 +56,7 @@ interface ProductFormProps {
   categories: Category[];
   stockItems: StockItem[];
   recipes: Recipe[];
-  onSubmit: (data: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => void;
+  onSubmit: (data: Omit<Product, 'created_at' | 'updated_at'>) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -167,7 +167,8 @@ export function ProductForm({
 
   const handleSubmit = () => {
     const selectedCategory = categories.find((c) => c.id === categoryId);
-    const data: Omit<Product, 'id' | 'created_at' | 'updated_at'> = {
+    const data: Omit<Product, 'created_at' | 'updated_at'> = {
+      id: productId,
       name,
       slug,
       description,

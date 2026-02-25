@@ -119,9 +119,10 @@ export class LocalStorageRepository<T extends BaseEntity> extends BaseRepository
   async create(data: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> {
     const items = this.getAll();
     const now = new Date().toISOString();
+    const provided = data as Record<string, unknown>;
     const newItem = {
       ...data,
-      id: crypto.randomUUID(),
+      id: (typeof provided.id === 'string' && provided.id) || crypto.randomUUID(),
       created_at: now,
       updated_at: now,
     } as T;

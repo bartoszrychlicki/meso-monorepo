@@ -121,7 +121,11 @@ export function ImageUploader({ productId, images, onChange }: ImageUploaderProp
     async (imageId: string) => {
       const img = images.find((i) => i.id === imageId);
       if (img?.storage_path) {
-        await deleteProductImage(img.storage_path);
+        try {
+          await deleteProductImage(img.storage_path);
+        } catch (err) {
+          console.error('[ImageUploader] Delete from storage failed:', err);
+        }
       }
       const updated = images
         .filter((i) => i.id !== imageId)
@@ -239,6 +243,7 @@ export function ImageUploader({ productId, images, onChange }: ImageUploaderProp
                   disabled={idx === 0}
                   className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                   data-action="move-image-up"
+                  aria-label="Przesun zdjecie wyzej"
                 >
                   <ChevronLeft className="h-3.5 w-3.5 rotate-90" />
                 </button>
@@ -249,6 +254,7 @@ export function ImageUploader({ productId, images, onChange }: ImageUploaderProp
                   disabled={idx === images.length - 1}
                   className="text-muted-foreground hover:text-foreground disabled:opacity-30"
                   data-action="move-image-down"
+                  aria-label="Przesun zdjecie nizej"
                 >
                   <ChevronRight className="h-3.5 w-3.5 rotate-90" />
                 </button>
@@ -285,6 +291,7 @@ export function ImageUploader({ productId, images, onChange }: ImageUploaderProp
                 className="text-muted-foreground hover:text-destructive shrink-0"
                 data-action="remove-image"
                 data-id={img.id}
+                aria-label="Usun zdjecie"
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
