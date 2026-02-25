@@ -174,3 +174,20 @@ export enum CustomerSource {
   WEBSITE = 'website',
   MANUAL_IMPORT = 'manual_import',
 }
+
+// Inventory: Polish VAT rate groups (stawki PTU)
+export enum VatRate {
+  PTU_A = 'PTU_A', // 23%
+  PTU_B = 'PTU_B', // 8%
+  PTU_C = 'PTU_C', // 0% (zwolniony)
+  PTU_D = 'PTU_D', // 5%
+  PTU_E = 'PTU_E', // 0% (NP)
+  PTU_F = 'PTU_F', // 0% (zw. art. 43)
+  PTU_G = 'PTU_G', // 0% (zw. inne)
+}
+
+// Inventory: consumption/deduction type for stock items
+export enum ConsumptionType {
+  PRODUCT = 'product',         // Deduct this item directly
+  COMPONENTS = 'components',   // Deduct component items (BOM)
+}

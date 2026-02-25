@@ -1,24 +1,77 @@
 'use client';
 
 import { create } from 'zustand';
-import { StockItem } from '@/types/inventory';
+import { StockItem, Warehouse, WarehouseStockItem, StockItemComponentWithDetails, StockItemUsage } from '@/types/inventory';
 import { inventoryRepository } from './repository';
 
 interface InventoryStore {
   stockItems: StockItem[];
+  warehouses: Warehouse[];
+  warehouseStockItems: WarehouseStockItem[];
+  selectedWarehouseId: string | null;
   isLoading: boolean;
+
+  // Detail view state
+  currentStockItem: StockItem | null;
+  currentComponents: StockItemComponentWithDetails[];
+  currentUsage: StockItemUsage | null;
+  isDetailLoading: boolean;
+
+  loadAll: () => Promise<void>;
   loadStockItems: () => Promise<void>;
+  setSelectedWarehouse: (id: string | null) => void;
+
   createStockItem: (data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>) => Promise<StockItem>;
   updateStockItem: (id: string, data: Partial<StockItem>) => Promise<void>;
   deleteStockItem: (id: string) => Promise<void>;
-  adjustStock: (stockItemId: string, quantity: number, reason: string) => Promise<void>;
-  getLowStockItems: () => StockItem[];
+
+  adjustStock: (warehouseId: string, stockItemId: string, quantity: number, reason: string) => Promise<void>;
+  transferStock: (sourceId: string, targetId: string, itemId: string, quantity: number) => Promise<void>;
+  assignToWarehouse: (warehouseId: string, itemId: string, quantity: number, minQuantity: number) => Promise<void>;
+
+  createWarehouse: (data: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateWarehouse: (id: string, data: Partial<Warehouse>) => Promise<void>;
+  deleteWarehouse: (id: string) => Promise<void>;
+
+  getItemsForWarehouse: (warehouseId: string | null) => WarehouseStockItem[];
+  getLowStockItems: () => WarehouseStockItem[];
   getStockValue: () => number;
+
+  // Detail view actions
+  loadStockItemDetail: (id: string) => Promise<void>;
+  loadComponents: (id: string) => Promise<void>;
+  loadUsage: (id: string) => Promise<void>;
+  addComponent: (parentId: string, componentId: string, quantity: number) => Promise<void>;
+  updateComponent: (componentId: string, quantity: number) => Promise<void>;
+  removeComponent: (componentId: string, parentId: string) => Promise<void>;
 }
 
 export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   stockItems: [],
+  warehouses: [],
+  warehouseStockItems: [],
+  selectedWarehouseId: null,
   isLoading: false,
+
+  // Detail view state
+  currentStockItem: null,
+  currentComponents: [],
+  currentUsage: null,
+  isDetailLoading: false,
+
+  loadAll: async () => {
+    set({ isLoading: true });
+    try {
+      const [stockItems, warehouses, warehouseStockItems] = await Promise.all([
+        inventoryRepository.getAllStockItems(),
+        inventoryRepository.getAllWarehouses(),
+        inventoryRepository.getAllWarehouseStockItems(),
+      ]);
+      set({ stockItems, warehouses, warehouseStockItems });
+    } finally {
+      set({ isLoading: false });
+    }
+  },
 
   loadStockItems: async () => {
     set({ isLoading: true });
@@ -30,6 +83,10 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
     }
   },
 
+  setSelectedWarehouse: (id) => {
+    set({ selectedWarehouseId: id });
+  },
+
   createStockItem: async (data) => {
     const newItem = await inventoryRepository.stockItems.create(data);
     set({ stockItems: [...get().stockItems, newItem] });
@@ -38,10 +95,12 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
 
   updateStockItem: async (id, data) => {
     await inventoryRepository.stockItems.update(id, data);
+    const updated = { ...get().currentStockItem, ...data, updated_at: new Date().toISOString() };
     set({
       stockItems: get().stockItems.map((item) =>
         item.id === id ? { ...item, ...data, updated_at: new Date().toISOString() } : item
       ),
+      currentStockItem: get().currentStockItem?.id === id ? updated as StockItem : get().currentStockItem,
     });
   },
 
@@ -50,27 +109,107 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
     set({ stockItems: get().stockItems.filter((item) => item.id !== id) });
   },
 
-  adjustStock: async (stockItemId: string, quantity: number, reason: string) => {
-    await inventoryRepository.adjustStock(stockItemId, quantity, reason);
+  adjustStock: async (warehouseId: string, stockItemId: string, quantity: number, reason: string) => {
+    await inventoryRepository.adjustStock(warehouseId, stockItemId, quantity, reason);
     set({
-      stockItems: get().stockItems.map((item) =>
-        item.id === stockItemId
+      warehouseStockItems: get().warehouseStockItems.map((item) =>
+        item.warehouse_id === warehouseId && item.id === stockItemId
           ? { ...item, quantity: item.quantity + quantity }
           : item
       ),
     });
   },
 
+  transferStock: async (sourceId: string, targetId: string, itemId: string, quantity: number) => {
+    await inventoryRepository.transferStock(sourceId, targetId, itemId, quantity);
+    // Reload all warehouse stock items to get accurate state
+    const warehouseStockItems = await inventoryRepository.getAllWarehouseStockItems();
+    set({ warehouseStockItems });
+  },
+
+  assignToWarehouse: async (warehouseId: string, itemId: string, quantity: number, minQuantity: number) => {
+    await inventoryRepository.assignToWarehouse(warehouseId, itemId, quantity, minQuantity);
+    const warehouseStockItems = await inventoryRepository.getAllWarehouseStockItems();
+    set({ warehouseStockItems });
+  },
+
+  createWarehouse: async (data) => {
+    await inventoryRepository.createWarehouse(data);
+    const warehouses = await inventoryRepository.getAllWarehouses();
+    set({ warehouses });
+  },
+
+  updateWarehouse: async (id, data) => {
+    await inventoryRepository.updateWarehouse(id, data);
+    const warehouses = await inventoryRepository.getAllWarehouses();
+    set({ warehouses });
+  },
+
+  deleteWarehouse: async (id) => {
+    await inventoryRepository.deleteWarehouse(id);
+    const warehouses = await inventoryRepository.getAllWarehouses();
+    set({ warehouses });
+  },
+
+  getItemsForWarehouse: (warehouseId) => {
+    const items = get().warehouseStockItems;
+    if (!warehouseId) return items;
+    return items.filter((item) => item.warehouse_id === warehouseId);
+  },
+
   getLowStockItems: () => {
-    return get().stockItems.filter(
+    return get().warehouseStockItems.filter(
       (item) => item.is_active && item.quantity < item.min_quantity
     );
   },
 
   getStockValue: () => {
-    return get().stockItems.reduce(
+    return get().warehouseStockItems.reduce(
       (total, item) => total + item.quantity * item.cost_per_unit,
       0
     );
+  },
+
+  // Detail view actions
+  loadStockItemDetail: async (id: string) => {
+    set({ isDetailLoading: true, currentStockItem: null, currentComponents: [], currentUsage: null });
+    try {
+      const item = await inventoryRepository.getStockItemById(id);
+      set({ currentStockItem: item });
+    } finally {
+      set({ isDetailLoading: false });
+    }
+  },
+
+  loadComponents: async (id: string) => {
+    const components = await inventoryRepository.getComponentsForItem(id);
+    set({ currentComponents: components });
+  },
+
+  loadUsage: async (id: string) => {
+    const usage = await inventoryRepository.getStockItemUsage(id);
+    set({ currentUsage: usage });
+  },
+
+  addComponent: async (parentId: string, componentId: string, quantity: number) => {
+    await inventoryRepository.addComponent(parentId, componentId, quantity);
+    const components = await inventoryRepository.getComponentsForItem(parentId);
+    set({ currentComponents: components });
+  },
+
+  updateComponent: async (componentId: string, quantity: number) => {
+    await inventoryRepository.updateComponent(componentId, quantity);
+    // Refresh components for current item
+    const currentItem = get().currentStockItem;
+    if (currentItem) {
+      const components = await inventoryRepository.getComponentsForItem(currentItem.id);
+      set({ currentComponents: components });
+    }
+  },
+
+  removeComponent: async (componentId: string, parentId: string) => {
+    await inventoryRepository.removeComponent(componentId);
+    const components = await inventoryRepository.getComponentsForItem(parentId);
+    set({ currentComponents: components });
   },
 }));

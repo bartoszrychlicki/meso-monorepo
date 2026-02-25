@@ -1,18 +1,44 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StockItem } from '@/types/inventory';
-import { ProductCategory } from '@/types/enums';
+import { StockItem, Warehouse, WarehouseStockItem, StockItemComponentWithDetails, StockItemUsage } from '@/types/inventory';
+import { ProductCategory, VatRate, ConsumptionType } from '@/types/enums';
 
 // Mock inventory repository
 const mockGetAllStockItems = vi.fn();
+const mockGetAllWarehouses = vi.fn();
+const mockGetAllWarehouseStockItems = vi.fn();
 const mockStockItemsCreate = vi.fn();
 const mockStockItemsUpdate = vi.fn();
 const mockStockItemsDelete = vi.fn();
 const mockAdjustStock = vi.fn();
+const mockTransferStock = vi.fn();
+const mockAssignToWarehouse = vi.fn();
+const mockCreateWarehouse = vi.fn();
+const mockUpdateWarehouse = vi.fn();
+const mockDeleteWarehouse = vi.fn();
+const mockGetStockItemById = vi.fn();
+const mockGetComponentsForItem = vi.fn();
+const mockGetStockItemUsage = vi.fn();
+const mockAddComponent = vi.fn();
+const mockUpdateComponent = vi.fn();
+const mockRemoveComponent = vi.fn();
 
 vi.mock('../repository', () => ({
   inventoryRepository: {
     getAllStockItems: (...args: unknown[]) => mockGetAllStockItems(...args),
+    getAllWarehouses: (...args: unknown[]) => mockGetAllWarehouses(...args),
+    getAllWarehouseStockItems: (...args: unknown[]) => mockGetAllWarehouseStockItems(...args),
     adjustStock: (...args: unknown[]) => mockAdjustStock(...args),
+    transferStock: (...args: unknown[]) => mockTransferStock(...args),
+    assignToWarehouse: (...args: unknown[]) => mockAssignToWarehouse(...args),
+    createWarehouse: (...args: unknown[]) => mockCreateWarehouse(...args),
+    updateWarehouse: (...args: unknown[]) => mockUpdateWarehouse(...args),
+    deleteWarehouse: (...args: unknown[]) => mockDeleteWarehouse(...args),
+    getStockItemById: (...args: unknown[]) => mockGetStockItemById(...args),
+    getComponentsForItem: (...args: unknown[]) => mockGetComponentsForItem(...args),
+    getStockItemUsage: (...args: unknown[]) => mockGetStockItemUsage(...args),
+    addComponent: (...args: unknown[]) => mockAddComponent(...args),
+    updateComponent: (...args: unknown[]) => mockUpdateComponent(...args),
+    removeComponent: (...args: unknown[]) => mockRemoveComponent(...args),
     stockItems: {
       create: (...args: unknown[]) => mockStockItemsCreate(...args),
       update: (...args: unknown[]) => mockStockItemsUpdate(...args),
@@ -29,48 +55,99 @@ const makeStockItem = (overrides: Partial<StockItem> = {}): StockItem => ({
   sku: 'TEST-001',
   product_category: ProductCategory.RAW_MATERIAL,
   unit: 'g',
-  quantity: 1000,
-  min_quantity: 500,
   cost_per_unit: 0.05,
   allergens: [],
+  is_active: true,
+  vat_rate: VatRate.PTU_B,
+  consumption_type: ConsumptionType.PRODUCT,
+  shelf_life_days: 0,
+  default_min_quantity: 0,
+  storage_location: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  ...overrides,
+});
+
+const makeWarehouse = (overrides: Partial<Warehouse> = {}): Warehouse => ({
+  id: 'wh-001',
+  name: 'Test Warehouse',
+  location_id: null,
   is_active: true,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
 });
 
+const makeWarehouseStockItem = (overrides: Partial<WarehouseStockItem> = {}): WarehouseStockItem => ({
+  id: 'si-001',
+  name: 'Test Item',
+  sku: 'TEST-001',
+  product_category: ProductCategory.RAW_MATERIAL,
+  unit: 'g',
+  cost_per_unit: 0.05,
+  allergens: [],
+  is_active: true,
+  vat_rate: VatRate.PTU_B,
+  consumption_type: ConsumptionType.PRODUCT,
+  shelf_life_days: 0,
+  default_min_quantity: 0,
+  storage_location: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  warehouse_id: 'wh-001',
+  warehouse_name: 'Test Warehouse',
+  quantity: 1000,
+  min_quantity: 500,
+  warehouse_stock_id: 'ws-001',
+  ...overrides,
+});
+
 describe('useInventoryStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset store state
-    useInventoryStore.setState({ stockItems: [], isLoading: false });
+    useInventoryStore.setState({
+      stockItems: [],
+      warehouses: [],
+      warehouseStockItems: [],
+      selectedWarehouseId: null,
+      isLoading: false,
+      currentStockItem: null,
+      currentComponents: [],
+      currentUsage: null,
+      isDetailLoading: false,
+    });
   });
 
-  describe('loadStockItems', () => {
-    it('loads stock items from repository', async () => {
-      const items = [makeStockItem({ id: '1' }), makeStockItem({ id: '2' })];
-      mockGetAllStockItems.mockResolvedValue(items);
+  describe('loadAll', () => {
+    it('loads stock items, warehouses, and warehouse stock items', async () => {
+      const items = [makeStockItem({ id: '1' })];
+      const warehouses = [makeWarehouse({ id: 'wh-1' })];
+      const whItems = [makeWarehouseStockItem({ id: '1', warehouse_id: 'wh-1' })];
 
-      await useInventoryStore.getState().loadStockItems();
+      mockGetAllStockItems.mockResolvedValue(items);
+      mockGetAllWarehouses.mockResolvedValue(warehouses);
+      mockGetAllWarehouseStockItems.mockResolvedValue(whItems);
+
+      await useInventoryStore.getState().loadAll();
 
       expect(useInventoryStore.getState().stockItems).toEqual(items);
+      expect(useInventoryStore.getState().warehouses).toEqual(warehouses);
+      expect(useInventoryStore.getState().warehouseStockItems).toEqual(whItems);
       expect(useInventoryStore.getState().isLoading).toBe(false);
     });
 
     it('sets isLoading during fetch', async () => {
-      let resolvePromise: (value: StockItem[]) => void;
+      let resolveItems: (value: StockItem[]) => void;
       mockGetAllStockItems.mockReturnValue(
-        new Promise<StockItem[]>((resolve) => {
-          resolvePromise = resolve;
-        })
+        new Promise<StockItem[]>((resolve) => { resolveItems = resolve; })
       );
+      mockGetAllWarehouses.mockResolvedValue([]);
+      mockGetAllWarehouseStockItems.mockResolvedValue([]);
 
-      const loadPromise = useInventoryStore.getState().loadStockItems();
-
-      // isLoading should be true while waiting
+      const loadPromise = useInventoryStore.getState().loadAll();
       expect(useInventoryStore.getState().isLoading).toBe(true);
 
-      resolvePromise!([]);
+      resolveItems!([]);
       await loadPromise;
 
       expect(useInventoryStore.getState().isLoading).toBe(false);
@@ -78,14 +155,54 @@ describe('useInventoryStore', () => {
 
     it('resets isLoading on error', async () => {
       mockGetAllStockItems.mockRejectedValue(new Error('Network error'));
+      mockGetAllWarehouses.mockResolvedValue([]);
+      mockGetAllWarehouseStockItems.mockResolvedValue([]);
 
       try {
-        await useInventoryStore.getState().loadStockItems();
+        await useInventoryStore.getState().loadAll();
       } catch {
         // expected
       }
 
       expect(useInventoryStore.getState().isLoading).toBe(false);
+    });
+  });
+
+  describe('setSelectedWarehouse', () => {
+    it('sets selected warehouse ID', () => {
+      useInventoryStore.getState().setSelectedWarehouse('wh-001');
+      expect(useInventoryStore.getState().selectedWarehouseId).toBe('wh-001');
+    });
+
+    it('sets null for all warehouses', () => {
+      useInventoryStore.getState().setSelectedWarehouse('wh-001');
+      useInventoryStore.getState().setSelectedWarehouse(null);
+      expect(useInventoryStore.getState().selectedWarehouseId).toBeNull();
+    });
+  });
+
+  describe('getItemsForWarehouse', () => {
+    it('returns all items when warehouse is null', () => {
+      const items = [
+        makeWarehouseStockItem({ id: '1', warehouse_id: 'wh-1' }),
+        makeWarehouseStockItem({ id: '2', warehouse_id: 'wh-2' }),
+      ];
+      useInventoryStore.setState({ warehouseStockItems: items });
+
+      const result = useInventoryStore.getState().getItemsForWarehouse(null);
+      expect(result).toHaveLength(2);
+    });
+
+    it('filters items by warehouse ID', () => {
+      const items = [
+        makeWarehouseStockItem({ id: '1', warehouse_id: 'wh-1' }),
+        makeWarehouseStockItem({ id: '2', warehouse_id: 'wh-2' }),
+      ];
+      useInventoryStore.setState({ warehouseStockItems: items });
+
+      const result = useInventoryStore.getState().getItemsForWarehouse('wh-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('1');
     });
   });
 
@@ -99,11 +216,14 @@ describe('useInventoryStore', () => {
         sku: newItem.sku,
         product_category: newItem.product_category,
         unit: newItem.unit,
-        quantity: newItem.quantity,
-        min_quantity: newItem.min_quantity,
         cost_per_unit: newItem.cost_per_unit,
         allergens: newItem.allergens,
         is_active: newItem.is_active,
+        vat_rate: newItem.vat_rate,
+        consumption_type: newItem.consumption_type,
+        shelf_life_days: newItem.shelf_life_days,
+        default_min_quantity: newItem.default_min_quantity,
+        storage_location: newItem.storage_location,
       });
 
       expect(result).toEqual(newItem);
@@ -140,27 +260,62 @@ describe('useInventoryStore', () => {
   });
 
   describe('adjustStock', () => {
-    it('updates quantity in store after adjust', async () => {
-      const item = makeStockItem({ id: 'si-001', quantity: 1000 });
-      useInventoryStore.setState({ stockItems: [item] });
+    it('updates quantity in warehouse stock items after adjust', async () => {
+      const item = makeWarehouseStockItem({ id: 'si-001', warehouse_id: 'wh-001', quantity: 1000 });
+      useInventoryStore.setState({ warehouseStockItems: [item] });
 
-      mockAdjustStock.mockResolvedValue({ ...item, quantity: 1500 });
+      mockAdjustStock.mockResolvedValue({ quantity: 1500 });
 
-      await useInventoryStore.getState().adjustStock('si-001', 500, 'Delivery');
+      await useInventoryStore.getState().adjustStock('wh-001', 'si-001', 500, 'Delivery');
 
-      const updated = useInventoryStore.getState().stockItems.find((i) => i.id === 'si-001');
+      const updated = useInventoryStore.getState().warehouseStockItems.find(
+        (i) => i.id === 'si-001' && i.warehouse_id === 'wh-001'
+      );
       expect(updated?.quantity).toBe(1500);
+    });
+  });
+
+  describe('transferStock', () => {
+    it('reloads warehouse stock items after transfer', async () => {
+      const updatedItems = [
+        makeWarehouseStockItem({ id: '1', warehouse_id: 'wh-1', quantity: 500 }),
+        makeWarehouseStockItem({ id: '1', warehouse_id: 'wh-2', quantity: 500, warehouse_stock_id: 'ws-002' }),
+      ];
+
+      mockTransferStock.mockResolvedValue(undefined);
+      mockGetAllWarehouseStockItems.mockResolvedValue(updatedItems);
+
+      await useInventoryStore.getState().transferStock('wh-1', 'wh-2', '1', 500);
+
+      expect(mockTransferStock).toHaveBeenCalledWith('wh-1', 'wh-2', '1', 500);
+      expect(useInventoryStore.getState().warehouseStockItems).toEqual(updatedItems);
+    });
+  });
+
+  describe('assignToWarehouse', () => {
+    it('reloads warehouse stock items after assignment', async () => {
+      const updatedItems = [
+        makeWarehouseStockItem({ id: '1', warehouse_id: 'wh-1', quantity: 100 }),
+      ];
+
+      mockAssignToWarehouse.mockResolvedValue({});
+      mockGetAllWarehouseStockItems.mockResolvedValue(updatedItems);
+
+      await useInventoryStore.getState().assignToWarehouse('wh-1', '1', 100, 50);
+
+      expect(mockAssignToWarehouse).toHaveBeenCalledWith('wh-1', '1', 100, 50);
+      expect(useInventoryStore.getState().warehouseStockItems).toEqual(updatedItems);
     });
   });
 
   describe('getLowStockItems', () => {
     it('returns items below min_quantity', () => {
       const items = [
-        makeStockItem({ id: '1', quantity: 100, min_quantity: 500, is_active: true }),
-        makeStockItem({ id: '2', quantity: 1000, min_quantity: 500, is_active: true }),
-        makeStockItem({ id: '3', quantity: 10, min_quantity: 100, is_active: false }),
+        makeWarehouseStockItem({ id: '1', quantity: 100, min_quantity: 500, is_active: true }),
+        makeWarehouseStockItem({ id: '2', quantity: 1000, min_quantity: 500, is_active: true, warehouse_stock_id: 'ws-002' }),
+        makeWarehouseStockItem({ id: '3', quantity: 10, min_quantity: 100, is_active: false, warehouse_stock_id: 'ws-003' }),
       ];
-      useInventoryStore.setState({ stockItems: items });
+      useInventoryStore.setState({ warehouseStockItems: items });
 
       const lowStock = useInventoryStore.getState().getLowStockItems();
       expect(lowStock).toHaveLength(1);
@@ -171,10 +326,10 @@ describe('useInventoryStore', () => {
   describe('getStockValue', () => {
     it('calculates total stock value', () => {
       const items = [
-        makeStockItem({ id: '1', quantity: 1000, cost_per_unit: 0.05 }),
-        makeStockItem({ id: '2', quantity: 500, cost_per_unit: 0.10 }),
+        makeWarehouseStockItem({ id: '1', quantity: 1000, cost_per_unit: 0.05, warehouse_stock_id: 'ws-001' }),
+        makeWarehouseStockItem({ id: '2', quantity: 500, cost_per_unit: 0.10, warehouse_stock_id: 'ws-002' }),
       ];
-      useInventoryStore.setState({ stockItems: items });
+      useInventoryStore.setState({ warehouseStockItems: items });
 
       const value = useInventoryStore.getState().getStockValue();
       // 1000 * 0.05 + 500 * 0.10 = 50 + 50 = 100
@@ -182,8 +337,108 @@ describe('useInventoryStore', () => {
     });
 
     it('returns 0 for empty stock', () => {
-      useInventoryStore.setState({ stockItems: [] });
+      useInventoryStore.setState({ warehouseStockItems: [] });
       expect(useInventoryStore.getState().getStockValue()).toBe(0);
+    });
+  });
+
+  describe('loadStockItemDetail', () => {
+    it('loads a single stock item by ID', async () => {
+      const item = makeStockItem({ id: 'si-detail' });
+      mockGetStockItemById.mockResolvedValue(item);
+
+      await useInventoryStore.getState().loadStockItemDetail('si-detail');
+
+      expect(mockGetStockItemById).toHaveBeenCalledWith('si-detail');
+      expect(useInventoryStore.getState().currentStockItem).toEqual(item);
+      expect(useInventoryStore.getState().isDetailLoading).toBe(false);
+    });
+
+    it('sets isDetailLoading during fetch', async () => {
+      let resolve: (value: StockItem | null) => void;
+      mockGetStockItemById.mockReturnValue(
+        new Promise<StockItem | null>((r) => { resolve = r; })
+      );
+
+      const promise = useInventoryStore.getState().loadStockItemDetail('si-001');
+      expect(useInventoryStore.getState().isDetailLoading).toBe(true);
+
+      resolve!(null);
+      await promise;
+
+      expect(useInventoryStore.getState().isDetailLoading).toBe(false);
+    });
+  });
+
+  describe('addComponent', () => {
+    it('adds component and reloads components list', async () => {
+      const components: StockItemComponentWithDetails[] = [{
+        id: 'comp-001',
+        parent_stock_item_id: 'si-001',
+        component_stock_item_id: 'si-002',
+        quantity: 0.5,
+        component_name: 'Tomatoes',
+        component_sku: 'RAW-VEG-003',
+        component_unit: 'kg',
+        current_total_stock: 14,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      }];
+
+      mockAddComponent.mockResolvedValue({});
+      mockGetComponentsForItem.mockResolvedValue(components);
+
+      await useInventoryStore.getState().addComponent('si-001', 'si-002', 0.5);
+
+      expect(mockAddComponent).toHaveBeenCalledWith('si-001', 'si-002', 0.5);
+      expect(useInventoryStore.getState().currentComponents).toEqual(components);
+    });
+  });
+
+  describe('removeComponent', () => {
+    it('removes component and reloads components list', async () => {
+      mockRemoveComponent.mockResolvedValue(undefined);
+      mockGetComponentsForItem.mockResolvedValue([]);
+
+      await useInventoryStore.getState().removeComponent('comp-001', 'si-001');
+
+      expect(mockRemoveComponent).toHaveBeenCalledWith('comp-001');
+      expect(useInventoryStore.getState().currentComponents).toEqual([]);
+    });
+  });
+
+  describe('warehouse CRUD', () => {
+    it('creates warehouse and reloads', async () => {
+      const newWarehouses = [makeWarehouse({ id: 'wh-new' })];
+      mockCreateWarehouse.mockResolvedValue({});
+      mockGetAllWarehouses.mockResolvedValue(newWarehouses);
+
+      await useInventoryStore.getState().createWarehouse({
+        name: 'New WH',
+        location_id: null,
+        is_active: true,
+      });
+
+      expect(useInventoryStore.getState().warehouses).toEqual(newWarehouses);
+    });
+
+    it('updates warehouse and reloads', async () => {
+      const updatedWarehouses = [makeWarehouse({ id: 'wh-001', name: 'Updated' })];
+      mockUpdateWarehouse.mockResolvedValue({});
+      mockGetAllWarehouses.mockResolvedValue(updatedWarehouses);
+
+      await useInventoryStore.getState().updateWarehouse('wh-001', { name: 'Updated' });
+
+      expect(useInventoryStore.getState().warehouses).toEqual(updatedWarehouses);
+    });
+
+    it('deletes warehouse and reloads', async () => {
+      mockDeleteWarehouse.mockResolvedValue(undefined);
+      mockGetAllWarehouses.mockResolvedValue([]);
+
+      await useInventoryStore.getState().deleteWarehouse('wh-001');
+
+      expect(useInventoryStore.getState().warehouses).toEqual([]);
     });
   });
 });

@@ -17,6 +17,9 @@ const TABLE_MAP: Record<string, string> = {
   recipe_versions: 'recipes_recipe_versions',
   ingredient_usage_logs: 'recipes_ingredient_usage_logs',
   stock_items: 'inventory_stock_items',
+  warehouses: 'inventory_warehouses',
+  warehouse_stock: 'inventory_warehouse_stock',
+  stock_item_components: 'inventory_stock_item_components',
   employees: 'employees_employees',
   work_times: 'employees_work_times',
   api_keys: 'integrations_api_keys',
@@ -31,6 +34,7 @@ const NUMERIC_FIELDS = new Set([
   'yield_quantity', 'total_cost', 'food_cost_percentage',
   'discount_value', 'minimum_order_value',
   'amount', 'multiplier', 'tax_rate', 'quantity_produced',
+  'default_min_quantity', 'shelf_life_days',
 ]);
 
 export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> {

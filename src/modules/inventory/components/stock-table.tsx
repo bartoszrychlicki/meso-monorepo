@@ -20,34 +20,36 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { StockItem } from '@/types/inventory';
+import { WarehouseStockItem } from '@/types/inventory';
 import { AllergenBadges } from '@/modules/menu/components/allergen-badges';
 import { formatCurrency } from '@/lib/utils';
 import { Plus, Minus, Package } from 'lucide-react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { toast } from 'sonner';
+import Link from 'next/link';
 
 interface StockTableProps {
-  items: StockItem[];
-  onAdjustStock?: (itemId: string, quantity: number, reason: string) => Promise<void>;
+  items: WarehouseStockItem[];
+  showWarehouseColumn?: boolean;
+  onAdjustStock?: (warehouseId: string, stockItemId: string, quantity: number, reason: string) => Promise<void>;
 }
 
-function getStockStatus(item: StockItem): { label: string; color: string } {
+function getStockStatus(item: WarehouseStockItem): { label: string; color: string } {
   const ratio = item.quantity / item.min_quantity;
   if (ratio < 0.5) return { label: 'Krytyczny', color: 'bg-red-100 text-red-800' };
   if (ratio < 1) return { label: 'Niski stan', color: 'bg-amber-100 text-amber-800' };
   return { label: 'OK', color: 'bg-green-100 text-green-800' };
 }
 
-function getQuantityColor(item: StockItem): string {
+function getQuantityColor(item: WarehouseStockItem): string {
   const ratio = item.quantity / item.min_quantity;
   if (ratio < 0.5) return 'text-red-600 font-bold';
   if (ratio < 1) return 'text-amber-600 font-semibold';
   return 'text-green-700';
 }
 
-export function StockTable({ items, onAdjustStock }: StockTableProps) {
-  const [adjustDialog, setAdjustDialog] = useState<StockItem | null>(null);
+export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockTableProps) {
+  const [adjustDialog, setAdjustDialog] = useState<WarehouseStockItem | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,7 +58,7 @@ export function StockTable({ items, onAdjustStock }: StockTableProps) {
     if (!adjustDialog || adjustQty === 0 || !onAdjustStock) return;
     setIsSubmitting(true);
     try {
-      await onAdjustStock(adjustDialog.id, adjustQty, adjustReason);
+      await onAdjustStock(adjustDialog.warehouse_id, adjustDialog.id, adjustQty, adjustReason);
       toast.success(`Stan magazynowy zaktualizowany: ${adjustDialog.name}`);
       setAdjustDialog(null);
       setAdjustQty(0);
@@ -86,6 +88,7 @@ export function StockTable({ items, onAdjustStock }: StockTableProps) {
             <TableRow>
               <TableHead>Nazwa</TableHead>
               <TableHead className="hidden md:table-cell">SKU</TableHead>
+              {showWarehouseColumn && <TableHead className="hidden sm:table-cell">Magazyn</TableHead>}
               <TableHead className="hidden sm:table-cell">Jednostka</TableHead>
               <TableHead className="text-right">Ilosc</TableHead>
               <TableHead className="text-right hidden sm:table-cell">Min</TableHead>
@@ -101,11 +104,25 @@ export function StockTable({ items, onAdjustStock }: StockTableProps) {
               const qtyColor = getQuantityColor(item);
 
               return (
-                <TableRow key={item.id} data-id={item.id}>
-                  <TableCell className="font-medium">{item.name}</TableCell>
+                <TableRow key={item.warehouse_stock_id} data-id={item.id} data-warehouse-id={item.warehouse_id}>
+                  <TableCell className="font-medium">
+                    <Link
+                      href={`/inventory/${item.id}`}
+                      className="hover:underline hover:text-primary"
+                      data-action="view-stock-item"
+                      data-id={item.id}
+                    >
+                      {item.name}
+                    </Link>
+                  </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
                     {item.sku}
                   </TableCell>
+                  {showWarehouseColumn && (
+                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+                      {item.warehouse_name}
+                    </TableCell>
+                  )}
                   <TableCell className="hidden sm:table-cell text-muted-foreground">
                     {item.unit}
                   </TableCell>
@@ -192,6 +209,12 @@ export function StockTable({ items, onAdjustStock }: StockTableProps) {
                 {adjustDialog?.quantity} {adjustDialog?.unit}
               </span>
             </div>
+            {adjustDialog?.warehouse_name && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Magazyn:</span>
+                <span className="font-medium">{adjustDialog.warehouse_name}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Zmiana ilosci</Label>
               <div className="flex items-center gap-2">
