@@ -101,8 +101,8 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
       throw new Error(`[${table}] findAll failed: ${error.message}`);
     }
 
-    const rows = (data ?? []).map((row) =>
-      this.transformRow(row as Record<string, unknown>)
+    const rows = (data ?? []).map((row: Record<string, unknown>) =>
+      this.transformRow(row)
     );
     const total = count ?? 0;
     const totalPages = Math.ceil(total / perPage);
@@ -144,8 +144,8 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
         throw new Error(`[${table}] findMany failed: ${error.message}`);
       }
 
-      const rows = (data ?? []).map((row) =>
-        this.transformRow(row as Record<string, unknown>)
+      const rows = (data ?? []).map((row: Record<string, unknown>) =>
+        this.transformRow(row)
       );
       return rows.filter(filter);
     }
@@ -164,8 +164,8 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
       throw new Error(`[${table}] findMany failed: ${error.message}`);
     }
 
-    return (data ?? []).map((row) =>
-      this.transformRow(row as Record<string, unknown>)
+    return (data ?? []).map((row: Record<string, unknown>) =>
+      this.transformRow(row)
     );
   }
 
