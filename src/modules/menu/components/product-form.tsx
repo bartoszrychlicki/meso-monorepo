@@ -37,6 +37,7 @@ import {
   MapPin,
   Beaker,
   ExternalLink,
+  Save,
 } from 'lucide-react';
 import { ImageUploader } from './image-uploader';
 import { ModifierSelector } from './modifier-selector';
@@ -730,24 +731,27 @@ export function ProductForm({
           {step === 0 ? 'Anuluj' : 'Wstecz'}
         </Button>
 
-        {step < STEPS.length - 1 ? (
-          <Button
-            onClick={() => setStep(step + 1)}
-            disabled={!canGoNext()}
-            data-action="next-step"
-          >
-            Dalej
-            <ChevronRight className="ml-1 h-4 w-4" />
-          </Button>
-        ) : (
+        <div className="flex items-center gap-2">
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting || !name || !categoryId || price <= 0}
+            variant={step < STEPS.length - 1 ? 'outline' : 'default'}
             data-action="submit-product"
           >
-            {isSubmitting ? 'Zapisywanie...' : product ? 'Zapisz zmiany' : 'Dodaj produkt'}
+            <Save className="mr-1 h-4 w-4" />
+            {isSubmitting ? 'Zapisywanie...' : product ? 'Zapisz zmiany' : 'Zapisz'}
           </Button>
-        )}
+          {step < STEPS.length - 1 && (
+            <Button
+              onClick={() => setStep(step + 1)}
+              disabled={!canGoNext()}
+              data-action="next-step"
+            >
+              Dalej
+              <ChevronRight className="ml-1 h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
