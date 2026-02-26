@@ -10,8 +10,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { StockItem } from '@/types/inventory';
-import { X } from 'lucide-react';
+import { X, Plus, PackagePlus } from 'lucide-react';
 
 export interface DeliveryLineRow {
   id: string;
@@ -62,12 +63,14 @@ interface DeliveryLineTableProps {
   items: DeliveryLineRow[];
   onItemsChange: (items: DeliveryLineRow[]) => void;
   stockItems: StockItem[];
+  onCreateNewItem?: (searchTerm: string, rowIndex: number) => void;
 }
 
 export function DeliveryLineTable({
   items,
   onItemsChange,
   stockItems,
+  onCreateNewItem,
 }: DeliveryLineTableProps) {
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [searchTerms, setSearchTerms] = useState<Record<number, string>>({});
@@ -117,10 +120,22 @@ export function DeliveryLineTable({
   };
 
   const deleteRow = (index: number) => {
-    // Don't allow deleting the only empty row
     if (items.length === 1 && isRowEmpty(items[0])) return;
     const newItems = items.filter((_, i) => i !== index);
     onItemsChange(newItems);
+  };
+
+  const addNewRow = () => {
+    // If last row is empty, just focus it
+    if (items.length > 0 && isRowEmpty(items[items.length - 1])) {
+      productInputRefs.current[items.length - 1]?.focus();
+      return;
+    }
+    const newItems = [...items, createEmptyRow()];
+    onItemsChange(newItems);
+    setTimeout(() => {
+      productInputRefs.current[newItems.length - 1]?.focus();
+    }, 50);
   };
 
   const handleProductInputChange = (rowIndex: number, value: string) => {
@@ -128,7 +143,6 @@ export function DeliveryLineTable({
     setActiveDropdown(rowIndex);
     setHighlightedIndex(-1);
 
-    // If value is cleared, reset the stock item selection
     if (!value.trim()) {
       updateRow(rowIndex, {
         stock_item_id: '',
@@ -144,10 +158,13 @@ export function DeliveryLineTable({
     if (activeDropdown !== rowIndex) return;
 
     const filtered = getFilteredStockItems(rowIndex);
+    const hasSearchTerm = (searchTerms[rowIndex] ?? '').trim().length > 0;
+    const hasCreateOption = !!onCreateNewItem && hasSearchTerm;
+    const totalOptions = filtered.length + (hasCreateOption ? 1 : 0);
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setHighlightedIndex((prev) => Math.min(prev + 1, filtered.length - 1));
+      setHighlightedIndex((prev) => Math.min(prev + 1, totalOptions - 1));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       setHighlightedIndex((prev) => Math.max(prev - 1, 0));
@@ -155,6 +172,10 @@ export function DeliveryLineTable({
       e.preventDefault();
       if (highlightedIndex >= 0 && highlightedIndex < filtered.length) {
         selectStockItem(rowIndex, filtered[highlightedIndex]);
+      } else if (hasCreateOption && highlightedIndex === filtered.length) {
+        onCreateNewItem!((searchTerms[rowIndex] ?? '').trim(), rowIndex);
+        setActiveDropdown(null);
+        setHighlightedIndex(-1);
       } else if (filtered.length === 1) {
         selectStockItem(rowIndex, filtered[0]);
       }
@@ -169,14 +190,12 @@ export function DeliveryLineTable({
     e: React.KeyboardEvent<HTMLInputElement>
   ) => {
     if (e.key === 'Tab' && !e.shiftKey) {
-      // If this is the last non-empty row, add a new one and focus its product input
       const isLastNonEmpty =
         rowIndex === items.length - 2 && !isRowEmpty(items[rowIndex]);
       const isLastRow = rowIndex === items.length - 1;
 
       if (isLastNonEmpty || isLastRow) {
         e.preventDefault();
-        // The useEffect will add a new empty row if needed. Focus the product input of the last row.
         const nextRowIndex = rowIndex + 1;
         setTimeout(() => {
           productInputRefs.current[nextRowIndex]?.focus();
@@ -186,7 +205,6 @@ export function DeliveryLineTable({
   };
 
   const handleProductBlur = (rowIndex: number) => {
-    // Delay closing dropdown to allow click on items
     setTimeout(() => {
       if (activeDropdown === rowIndex) {
         setActiveDropdown(null);
@@ -195,202 +213,291 @@ export function DeliveryLineTable({
     }, 200);
   };
 
+  const filledRowCount = items.filter((r) => !isRowEmpty(r)).length;
+
   return (
-    <div className="rounded-md border overflow-x-auto" data-component="delivery-line-table">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[280px]">Produkt</TableHead>
-            <TableHead className="w-[100px]">Zamowiono</TableHead>
-            <TableHead className="w-[100px]">Przyjeto</TableHead>
-            <TableHead className="w-[120px]">Cena netto</TableHead>
-            <TableHead className="w-[130px]">Data waznosci</TableHead>
-            <TableHead className="w-[180px]">Notatki</TableHead>
-            <TableHead className="w-[50px]" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {items.map((row, index) => {
-            const filtered = getFilteredStockItems(index);
-            const showDropdown = activeDropdown === index && filtered.length > 0;
-
-            return (
-              <TableRow key={row.id} data-row={index}>
-                {/* Product column */}
-                <TableCell className="relative p-1">
-                  <input
-                    ref={(el) => {
-                      productInputRefs.current[index] = el;
-                    }}
-                    type="text"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="Wpisz nazwe produktu..."
-                    value={
-                      activeDropdown === index
-                        ? searchTerms[index] ?? row.stock_item_name
-                        : row.stock_item_name
-                    }
-                    onChange={(e) => handleProductInputChange(index, e.target.value)}
-                    onFocus={() => {
-                      setActiveDropdown(index);
-                      if (!searchTerms[index] && row.stock_item_name) {
-                        setSearchTerms((prev) => ({
-                          ...prev,
-                          [index]: row.stock_item_name,
-                        }));
-                      }
-                    }}
-                    onBlur={() => handleProductBlur(index)}
-                    onKeyDown={(e) => handleProductKeyDown(index, e)}
-                    data-field="product"
-                    aria-label="Produkt"
-                  />
-                  {showDropdown && (
-                    <div
-                      ref={dropdownRef}
-                      className="absolute z-50 left-1 right-1 top-full mt-1 max-h-48 overflow-y-auto rounded-md border bg-popover shadow-lg"
-                    >
-                      {filtered.map((si, i) => (
-                        <button
-                          key={si.id}
-                          type="button"
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
-                            i === highlightedIndex ? 'bg-accent' : ''
-                          }`}
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            selectStockItem(index, si);
-                          }}
-                          data-action="select-stock-item"
-                          data-id={si.id}
-                        >
-                          <span className="font-medium">{si.name}</span>
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            {si.sku} &middot; {si.unit}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </TableCell>
-
-                {/* Quantity ordered */}
-                <TableCell className="p-1">
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="—"
-                    value={row.quantity_ordered ?? ''}
-                    onChange={(e) =>
-                      updateRow(index, {
-                        quantity_ordered: e.target.value
-                          ? parseFloat(e.target.value)
-                          : null,
-                      })
-                    }
-                    step="any"
-                    min="0"
-                    data-field="quantity-ordered"
-                    aria-label="Ilosc zamowiona"
-                  />
-                </TableCell>
-
-                {/* Quantity received */}
-                <TableCell className="p-1">
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="0"
-                    value={row.quantity_received ?? ''}
-                    onChange={(e) =>
-                      updateRow(index, {
-                        quantity_received: e.target.value
-                          ? parseFloat(e.target.value)
-                          : null,
-                      })
-                    }
-                    step="any"
-                    min="0"
-                    data-field="quantity-received"
-                    aria-label="Ilosc przyjeta"
-                  />
-                </TableCell>
-
-                {/* Unit price net */}
-                <TableCell className="p-1">
-                  <input
-                    type="number"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder="—"
-                    value={row.unit_price_net ?? ''}
-                    onChange={(e) =>
-                      updateRow(index, {
-                        unit_price_net: e.target.value
-                          ? parseFloat(e.target.value)
-                          : null,
-                      })
-                    }
-                    step="0.01"
-                    min="0"
-                    data-field="unit-price-net"
-                    aria-label="Cena netto"
-                  />
-                </TableCell>
-
-                {/* Expiry date */}
-                <TableCell className="p-1">
-                  <input
-                    type="date"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    value={row.expiry_date ?? ''}
-                    onChange={(e) =>
-                      updateRow(index, {
-                        expiry_date: e.target.value || null,
-                      })
-                    }
-                    data-field="expiry-date"
-                    aria-label="Data waznosci"
-                  />
-                </TableCell>
-
-                {/* Notes */}
-                <TableCell className="p-1">
-                  <input
-                    ref={(el) => {
-                      notesInputRefs.current[index] = el;
-                    }}
-                    type="text"
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                    placeholder=""
-                    value={row.notes}
-                    onChange={(e) => updateRow(index, { notes: e.target.value })}
-                    onKeyDown={(e) => handleNotesKeyDown(index, e)}
-                    data-field="notes"
-                    aria-label="Notatki"
-                  />
-                </TableCell>
-
-                {/* Delete button */}
-                <TableCell className="p-1">
-                  {!(items.length === 1 && isRowEmpty(row)) && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteRow(index)}
-                      data-action="delete-row"
-                      data-row={index}
-                      aria-label="Usun wiersz"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
-                </TableCell>
+    <div data-component="delivery-line-table">
+      <div className="rounded-lg border border-border/60 overflow-hidden bg-card">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
+                <TableHead className="w-[40px] text-center text-xs font-semibold text-muted-foreground">#</TableHead>
+                <TableHead className="w-[280px] text-xs font-semibold">Produkt</TableHead>
+                <TableHead className="w-[100px] text-xs font-semibold text-right pr-3">Zamowiono</TableHead>
+                <TableHead className="w-[100px] text-xs font-semibold text-right pr-3">Przyjeto</TableHead>
+                <TableHead className="w-[120px] text-xs font-semibold text-right pr-3">Cena netto</TableHead>
+                <TableHead className="w-[130px] text-xs font-semibold">Data waznosci</TableHead>
+                <TableHead className="w-[160px] text-xs font-semibold">Notatki</TableHead>
+                <TableHead className="w-[44px]" />
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+            </TableHeader>
+            <TableBody>
+              {items.map((row, index) => {
+                const filtered = getFilteredStockItems(index);
+                const showDropdown = activeDropdown === index;
+                const hasSearchTerm = (searchTerms[index] ?? '').trim().length > 0;
+                const isEmpty = isRowEmpty(row);
+                const isLast = index === items.length - 1;
+
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-row={index}
+                    className={`
+                      ${isEmpty && isLast ? 'bg-muted/20' : 'hover:bg-accent/30'}
+                      transition-colors border-b border-border/40
+                    `}
+                  >
+                    {/* Row number */}
+                    <TableCell className="p-1.5 text-center">
+                      <span className="text-xs text-muted-foreground/70 tabular-nums select-none">
+                        {isEmpty && isLast ? '' : index + 1}
+                      </span>
+                    </TableCell>
+
+                    {/* Product column */}
+                    <TableCell className="relative p-1.5">
+                      <input
+                        ref={(el) => {
+                          productInputRefs.current[index] = el;
+                        }}
+                        type="text"
+                        className={`
+                          w-full rounded-md border px-3 py-1.5 text-sm transition-all
+                          focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent
+                          ${row.stock_item_id
+                            ? 'border-transparent bg-transparent font-medium text-foreground'
+                            : 'border-input bg-background'
+                          }
+                          ${isEmpty && isLast ? 'border-dashed border-muted-foreground/30 bg-transparent placeholder:text-muted-foreground/40' : ''}
+                        `}
+                        placeholder={isEmpty && isLast ? 'Wyszukaj produkt...' : 'Wpisz nazwe produktu...'}
+                        value={
+                          activeDropdown === index
+                            ? searchTerms[index] ?? row.stock_item_name
+                            : row.stock_item_name
+                        }
+                        onChange={(e) => handleProductInputChange(index, e.target.value)}
+                        onFocus={() => {
+                          setActiveDropdown(index);
+                          if (!searchTerms[index] && row.stock_item_name) {
+                            setSearchTerms((prev) => ({
+                              ...prev,
+                              [index]: row.stock_item_name,
+                            }));
+                          }
+                        }}
+                        onBlur={() => handleProductBlur(index)}
+                        onKeyDown={(e) => handleProductKeyDown(index, e)}
+                        data-field="product"
+                        aria-label="Produkt"
+                      />
+                      {showDropdown && (filtered.length > 0 || hasSearchTerm) && (
+                        <div
+                          ref={dropdownRef}
+                          className="absolute z-50 left-1.5 right-1.5 top-full mt-1 max-h-60 overflow-y-auto rounded-lg border bg-popover shadow-lg"
+                        >
+                          {filtered.length > 0 ? (
+                            filtered.map((si, i) => (
+                              <button
+                                key={si.id}
+                                type="button"
+                                className={`
+                                  w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2
+                                  transition-colors
+                                  ${i === highlightedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'}
+                                  ${i > 0 ? 'border-t border-border/30' : ''}
+                                `}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  selectStockItem(index, si);
+                                }}
+                                data-action="select-stock-item"
+                                data-id={si.id}
+                              >
+                                <span className="font-medium truncate">{si.name}</span>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono rounded">
+                                    {si.sku}
+                                  </Badge>
+                                  <span className="text-[10px] text-muted-foreground">{si.unit}</span>
+                                </div>
+                              </button>
+                            ))
+                          ) : hasSearchTerm ? (
+                            <div className="px-3 py-2.5 text-sm text-muted-foreground">
+                              Brak wynikow dla &ldquo;{searchTerms[index]}&rdquo;
+                            </div>
+                          ) : null}
+                          {onCreateNewItem && hasSearchTerm && (
+                            <>
+                              {filtered.length > 0 && (
+                                <div className="border-t border-border/50" />
+                              )}
+                              <button
+                                type="button"
+                                className={`
+                                  w-full text-left px-3 py-2.5 text-sm flex items-center gap-2
+                                  transition-colors text-primary font-medium
+                                  ${highlightedIndex === filtered.length ? 'bg-accent' : 'hover:bg-accent/50'}
+                                `}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  onCreateNewItem((searchTerms[index] ?? '').trim(), index);
+                                  setActiveDropdown(null);
+                                  setHighlightedIndex(-1);
+                                }}
+                                data-action="create-new-stock-item"
+                              >
+                                <PackagePlus className="h-3.5 w-3.5" />
+                                <span>Dodaj nowy: &ldquo;{searchTerms[index]}&rdquo;</span>
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </TableCell>
+
+                    {/* Quantity ordered */}
+                    <TableCell className="p-1.5">
+                      <input
+                        type="number"
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
+                        placeholder="—"
+                        value={row.quantity_ordered ?? ''}
+                        onChange={(e) =>
+                          updateRow(index, {
+                            quantity_ordered: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          })
+                        }
+                        step="any"
+                        min="0"
+                        data-field="quantity-ordered"
+                        aria-label="Ilosc zamowiona"
+                      />
+                    </TableCell>
+
+                    {/* Quantity received */}
+                    <TableCell className="p-1.5">
+                      <input
+                        type="number"
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
+                        placeholder="0"
+                        value={row.quantity_received ?? ''}
+                        onChange={(e) =>
+                          updateRow(index, {
+                            quantity_received: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          })
+                        }
+                        step="any"
+                        min="0"
+                        data-field="quantity-received"
+                        aria-label="Ilosc przyjeta"
+                      />
+                    </TableCell>
+
+                    {/* Unit price net */}
+                    <TableCell className="p-1.5">
+                      <input
+                        type="number"
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
+                        placeholder="—"
+                        value={row.unit_price_net ?? ''}
+                        onChange={(e) =>
+                          updateRow(index, {
+                            unit_price_net: e.target.value
+                              ? parseFloat(e.target.value)
+                              : null,
+                          })
+                        }
+                        step="0.01"
+                        min="0"
+                        data-field="unit-price-net"
+                        aria-label="Cena netto"
+                      />
+                    </TableCell>
+
+                    {/* Expiry date */}
+                    <TableCell className="p-1.5">
+                      <input
+                        type="date"
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
+                        value={row.expiry_date ?? ''}
+                        onChange={(e) =>
+                          updateRow(index, {
+                            expiry_date: e.target.value || null,
+                          })
+                        }
+                        data-field="expiry-date"
+                        aria-label="Data waznosci"
+                      />
+                    </TableCell>
+
+                    {/* Notes */}
+                    <TableCell className="p-1.5">
+                      <input
+                        ref={(el) => {
+                          notesInputRefs.current[index] = el;
+                        }}
+                        type="text"
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
+                        placeholder=""
+                        value={row.notes}
+                        onChange={(e) => updateRow(index, { notes: e.target.value })}
+                        onKeyDown={(e) => handleNotesKeyDown(index, e)}
+                        data-field="notes"
+                        aria-label="Notatki"
+                      />
+                    </TableCell>
+
+                    {/* Delete button */}
+                    <TableCell className="p-1.5">
+                      {!isEmpty && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-colors"
+                          onClick={() => deleteRow(index)}
+                          data-action="delete-row"
+                          data-row={index}
+                          aria-label="Usun wiersz"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Add row button */}
+      <div className="flex items-center gap-3 mt-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-xs gap-1.5 text-muted-foreground hover:text-foreground"
+          onClick={addNewRow}
+          data-action="add-row"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Dodaj pozycje
+        </Button>
+        {filledRowCount > 0 && (
+          <span className="text-xs text-muted-foreground/60">
+            {filledRowCount} {filledRowCount === 1 ? 'pozycja' : filledRowCount < 5 ? 'pozycje' : 'pozycji'}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
