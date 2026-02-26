@@ -12,6 +12,7 @@ import {
   UserCheck,
   Settings,
   ExternalLink,
+  Truck,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -35,6 +36,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Users,
   UserCheck,
   Settings,
+  Truck,
 };
 
 const mainNavItems = [
@@ -43,6 +45,7 @@ const mainNavItems = [
   { title: 'Menu', href: '/menu', icon: 'UtensilsCrossed' },
   { title: 'Receptury', href: '/recipes', icon: 'ChefHat' },
   { title: 'Magazyn', href: '/inventory', icon: 'Warehouse' },
+  { title: 'Dostawy', href: '/deliveries', icon: 'Truck' },
   { title: 'Klienci', href: '/crm', icon: 'UserCheck' },
   { title: 'Pracownicy', href: '/employees', icon: 'Users' },
 ];
