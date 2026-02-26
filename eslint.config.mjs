@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
         varsIgnorePattern: "^_",
       }],
       "react-hooks/purity": "warn",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/incompatible-library": "warn",
     },
   },
   // Override default ignores of eslint-config-next.
