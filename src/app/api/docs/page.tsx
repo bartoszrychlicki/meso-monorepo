@@ -160,6 +160,12 @@ export default function ApiDocsPage() {
               <li><a href="#orders-status" className="hover:text-blue-600">Zmiana statusu</a></li>
             </ul>
           </li>
+          <li>
+            <a href="#crm" className="text-blue-600 hover:underline">Klienci (CRM)</a>
+            <ul className="ml-4 mt-1 space-y-1 text-gray-500">
+              <li><a href="#crm-customers" className="hover:text-blue-600">CRUD klientów</a></li>
+            </ul>
+          </li>
           <li><a href="#enumy" className="text-blue-600 hover:underline">Wartości enum</a></li>
         </ul>
       </nav>
@@ -209,6 +215,14 @@ export default function ApiDocsPage() {
               <tr className="border-t border-gray-100">
                 <td className="py-1.5 pr-4 font-mono text-xs">orders:status</td>
                 <td className="py-1.5 text-gray-600">Zmiana statusu zamówień</td>
+              </tr>
+              <tr className="border-t border-gray-100">
+                <td className="py-1.5 pr-4 font-mono text-xs">crm:read</td>
+                <td className="py-1.5 text-gray-600">Odczyt klientów</td>
+              </tr>
+              <tr className="border-t border-gray-100">
+                <td className="py-1.5 pr-4 font-mono text-xs">crm:write</td>
+                <td className="py-1.5 text-gray-600">Tworzenie, edycja i usuwanie klientów</td>
               </tr>
             </tbody>
           </table>
@@ -759,6 +773,142 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
+      {/* ──────────── CRM ──────────── */}
+      <section className="mb-12" id="crm">
+        <h2 className="mb-6 text-2xl font-bold text-gray-900">Klienci (CRM)</h2>
+
+        <div className="mb-8" id="crm-customers">
+          <h3 className="mb-4 text-xl font-semibold text-gray-800">CRUD klientów</h3>
+          <div className="space-y-4">
+            <Endpoint
+              method="GET"
+              path="/api/v1/crm/customers"
+              description="Pobierz listę klientów z opcjonalnym filtrowaniem, wyszukiwaniem i paginacją."
+              permission="crm:read"
+              queryParams={[
+                { name: 'page', type: 'number', desc: 'Numer strony (domyślnie: 1)' },
+                { name: 'per_page', type: 'number', desc: 'Wyników na stronę (domyślnie: 50, maks: 100)' },
+                { name: 'search', type: 'string', desc: 'Szukaj po imieniu, nazwisku, email lub telefonie' },
+                { name: 'phone', type: 'string', desc: 'Szukaj po dokładnym numerze telefonu' },
+                { name: 'email', type: 'string', desc: 'Szukaj po dokładnym adresie email' },
+                { name: 'tier', type: 'string', desc: 'Filtruj po poziomie lojalności (bronze, silver, gold)' },
+              ]}
+              response={`{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "first_name": "Jan",
+      "last_name": "Kowalski",
+      "email": "jan@example.com",
+      "phone": "+48123456789",
+      "loyalty_points": 150,
+      "loyalty_tier": "bronze",
+      "registration_date": "2026-01-15T10:00:00.000Z",
+      "source": "pos_terminal",
+      "marketing_consent": true,
+      "addresses": [...],
+      "preferences": { ... },
+      "order_history": {
+        "total_orders": 5,
+        "total_spent": 250.00,
+        "average_order_value": 50.00,
+        "last_order_date": "2026-02-20T12:00:00.000Z",
+        "first_order_date": "2026-01-15T10:00:00.000Z"
+      },
+      "is_active": true,
+      ...
+    }
+  ],
+  "meta": { "total": 42, "page": 1, "per_page": 50, "timestamp": "..." }
+}`}
+            />
+
+            <Endpoint
+              method="POST"
+              path="/api/v1/crm/customers"
+              description="Utwórz nowego klienta. Numer telefonu jest wymagany i musi być unikalny. Email jest opcjonalny. Nowy klient otrzymuje automatycznie 0 punktów lojalnościowych i poziom Bronze."
+              permission="crm:write"
+              body={`{
+  "first_name": "Jan",
+  "last_name": "Kowalski",
+  "phone": "+48123456789",           // wymagany, unikalny
+  "email": "jan@example.com",        // opcjonalny, unikalny
+  "birth_date": "1990-05-15T00:00:00.000Z",  // opcjonalny
+  "source": "pos_terminal",          // mobile_app | pos_terminal | website | manual_import
+  "marketing_consent": true,         // GDPR
+  "addresses": [                     // opcjonalne
+    {
+      "label": "Dom",
+      "street": "Marszałkowska",
+      "building_number": "10",
+      "apartment_number": "5",       // opcjonalne
+      "postal_code": "00-001",       // format: XX-XXX
+      "city": "Warszawa",
+      "is_default": true,
+      "delivery_instructions": "Domofon 105"  // opcjonalne
+    }
+  ],
+  "preferences": {                   // opcjonalne
+    "favorite_products": ["uuid1", "uuid2"],
+    "dietary_restrictions": ["gluten", "milk"],
+    "default_payment_method": "card"
+  },
+  "notes": "Klient VIP"             // opcjonalne
+}`}
+              response={`{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "first_name": "Jan",
+    "last_name": "Kowalski",
+    "phone": "+48123456789",
+    "loyalty_points": 0,
+    "loyalty_tier": "bronze",
+    "is_active": true,
+    ...
+  },
+  "meta": { "timestamp": "..." }
+}`}
+            />
+
+            <Endpoint
+              method="GET"
+              path="/api/v1/crm/customers/:id"
+              description="Pobierz szczegóły klienta."
+              permission="crm:read"
+              params={[{ name: ':id', type: 'UUID', desc: 'ID klienta' }]}
+            />
+
+            <Endpoint
+              method="PUT"
+              path="/api/v1/crm/customers/:id"
+              description="Zaktualizuj dane klienta (partial update). Przy zmianie telefonu/email sprawdzana jest unikalność."
+              permission="crm:write"
+              params={[{ name: ':id', type: 'UUID', desc: 'ID klienta' }]}
+              body={`{
+  "first_name": "Janusz",
+  "marketing_consent": true,
+  "notes": "Zmiana preferencji"
+}`}
+            />
+
+            <Endpoint
+              method="DELETE"
+              path="/api/v1/crm/customers/:id"
+              description="Usuń klienta (soft-delete — ustawia is_active na false)."
+              permission="crm:write"
+              params={[{ name: ':id', type: 'UUID', desc: 'ID klienta' }]}
+              response={`{
+  "success": true,
+  "data": { "deleted": true },
+  "meta": { "timestamp": "..." }
+}`}
+            />
+          </div>
+        </div>
+      </section>
+
       {/* ──────────── ENUMS ──────────── */}
       <section className="mb-12" id="enumy">
         <h2 className="mb-4 text-2xl font-bold text-gray-900">Wartości enum</h2>
@@ -819,6 +969,16 @@ export default function ApiDocsPage() {
             <code className="text-xs text-gray-600">
               gluten | crustaceans | eggs | fish | peanuts | soybeans | milk | nuts | celery | mustard | sesame | sulphites | lupin | molluscs
             </code>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <h3 className="mb-2 text-sm font-semibold text-gray-700">CustomerSource</h3>
+            <code className="text-xs text-gray-600">mobile_app | pos_terminal | website | manual_import</code>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <h3 className="mb-2 text-sm font-semibold text-gray-700">LoyaltyTier</h3>
+            <code className="text-xs text-gray-600">bronze | silver | gold</code>
           </div>
         </div>
       </section>
