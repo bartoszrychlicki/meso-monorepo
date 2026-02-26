@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Table,
   TableBody,
@@ -75,6 +76,7 @@ export function DeliveryLineTable({
   const [activeDropdown, setActiveDropdown] = useState<number | null>(null);
   const [searchTerms, setSearchTerms] = useState<Record<number, string>>({});
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1);
+  const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
   const productInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const notesInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -85,6 +87,33 @@ export function DeliveryLineTable({
       onItemsChange([...items, createEmptyRow()]);
     }
   }, [items, onItemsChange]);
+
+  // Track dropdown position based on the active input
+  useEffect(() => {
+    if (activeDropdown === null) {
+      setDropdownRect(null);
+      return;
+    }
+
+    const input = productInputRefs.current[activeDropdown];
+    if (!input) {
+      setDropdownRect(null);
+      return;
+    }
+
+    const updateRect = () => {
+      setDropdownRect(input.getBoundingClientRect());
+    };
+
+    updateRect();
+
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+    };
+  }, [activeDropdown]);
 
   const getFilteredStockItems = useCallback(
     (rowIndex: number) => {
@@ -126,7 +155,6 @@ export function DeliveryLineTable({
   };
 
   const addNewRow = () => {
-    // If last row is empty, just focus it
     if (items.length > 0 && isRowEmpty(items[items.length - 1])) {
       productInputRefs.current[items.length - 1]?.focus();
       return;
@@ -215,6 +243,90 @@ export function DeliveryLineTable({
 
   const filledRowCount = items.filter((r) => !isRowEmpty(r)).length;
 
+  // Render dropdown content for the active row
+  const renderDropdownPortal = () => {
+    if (activeDropdown === null || !dropdownRect) return null;
+
+    const index = activeDropdown;
+    const filtered = getFilteredStockItems(index);
+    const hasSearchTerm = (searchTerms[index] ?? '').trim().length > 0;
+
+    if (filtered.length === 0 && !hasSearchTerm) return null;
+
+    return createPortal(
+      <div
+        ref={dropdownRef}
+        style={{
+          position: 'fixed',
+          top: dropdownRect.bottom + 4,
+          left: dropdownRect.left,
+          width: dropdownRect.width,
+          zIndex: 9999,
+        }}
+        className="max-h-60 overflow-y-auto rounded-lg border bg-popover shadow-lg"
+      >
+        {filtered.length > 0 ? (
+          filtered.map((si, i) => (
+            <button
+              key={si.id}
+              type="button"
+              className={`
+                w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2
+                transition-colors
+                ${i === highlightedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'}
+                ${i > 0 ? 'border-t border-border/30' : ''}
+              `}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectStockItem(index, si);
+              }}
+              data-action="select-stock-item"
+              data-id={si.id}
+            >
+              <span className="font-medium truncate">{si.name}</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono rounded">
+                  {si.sku}
+                </Badge>
+                <span className="text-[10px] text-muted-foreground">{si.unit}</span>
+              </div>
+            </button>
+          ))
+        ) : hasSearchTerm ? (
+          <div className="px-3 py-2.5 text-sm text-muted-foreground">
+            Brak wynikow dla &ldquo;{searchTerms[index]}&rdquo;
+          </div>
+        ) : null}
+        {onCreateNewItem && hasSearchTerm && (
+          <>
+            {filtered.length > 0 && (
+              <div className="border-t border-border/50" />
+            )}
+            <button
+              type="button"
+              className={`
+                w-full text-left px-3 py-2.5 text-sm flex items-center gap-2
+                transition-colors text-primary font-medium
+                ${highlightedIndex === filtered.length ? 'bg-accent' : 'hover:bg-accent/50'}
+              `}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onCreateNewItem((searchTerms[index] ?? '').trim(), index);
+                setActiveDropdown(null);
+                setHighlightedIndex(-1);
+              }}
+              data-action="create-new-stock-item"
+            >
+              <PackagePlus className="h-3.5 w-3.5" />
+              <span>Dodaj nowy: &ldquo;{searchTerms[index]}&rdquo;</span>
+            </button>
+          </>
+        )}
+      </div>,
+      document.body
+    );
+  };
+
   return (
     <div data-component="delivery-line-table">
       <div className="rounded-lg border border-border/60 bg-card">
@@ -234,9 +346,6 @@ export function DeliveryLineTable({
             </TableHeader>
             <TableBody>
               {items.map((row, index) => {
-                const filtered = getFilteredStockItems(index);
-                const showDropdown = activeDropdown === index;
-                const hasSearchTerm = (searchTerms[index] ?? '').trim().length > 0;
                 const isEmpty = isRowEmpty(row);
                 const isLast = index === items.length - 1;
 
@@ -257,7 +366,7 @@ export function DeliveryLineTable({
                     </TableCell>
 
                     {/* Product column */}
-                    <TableCell className="relative p-1.5">
+                    <TableCell className="p-1.5">
                       <input
                         ref={(el) => {
                           productInputRefs.current[index] = el;
@@ -293,70 +402,6 @@ export function DeliveryLineTable({
                         data-field="product"
                         aria-label="Produkt"
                       />
-                      {showDropdown && (filtered.length > 0 || hasSearchTerm) && (
-                        <div
-                          ref={dropdownRef}
-                          className="absolute z-50 left-1.5 right-1.5 top-full mt-1 max-h-60 overflow-y-auto rounded-lg border bg-popover shadow-lg"
-                        >
-                          {filtered.length > 0 ? (
-                            filtered.map((si, i) => (
-                              <button
-                                key={si.id}
-                                type="button"
-                                className={`
-                                  w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2
-                                  transition-colors
-                                  ${i === highlightedIndex ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'}
-                                  ${i > 0 ? 'border-t border-border/30' : ''}
-                                `}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  selectStockItem(index, si);
-                                }}
-                                data-action="select-stock-item"
-                                data-id={si.id}
-                              >
-                                <span className="font-medium truncate">{si.name}</span>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono rounded">
-                                    {si.sku}
-                                  </Badge>
-                                  <span className="text-[10px] text-muted-foreground">{si.unit}</span>
-                                </div>
-                              </button>
-                            ))
-                          ) : hasSearchTerm ? (
-                            <div className="px-3 py-2.5 text-sm text-muted-foreground">
-                              Brak wynikow dla &ldquo;{searchTerms[index]}&rdquo;
-                            </div>
-                          ) : null}
-                          {onCreateNewItem && hasSearchTerm && (
-                            <>
-                              {filtered.length > 0 && (
-                                <div className="border-t border-border/50" />
-                              )}
-                              <button
-                                type="button"
-                                className={`
-                                  w-full text-left px-3 py-2.5 text-sm flex items-center gap-2
-                                  transition-colors text-primary font-medium
-                                  ${highlightedIndex === filtered.length ? 'bg-accent' : 'hover:bg-accent/50'}
-                                `}
-                                onMouseDown={(e) => {
-                                  e.preventDefault();
-                                  onCreateNewItem((searchTerms[index] ?? '').trim(), index);
-                                  setActiveDropdown(null);
-                                  setHighlightedIndex(-1);
-                                }}
-                                data-action="create-new-stock-item"
-                              >
-                                <PackagePlus className="h-3.5 w-3.5" />
-                                <span>Dodaj nowy: &ldquo;{searchTerms[index]}&rdquo;</span>
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
                     </TableCell>
 
                     {/* Quantity ordered */}
@@ -498,6 +543,9 @@ export function DeliveryLineTable({
           </span>
         )}
       </div>
+
+      {/* Dropdown portal - rendered at body level to avoid overflow clipping */}
+      {renderDropdownPortal()}
     </div>
   );
 }
