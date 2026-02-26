@@ -50,8 +50,8 @@ interface DeliveryFormProps {
 }
 
 export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
-  const { warehouses, stockItems, loadAll: loadInventory } = useInventoryStore();
-  const { suppliers, loadAll: loadDeliveries } = useDeliveryStore();
+  const { warehouses, stockItems } = useInventoryStore();
+  const { suppliers } = useDeliveryStore();
 
   const [warehouseId, setWarehouseId] = useState<string>('');
   const [supplierId, setSupplierId] = useState<string>(NONE_SUPPLIER);
@@ -66,11 +66,6 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
   const [showScanReview, setShowScanReview] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    loadInventory();
-    loadDeliveries();
-  }, [loadInventory, loadDeliveries]);
 
   // Auto-select warehouse if only one
   useEffect(() => {
