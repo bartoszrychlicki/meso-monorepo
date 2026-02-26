@@ -15,12 +15,14 @@ import {
 import { useInventoryStore } from '@/modules/inventory/store';
 import { useDeliveryStore } from '@/modules/deliveries/store';
 import { DeliverySource } from '@/types/enums';
+import { AIScanResult } from '@/types/delivery';
 import { formatCurrency } from '@/lib/utils';
 import {
   DeliveryLineTable,
   DeliveryLineRow,
   createEmptyRow,
 } from './delivery-line-table';
+import { AIScanReview } from './ai-scan-review';
 import { Save, CheckCircle, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -60,7 +62,7 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
   const [lineItems, setLineItems] = useState<DeliveryLineRow[]>([createEmptyRow()]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isScanLoading, setIsScanLoading] = useState(false);
-  const [scanResult, setScanResult] = useState<import('@/types/delivery').AIScanResult | null>(null);
+  const [scanResult, setScanResult] = useState<AIScanResult | null>(null);
   const [showScanReview, setShowScanReview] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -169,7 +171,7 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
         return;
       }
 
-      setScanResult(result.data);
+      setScanResult(result.data as AIScanResult);
       setShowScanReview(true);
     } catch {
       toast.error('Nie udalo sie przeslac dokumentu');
@@ -210,30 +212,6 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
     setShowScanReview(false);
     setScanResult(null);
   };
-
-  // Lazy import AIScanReview to avoid circular dependency issues
-  // It will be added in Task 10 - for now the button and file input are wired up
-  let AIScanReviewComponent: React.ComponentType<{
-    scanResult: import('@/types/delivery').AIScanResult;
-    stockItems: import('@/types/inventory').StockItem[];
-    suppliers: import('@/types/delivery').Supplier[];
-    onConfirm: (matched: {
-      items: DeliveryLineRow[];
-      supplier_id?: string;
-      document_number?: string;
-      document_date?: string;
-    }) => void;
-    onCancel: () => void;
-  }> | null = null;
-
-  try {
-    // This will be available after Task 10
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('./ai-scan-review');
-    AIScanReviewComponent = mod.AIScanReview;
-  } catch {
-    // Component not yet created
-  }
 
   return (
     <div className="space-y-6" data-component="delivery-form">
@@ -332,9 +310,9 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
         </div>
       </div>
 
-      {/* AI Scan Review (loaded dynamically after Task 10) */}
-      {showScanReview && scanResult && AIScanReviewComponent && (
-        <AIScanReviewComponent
+      {/* AI Scan Review */}
+      {showScanReview && scanResult && (
+        <AIScanReview
           scanResult={scanResult}
           stockItems={stockItems}
           suppliers={suppliers}
