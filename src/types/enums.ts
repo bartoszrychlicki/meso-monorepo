@@ -191,3 +191,14 @@ export enum ConsumptionType {
   PRODUCT = 'product',         // Deduct this item directly
   COMPONENTS = 'components',   // Deduct component items (BOM)
 }
+
+// Delivery enums
+export enum DeliveryStatus {
+  DRAFT = 'draft',
+  COMPLETED = 'completed',
+}
+
+export enum DeliverySource {
+  AI_SCAN = 'ai_scan',
+  MANUAL = 'manual',
+}
