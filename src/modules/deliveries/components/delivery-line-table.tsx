@@ -217,8 +217,8 @@ export function DeliveryLineTable({
 
   return (
     <div data-component="delivery-line-table">
-      <div className="rounded-lg border border-border/60 overflow-hidden bg-card">
-        <div className="overflow-x-auto">
+      <div className="rounded-lg border border-border/60 bg-card">
+        <div className="overflow-x-auto [&::-webkit-scrollbar]:h-1.5">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
