@@ -12,6 +12,7 @@ const eslintConfig = defineConfig([
         argsIgnorePattern: "^_",
         varsIgnorePattern: "^_",
       }],
+      "react-hooks/purity": "warn",
     },
   },
   // Override default ignores of eslint-config-next.
