@@ -3,31 +3,46 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LoginSchema, type LoginInput } from '@/schemas/user';
-import { useUserStore } from '../store';
+import { signIn } from '@/app/(auth)/login/actions';
 import { Loader2, Mail, AlertCircle } from 'lucide-react';
 
-export function LoginForm() {
+interface LoginFormProps {
+  redirectTo?: string;
+}
+
+export function LoginForm({ redirectTo }: LoginFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useUserStore();
 
-  const emailForm = useForm<LoginInput>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginInput>({
     resolver: zodResolver(LoginSchema),
     defaultValues: { email: '', password: '' },
   });
 
-  const handleEmailLogin = async (data: LoginInput) => {
+  const onSubmit = async (data: LoginInput) => {
     setError(null);
     setIsSubmitting(true);
     try {
-      const success = await login(data.email, data.password);
-      if (!success) {
-        setError('Nieprawidlowy adres email. Sprawdz dane logowania.');
+      const formData = new FormData();
+      formData.set('email', data.email);
+      formData.set('password', data.password);
+      if (redirectTo) {
+        formData.set('redirectTo', redirectTo);
+      }
+
+      const result = await signIn(formData);
+      if (result?.error) {
+        setError(result.error);
       }
     } catch {
       setError('Wystapil blad podczas logowania. Sprobuj ponownie.');
@@ -38,10 +53,9 @@ export function LoginForm() {
 
   return (
     <form
-      onSubmit={emailForm.handleSubmit(handleEmailLogin)}
+      onSubmit={handleSubmit(onSubmit)}
       className="space-y-4"
       data-component="login-form"
-      data-mode="email"
     >
       {error && (
         <Alert variant="destructive" data-status="error">
@@ -56,12 +70,12 @@ export function LoginForm() {
           id="email"
           type="email"
           placeholder="jan.kowalski@mesopos.pl"
-          {...emailForm.register('email')}
+          {...register('email')}
           data-field="email"
         />
-        {emailForm.formState.errors.email && (
+        {errors.email && (
           <p className="text-sm text-destructive">
-            {emailForm.formState.errors.email.message}
+            {errors.email.message}
           </p>
         )}
       </div>
@@ -72,12 +86,12 @@ export function LoginForm() {
           id="password"
           type="password"
           placeholder="Wprowadz haslo"
-          {...emailForm.register('password')}
+          {...register('password')}
           data-field="password"
         />
-        {emailForm.formState.errors.password && (
+        {errors.password && (
           <p className="text-sm text-destructive">
-            {emailForm.formState.errors.password.message}
+            {errors.password.message}
           </p>
         )}
       </div>
@@ -93,8 +107,17 @@ export function LoginForm() {
         ) : (
           <Mail className="mr-2 h-4 w-4" />
         )}
-        Zaloguj sie
+        {isSubmitting ? 'Logowanie...' : 'Zaloguj sie'}
       </Button>
+
+      <div className="text-center">
+        <Link
+          href="/forgot-password"
+          className="text-sm text-muted-foreground hover:text-primary transition-colors"
+        >
+          Nie pamietasz hasla?
+        </Link>
+      </div>
     </form>
   );
 }

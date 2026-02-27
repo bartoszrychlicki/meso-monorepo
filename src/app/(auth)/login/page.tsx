@@ -1,27 +1,12 @@
-'use client';
-
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { LoginForm } from '@/modules/users/components/login-form';
-import { useUserStore } from '@/modules/users/store';
-import { seedAll } from '@/seed';
-import Link from 'next/link';
-import { Clock } from 'lucide-react';
 
-export default function LoginPage() {
-  const router = useRouter();
-  const { isAuthenticated } = useUserStore();
+interface LoginPageProps {
+  searchParams: Promise<{ redirect?: string }>;
+}
 
-  useEffect(() => {
-    seedAll();
-  }, []);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.push('/dashboard');
-    }
-  }, [isAuthenticated, router]);
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { redirect } = await searchParams;
 
   return (
     <div className="space-y-4" data-page="login">
@@ -32,24 +17,13 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">MESOpos</CardTitle>
           <CardDescription className="text-base">
-            System zarządzania punktem sprzedaży
+            System zarzadzania punktem sprzedazy
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-2">
-          <LoginForm />
+          <LoginForm redirectTo={redirect} />
         </CardContent>
       </Card>
-
-      <div className="text-center">
-        <Link
-          href="/clock-in"
-          className="inline-flex items-center gap-2 text-sm text-white/70 hover:text-white transition-colors"
-          data-action="go-to-clock-in"
-        >
-          <Clock className="h-4 w-4" />
-          Rejestracja czasu pracy
-        </Link>
-      </div>
     </div>
   );
 }
