@@ -12,7 +12,8 @@ import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
-import { Package, AlertTriangle, DollarSign, Plus, ArrowLeftRight, Settings } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Package, AlertTriangle, DollarSign, Plus, ArrowLeftRight, Settings, Search } from 'lucide-react';
 
 export default function InventoryPage() {
   const {
@@ -34,6 +35,7 @@ export default function InventoryPage() {
   const [showNewItemForm, setShowNewItemForm] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showWarehouseManager, setShowWarehouseManager] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadAll();
@@ -43,6 +45,16 @@ export default function InventoryPage() {
     if (!selectedWarehouseId) return warehouseStockItems;
     return warehouseStockItems.filter((item) => item.warehouse_id === selectedWarehouseId);
   }, [warehouseStockItems, selectedWarehouseId]);
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return currentItems;
+    const q = searchQuery.toLowerCase();
+    return currentItems.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        item.sku.toLowerCase().includes(q)
+    );
+  }, [currentItems, searchQuery]);
 
   const lowStockItems = useMemo(() => {
     return currentItems.filter((item) => item.is_active && item.quantity < item.min_quantity);
@@ -131,6 +143,17 @@ export default function InventoryPage() {
         />
       </div>
 
+      <div className="relative" data-component="stock-search">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Szukaj produktu po nazwie lub SKU..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+          data-field="stock-search"
+        />
+      </div>
+
       <Tabs
         value={selectedWarehouseId ?? 'all'}
         onValueChange={handleTabChange}
@@ -149,7 +172,7 @@ export default function InventoryPage() {
 
         <TabsContent value="all">
           <StockTable
-            items={currentItems}
+            items={filteredItems}
             showWarehouseColumn
             onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
               await adjustStock(warehouseId, stockItemId, quantity, reason);
@@ -159,7 +182,7 @@ export default function InventoryPage() {
         {warehouses.map((w) => (
           <TabsContent key={w.id} value={w.id}>
             <StockTable
-              items={currentItems}
+              items={filteredItems}
               onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
                 await adjustStock(warehouseId, stockItemId, quantity, reason);
               }}
