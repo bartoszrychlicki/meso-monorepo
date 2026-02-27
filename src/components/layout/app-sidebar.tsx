@@ -13,6 +13,7 @@ import {
   Settings,
   ExternalLink,
   Truck,
+  Shield,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -37,6 +38,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   UserCheck,
   Settings,
   Truck,
+  Shield,
 };
 
 const mainNavItems = [
@@ -51,6 +53,7 @@ const mainNavItems = [
 ];
 
 const secondaryNavItems = [
+  { title: 'Uzytkownicy', href: '/admin/users', icon: 'Shield' },
   { title: 'Ustawienia', href: '/settings', icon: 'Settings' },
 ];
 
