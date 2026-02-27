@@ -6,7 +6,6 @@ export interface User extends BaseEntity {
   name: string;
   email: string;
   role: UserRole;
-  pin?: string;
   location_id: string;
   is_active: boolean;
   avatar_url?: string;

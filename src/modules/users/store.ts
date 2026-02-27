@@ -16,7 +16,6 @@ interface UserStore {
   isAuthenticated: boolean;
   // Actions
   login: (email: string, password: string) => Promise<boolean>;
-  loginWithPin: (employeeCode: string, pin: string) => Promise<boolean>;
   logout: () => void;
   setCurrentLocation: (locationId: string) => void;
   loadLocations: () => Promise<void>;
@@ -33,24 +32,10 @@ export const useUserStore = create<UserStore>()(
 
       login: async (email: string, _password: string) => {
         // Prototype: any password works, just check email exists
-        const user = await usersRepository.authenticateUser(email);
+        const user = await usersRepository.findByEmail(email);
         if (!user) return false;
 
         // Load location for the user
-        const location = await locationsRepo.findById(user.location_id);
-
-        set({
-          currentUser: user,
-          currentLocation: location,
-          isAuthenticated: true,
-        });
-        return true;
-      },
-
-      loginWithPin: async (employeeCode: string, pin: string) => {
-        const user = await usersRepository.findByPin(employeeCode, pin);
-        if (!user) return false;
-
         const location = await locationsRepo.findById(user.location_id);
 
         set({
