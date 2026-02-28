@@ -29,7 +29,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { UpdateCustomerInput } from '@/schemas/crm';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { LoyaltyTransaction } from '@/types/crm';
 import { formatCurrency } from '@/lib/utils';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
@@ -43,8 +43,6 @@ export default function CustomerDetailPage() {
   const router = useRouter();
   const customerId = params.id as string;
   const { updateCustomer, deleteCustomer, loadCustomers } = useCRMStore();
-  const { toast } = useToast();
-
   const [customer, setCustomer] = useState<any>(null);
   useBreadcrumbLabel(customerId, customer ? `${customer.first_name} ${customer.last_name}` : undefined);
   const [loyaltyHistory, setLoyaltyHistory] = useState<LoyaltyTransaction[]>([]);
@@ -56,11 +54,7 @@ export default function CustomerDetailPage() {
       try {
         const customerData = await crmRepository.customers.findById(customerId);
         if (!customerData) {
-          toast({
-            title: 'Błąd',
-            description: 'Nie znaleziono klienta',
-            variant: 'destructive',
-          });
+          toast.error('Nie znaleziono klienta');
           router.push('/crm');
           return;
         }
@@ -70,18 +64,14 @@ export default function CustomerDetailPage() {
         setLoyaltyHistory(history);
       } catch (error) {
         console.error('Failed to load customer:', error);
-        toast({
-          title: 'Błąd',
-          description: 'Nie udało się załadować danych klienta',
-          variant: 'destructive',
-        });
+        toast.error('Nie udalo sie zaladowac danych klienta');
       } finally {
         setIsLoading(false);
       }
     };
 
     loadCustomerData();
-  }, [customerId, router, toast]);
+  }, [customerId, router]);
 
   const handleUpdate = async (data: UpdateCustomerInput) => {
     try {
@@ -90,16 +80,9 @@ export default function CustomerDetailPage() {
       const updatedCustomer = await crmRepository.customers.findById(customerId);
       setCustomer(updatedCustomer);
       setIsEditing(false);
-      toast({
-        title: 'Zapisano',
-        description: 'Dane klienta zostały zaktualizowane',
-      });
+      toast.success('Dane klienta zostaly zaktualizowane');
     } catch (error) {
-      toast({
-        title: 'Błąd',
-        description: 'Nie udało się zaktualizować klienta',
-        variant: 'destructive',
-      });
+      toast.error('Nie udalo sie zaktualizowac klienta');
     }
   };
 
@@ -108,17 +91,10 @@ export default function CustomerDetailPage() {
 
     try {
       await deleteCustomer(customerId);
-      toast({
-        title: 'Usunięto',
-        description: 'Klient został usunięty',
-      });
+      toast.success('Klient zostal usuniety');
       router.push('/crm');
     } catch (error) {
-      toast({
-        title: 'Błąd',
-        description: 'Nie udało się usunąć klienta',
-        variant: 'destructive',
-      });
+      toast.error('Nie udalo sie usunac klienta');
     }
   };
 

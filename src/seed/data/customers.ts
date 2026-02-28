@@ -53,7 +53,7 @@ export const customers: Customer[] = [
     ],
 
     preferences: {
-      favorite_products: [],
+      favorite_products: ['Cheeseburger', 'Frytki klasyczne', 'Lemoniada domowa'],
       dietary_restrictions: ['gluten_free'],
       default_payment_method: 'card',
     },
@@ -64,6 +64,11 @@ export const customers: Customer[] = [
       average_order_value: 37.5,
       last_order_date: new Date('2024-02-01').toISOString(),
       first_order_date: new Date('2024-01-05').toISOString(),
+      top_ordered_products: [
+        { product_id: 'prod-cheeseburger', product_name: 'Cheeseburger Klasyczny', order_count: 8 },
+        { product_id: 'prod-fries-regular', product_name: 'Frytki klasyczne', order_count: 6 },
+        { product_id: 'prod-lemonade', product_name: 'Lemoniada domowa', order_count: 5 },
+      ],
     },
 
     notes: null,
@@ -102,6 +107,10 @@ export const customers: Customer[] = [
       average_order_value: 43.0,
       last_order_date: new Date('2024-01-30').toISOString(),
       first_order_date: new Date('2024-01-15').toISOString(),
+      top_ordered_products: [
+        { product_id: 'prod-bacon-burger', product_name: 'Bacon Burger', order_count: 4 },
+        { product_id: 'prod-fries-regular', product_name: 'Frytki klasyczne', order_count: 3 },
+      ],
     },
 
     notes: 'Zawsze zamawia z dodatkiem ostrego sosu',
@@ -147,7 +156,7 @@ export const customers: Customer[] = [
     ],
 
     preferences: {
-      favorite_products: [],
+      favorite_products: ['Bacon Burger', 'Loaded frytki', 'Cola 0.5l'],
       dietary_restrictions: [],
       default_payment_method: 'blik',
     },
@@ -158,6 +167,11 @@ export const customers: Customer[] = [
       average_order_value: 35.71,
       last_order_date: new Date('2024-01-28').toISOString(),
       first_order_date: new Date('2023-10-05').toISOString(),
+      top_ordered_products: [
+        { product_id: 'prod-bacon-burger', product_name: 'Bacon Burger', order_count: 18 },
+        { product_id: 'prod-fries-regular', product_name: 'Loaded frytki', order_count: 12 },
+        { product_id: 'prod-cola', product_name: 'Cola', order_count: 10 },
+      ],
     },
 
     notes: 'Stały klient, preferuje burgery ostrzejsze',
@@ -216,7 +230,7 @@ export const customers: Customer[] = [
     ],
 
     preferences: {
-      favorite_products: [],
+      favorite_products: ['Truffle Burger', 'Salatka Cezar', 'Kawa latte'],
       dietary_restrictions: [],
       default_payment_method: 'card',
     },
@@ -227,6 +241,11 @@ export const customers: Customer[] = [
       average_order_value: 41.03,
       last_order_date: new Date('2024-02-05').toISOString(),
       first_order_date: new Date('2023-06-08').toISOString(),
+      top_ordered_products: [
+        { product_id: 'prod-truffle-burger', product_name: 'Truffle Burger', order_count: 32 },
+        { product_id: 'prod-salad-caesar', product_name: 'Salatka Cezar', order_count: 20 },
+        { product_id: 'prod-latte', product_name: 'Kawa latte', order_count: 15 },
+      ],
     },
 
     notes: 'VIP - zawsze pyta o nowości w menu',

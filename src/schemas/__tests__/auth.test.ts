@@ -253,4 +253,25 @@ describe('CreateStaffUserSchema', () => {
     const result = CreateStaffUserSchema.safeParse({});
     expect(result.success).toBe(false);
   });
+
+  it('accepts is_admin set to true', () => {
+    const result = CreateStaffUserSchema.safeParse({ ...validData, is_admin: true });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.is_admin).toBe(true);
+    }
+  });
+
+  it('defaults is_admin to false when omitted', () => {
+    const result = CreateStaffUserSchema.safeParse(validData);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.is_admin).toBe(false);
+    }
+  });
+
+  it('rejects non-boolean is_admin', () => {
+    const result = CreateStaffUserSchema.safeParse({ ...validData, is_admin: 'yes' });
+    expect(result.success).toBe(false);
+  });
 });

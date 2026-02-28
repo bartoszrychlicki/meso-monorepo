@@ -144,7 +144,7 @@ export default function ClockInPage() {
           </div>
         </div>
 
-        <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur">
+        <Card className="border-0 shadow-2xl backdrop-blur">
           <CardHeader className="text-center pb-2">
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-lg shadow-lg">
               M
@@ -257,7 +257,7 @@ export default function ClockInPage() {
         </Card>
 
         {activeWorkTimes.length > 0 && (
-          <Card className="border-0 shadow-lg bg-white/90 backdrop-blur">
+          <Card className="border-0 shadow-lg backdrop-blur">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 Aktywne zmiany

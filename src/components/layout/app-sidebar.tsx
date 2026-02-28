@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useUserStore } from '@/modules/users/store';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -59,6 +60,11 @@ const secondaryNavItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const currentUser = useUserStore((s) => s.currentUser);
+
+  const filteredSecondaryNavItems = secondaryNavItems.filter(
+    (item) => !item.href.startsWith('/admin') || currentUser?.role === 'admin'
+  );
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -126,7 +132,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {secondaryNavItems.map((item) => {
+              {filteredSecondaryNavItems.map((item) => {
                 const Icon = iconMap[item.icon];
                 const active = isActive(item.href);
                 return (

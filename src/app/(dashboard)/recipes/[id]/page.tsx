@@ -26,13 +26,12 @@ import {
   Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
 export default function RecipeDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { toast } = useToast();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   useBreadcrumbLabel(params.id as string, recipe?.name);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -77,17 +76,10 @@ export default function RecipeDetailPage() {
         is_active: false,
         updated_at: new Date().toISOString(),
       });
-      toast({
-        title: 'Receptura usunieta',
-        description: `"${recipe.name}" zostala dezaktywowana`,
-      });
+      toast.success(`Receptura "${recipe.name}" zostala dezaktywowana`);
       router.push('/recipes');
     } catch {
-      toast({
-        title: 'Blad',
-        description: 'Nie udalo sie usunac receptury',
-        variant: 'destructive',
-      });
+      toast.error('Nie udalo sie usunac receptury');
     }
   };
 

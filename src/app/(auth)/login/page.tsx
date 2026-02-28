@@ -10,7 +10,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <div className="space-y-4" data-page="login">
-      <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur">
+      <Card className="border-0 shadow-2xl backdrop-blur">
         <CardHeader className="text-center pb-2">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-xl shadow-lg">
             M

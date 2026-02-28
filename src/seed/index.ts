@@ -23,6 +23,12 @@ export function seedAll(): void {
   if (process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase') return;
   if (isSeeded()) return;
 
+  // Clear stale seed data before re-seeding (version bump)
+  const keys = Object.keys(localStorage).filter((key) =>
+    key.startsWith(STORAGE_PREFIX)
+  );
+  keys.forEach((key) => localStorage.removeItem(key));
+
   // Seed in dependency order
   seedCollection('locations', locations);
   seedCollection('users', users);

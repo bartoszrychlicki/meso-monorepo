@@ -36,6 +36,17 @@ export interface CustomerPreferences {
 }
 
 /**
+ * Top Ordered Product
+ * Product frequently ordered by a customer (computed from order history)
+ */
+export interface TopOrderedProduct {
+  product_id: string;
+  product_name: string;
+  order_count: number;
+  image_url?: string;
+}
+
+/**
  * Customer Order History Statistics
  * Denormalized stats for quick access
  */
@@ -45,6 +56,7 @@ export interface CustomerOrderHistory {
   average_order_value: number;
   last_order_date: string | null;
   first_order_date: string | null;
+  top_ordered_products?: TopOrderedProduct[];
 }
 
 /**

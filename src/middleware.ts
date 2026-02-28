@@ -66,6 +66,15 @@ export async function middleware(request: NextRequest) {
 
   const { user, supabaseResponse } = await updateSession(request);
 
+  // Admin route + authenticated non-admin → redirect to /dashboard
+  const isAdminRoute = pathname.startsWith('/admin');
+  if (isAdminRoute && user) {
+    const role = user.user_metadata?.role;
+    if (role !== 'admin') {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
   // Protected route + no user → redirect to /login
   if (isProtected && !user) {
     const loginUrl = new URL('/login', request.url);

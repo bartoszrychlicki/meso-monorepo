@@ -39,10 +39,10 @@ function createMockRequest(
   });
 }
 
-function mockAuthenticatedUser() {
+function mockAuthenticatedUser(metadata?: Record<string, unknown>) {
   const supabaseResponse = NextResponse.next();
   mockUpdateSession.mockResolvedValue({
-    user: { id: 'user-123', email: 'test@example.com' },
+    user: { id: 'user-123', email: 'test@example.com', user_metadata: metadata },
     supabaseResponse,
   });
   return supabaseResponse;
@@ -231,7 +231,54 @@ describe('Middleware auth guard', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 6. Other routes — pass through without Supabase call
+  // 6. Admin routes — role-based access
+  // -------------------------------------------------------------------------
+  describe('Admin routes — role-based access', () => {
+    it('should allow admin user to access /admin/users', async () => {
+      const supabaseResponse = mockAuthenticatedUser({ role: 'admin' });
+      const request = createMockRequest('/admin/users');
+
+      const response = await middleware(request);
+
+      expect(response).toBe(supabaseResponse);
+    });
+
+    it('should redirect cashier from /admin/users to /dashboard', async () => {
+      mockAuthenticatedUser({ role: 'cashier' });
+      const request = createMockRequest('/admin/users');
+
+      const response = await middleware(request);
+
+      expect(response.status).toBe(307);
+      const location = new URL(response.headers.get('location')!);
+      expect(location.pathname).toBe('/dashboard');
+    });
+
+    it('should redirect manager from /admin to /dashboard', async () => {
+      mockAuthenticatedUser({ role: 'manager' });
+      const request = createMockRequest('/admin');
+
+      const response = await middleware(request);
+
+      expect(response.status).toBe(307);
+      const location = new URL(response.headers.get('location')!);
+      expect(location.pathname).toBe('/dashboard');
+    });
+
+    it('should redirect user without role metadata from /admin/users to /dashboard', async () => {
+      mockAuthenticatedUser();
+      const request = createMockRequest('/admin/users');
+
+      const response = await middleware(request);
+
+      expect(response.status).toBe(307);
+      const location = new URL(response.headers.get('location')!);
+      expect(location.pathname).toBe('/dashboard');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 7. Other routes — pass through without Supabase call
   // -------------------------------------------------------------------------
   describe('Other routes', () => {
     it('should pass through /kitchen without calling updateSession', async () => {

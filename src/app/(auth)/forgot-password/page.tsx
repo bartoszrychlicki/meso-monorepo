@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="space-y-4" data-page="forgot-password">
-      <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur">
+      <Card className="border-0 shadow-2xl backdrop-blur">
         <CardHeader className="text-center pb-2">
           <CardTitle className="text-2xl font-bold tracking-tight">
             Resetowanie hasla

@@ -8,6 +8,7 @@ vi.mock('../actions', () => ({
   createStaffUser: vi.fn(),
   resetStaffPassword: vi.fn(),
   toggleStaffActive: vi.fn(),
+  toggleStaffAdmin: vi.fn(),
 }));
 
 // Mock sonner toast
@@ -208,5 +209,39 @@ describe('AdminUsersPage', () => {
 
     // Staff list should be reloaded (getStaffUsers called again)
     expect(mockGetStaffUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows administrator checkbox in create form', async () => {
+    mockGetStaffUsers.mockResolvedValue({ data: mockUsers });
+
+    render(<AdminUsersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
+    });
+
+    const addButton = screen.getByRole('button', {
+      name: /dodaj użytkownika|dodaj uzytkownika/i,
+    });
+    fireEvent.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('checkbox', { name: /administrator/i })).toBeInTheDocument();
+  });
+
+  it('shows toggle admin button for each user in the table', async () => {
+    mockGetStaffUsers.mockResolvedValue({ data: mockUsers });
+
+    render(<AdminUsersPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
+    });
+
+    const toggleAdminButtons = screen.getAllByTitle(/admin/i);
+    expect(toggleAdminButtons.length).toBe(mockUsers.length);
   });
 });

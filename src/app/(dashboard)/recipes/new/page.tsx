@@ -6,27 +6,19 @@ import { PageHeader } from '@/components/layout/page-header';
 import { RecipeForm } from '@/modules/recipes/components/recipe-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { CreateRecipeInput } from '@/schemas/recipe';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 export default function NewRecipePage() {
   const router = useRouter();
   const { createRecipe, isLoading } = useRecipesStore();
-  const { toast } = useToast();
 
   const handleSubmit = async (data: CreateRecipeInput) => {
     try {
       const recipe = await createRecipe(data);
-      toast({
-        title: 'Receptura utworzona',
-        description: `"${recipe.name}" została dodana do systemu`,
-      });
+      toast.success(`Receptura "${recipe.name}" zostala utworzona`);
       router.push(`/recipes/${recipe.id}`);
     } catch {
-      toast({
-        title: 'Blad',
-        description: 'Nie udalo sie utworzyc receptury',
-        variant: 'destructive',
-      });
+      toast.error('Nie udalo sie utworzyc receptury');
     }
   };
 

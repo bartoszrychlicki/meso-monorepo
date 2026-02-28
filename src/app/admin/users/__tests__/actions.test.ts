@@ -14,6 +14,7 @@ const mockFrom = vi.fn((_table: string) => ({
 const mockCreateUser = vi.fn();
 const mockResetPasswordForEmail = vi.fn();
 const mockAdminGetUserById = vi.fn();
+const mockUpdateUserById = vi.fn();
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue({
@@ -25,6 +26,7 @@ vi.mock('@/lib/supabase/server', () => ({
       admin: {
         createUser: (opts: unknown) => mockCreateUser(opts),
         getUserById: (id: string) => mockAdminGetUserById(id),
+        updateUserById: (id: string, attrs: unknown) => mockUpdateUserById(id, attrs),
       },
       resetPasswordForEmail: mockResetPasswordForEmail,
     },
@@ -42,6 +44,7 @@ import {
   createStaffUser,
   resetStaffPassword,
   toggleStaffActive,
+  toggleStaffAdmin,
 } from '@/app/admin/users/actions';
 
 // ---- helpers ----
@@ -225,5 +228,108 @@ describe('toggleStaffActive', () => {
     await toggleStaffActive('user-1', false);
 
     expect(mockRevalidatePath).toHaveBeenCalledWith('/admin/users');
+  });
+});
+
+describe('createStaffUser — admin role', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('creates user with admin role when is_admin is "true"', async () => {
+    mockCreateUser.mockResolvedValue({
+      data: { user: { id: 'admin-user-id' } },
+      error: null,
+    });
+
+    const fd = makeFormData({
+      email: 'admin@test.com',
+      password: 'Secure123!',
+      name: 'Admin User',
+      is_admin: 'true',
+    });
+
+    const result = await createStaffUser(fd);
+
+    expect(mockCreateUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_metadata: expect.objectContaining({
+          role: 'admin',
+        }),
+      })
+    );
+    expect(result).toEqual(expect.objectContaining({ success: true }));
+  });
+
+  it('creates user with cashier role when is_admin is not set', async () => {
+    mockCreateUser.mockResolvedValue({
+      data: { user: { id: 'cashier-user-id' } },
+      error: null,
+    });
+
+    const fd = makeFormData({
+      email: 'cashier@test.com',
+      password: 'Secure123!',
+      name: 'Cashier User',
+    });
+
+    const result = await createStaffUser(fd);
+
+    expect(mockCreateUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_metadata: expect.objectContaining({
+          role: 'cashier',
+        }),
+      })
+    );
+    expect(result).toEqual(expect.objectContaining({ success: true }));
+  });
+});
+
+describe('toggleStaffAdmin', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockEq.mockReturnValue({ error: null });
+    mockUpdate.mockReturnValue({ eq: mockEq });
+  });
+
+  it('promotes user to admin — updates both auth metadata and users_users', async () => {
+    mockUpdateUserById.mockResolvedValue({ error: null });
+
+    const result = await toggleStaffAdmin('user-1', true);
+
+    expect(mockUpdateUserById).toHaveBeenCalledWith('user-1', {
+      user_metadata: { role: 'admin' },
+    });
+    expect(mockFrom).toHaveBeenCalledWith('users_users');
+    expect(mockUpdate).toHaveBeenCalledWith({ role: 'admin' });
+    expect(mockEq).toHaveBeenCalledWith('id', 'user-1');
+    expect(result).toEqual(expect.objectContaining({ success: true }));
+  });
+
+  it('demotes user from admin — updates both auth metadata and users_users', async () => {
+    mockUpdateUserById.mockResolvedValue({ error: null });
+
+    const result = await toggleStaffAdmin('user-1', false);
+
+    expect(mockUpdateUserById).toHaveBeenCalledWith('user-1', {
+      user_metadata: { role: 'cashier' },
+    });
+    expect(mockUpdate).toHaveBeenCalledWith({ role: 'cashier' });
+    expect(result).toEqual(expect.objectContaining({ success: true }));
+  });
+
+  it('returns error when auth update fails', async () => {
+    mockUpdateUserById.mockResolvedValue({
+      error: { message: 'Auth update failed' },
+    });
+
+    const result = await toggleStaffAdmin('user-1', true);
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        error: expect.any(String),
+      })
+    );
   });
 });

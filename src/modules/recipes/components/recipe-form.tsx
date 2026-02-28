@@ -17,6 +17,7 @@ import { getCategoryDisplayName } from '../utils/recipe-calculator';
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -35,7 +36,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Save, X, Search } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Trash2, Save, X, Search, DollarSign, HelpCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface IngredientChecklistProps {
   stockItems: StockItem[];
@@ -127,9 +135,31 @@ function IngredientChecklist({
               </Badge>
             )}
           </CardTitle>
+          {onSaveIngredients && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleSaveIngredients}
+              disabled={isSavingIngredients}
+              data-action="save-ingredients"
+            >
+              <Save className="mr-1 h-4 w-4" />
+              {isSavingIngredients ? 'Zapisywanie...' : 'Zapisz skladniki'}
+            </Button>
+          )}
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3">
+        {/* Estimated Cost - always visible at top */}
+        <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2">
+          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Szacowany koszt:</span>
+          <span className="text-sm font-bold" data-field="estimated-cost">
+            {estimatedCost.toFixed(2)} zl
+          </span>
+        </div>
+
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -166,7 +196,7 @@ function IngredientChecklist({
                       data-action={`toggle-ingredient-${stockItem.id}`}
                       aria-label={`Odznacz ${stockItem.name}`}
                     />
-                    <span className="text-sm font-medium min-w-[140px] truncate">
+                    <span className="text-sm font-medium min-w-[120px] truncate">
                       {stockItem.name}
                     </span>
                     <div className="flex items-center gap-2 ml-auto">
@@ -184,23 +214,9 @@ function IngredientChecklist({
                         }
                         data-field={`quantity-${stockItem.id}`}
                       />
-                      <Select
-                        value={watchedIngredients[fieldIndex]?.unit || stockItem.unit}
-                        onValueChange={(val) =>
-                          form.setValue(`ingredients.${fieldIndex}.unit`, val)
-                        }
-                      >
-                        <SelectTrigger className="w-20 h-8 text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="g">g</SelectItem>
-                          <SelectItem value="kg">kg</SelectItem>
-                          <SelectItem value="ml">ml</SelectItem>
-                          <SelectItem value="l">l</SelectItem>
-                          <SelectItem value="szt">szt</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <span className="text-xs text-muted-foreground w-8">
+                        {stockItem.unit}
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
@@ -238,7 +254,7 @@ function IngredientChecklist({
                     data-action={`toggle-ingredient-${stockItem.id}`}
                     aria-label={`Zaznacz ${stockItem.name}`}
                   />
-                  <span className="text-sm min-w-[140px] truncate">
+                  <span className="text-sm min-w-[120px] truncate">
                     {stockItem.name}
                   </span>
                   <span className="text-xs text-muted-foreground ml-auto">
@@ -255,33 +271,6 @@ function IngredientChecklist({
                 ? 'Brak skladnikow pasujacych do wyszukiwania'
                 : 'Brak dostepnych skladnikow'}
             </div>
-          )}
-        </div>
-
-        {/* Estimated Cost + Save button */}
-        <div className="flex items-center justify-between pt-3 border-t">
-          <div className="text-sm">
-            {estimatedCost > 0 && (
-              <>
-                <span className="text-muted-foreground mr-2">Szacowany koszt:</span>
-                <span className="font-bold" data-field="estimated-cost">
-                  {estimatedCost.toFixed(2)} zl
-                </span>
-              </>
-            )}
-          </div>
-          {onSaveIngredients && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleSaveIngredients}
-              disabled={isSavingIngredients}
-              data-action="save-ingredients"
-            >
-              <Save className="mr-1 h-4 w-4" />
-              {isSavingIngredients ? 'Zapisywanie...' : 'Zapisz skladniki'}
-            </Button>
           )}
         </div>
       </CardContent>
@@ -327,7 +316,7 @@ export function RecipeForm({
         defaultValues?.preparation_time_minutes || 10,
       instructions: defaultValues?.instructions || '',
       created_by:
-        defaultValues?.created_by || '11111111-1111-1111-1111-111111111111',
+        defaultValues?.created_by || crypto.randomUUID(),
     },
   });
 
@@ -344,6 +333,15 @@ export function RecipeForm({
     await onSubmit(data as CreateRecipeInput);
   };
 
+  const handleInvalid = (errors: any) => {
+    const messages: string[] = [];
+    if (errors.name) messages.push(`Nazwa: ${errors.name.message}`);
+    if (errors.ingredients) messages.push(`Skladniki: ${errors.ingredients.message || 'Dodaj co najmniej 1 skladnik'}`);
+    if (errors.product_category) messages.push(`Kategoria: ${errors.product_category.message}`);
+    if (messages.length === 0) messages.push('Formularz zawiera bledy walidacji');
+    toast.error(messages.join('. '));
+  };
+
   // Calculate estimated cost
   const watchedIngredients = form.watch('ingredients');
   const estimatedCost = (watchedIngredients || []).reduce(
@@ -356,20 +354,21 @@ export function RecipeForm({
   );
 
   return (
+    <TooltipProvider>
     <Form {...form}>
       <form
-        onSubmit={form.handleSubmit(handleFormSubmit)}
-        className="space-y-6"
+        onSubmit={form.handleSubmit(handleFormSubmit, handleInvalid)}
+        className="space-y-4"
         data-component="recipe-form"
       >
-        {/* Basic Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Row 1: Name + Category + Yield + Prep Time — all in one line */}
+        <div className="flex flex-col md:flex-row md:items-end gap-3">
           <FormField
             control={form.control}
             name="name"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nazwa receptury *</FormLabel>
+              <FormItem className="flex-1">
+                <FormLabel>Nazwa *</FormLabel>
                 <FormControl>
                   <Input
                     placeholder="np. Cheeseburger Classic"
@@ -387,14 +386,24 @@ export function RecipeForm({
             name="product_category"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Kategoria *</FormLabel>
+                <FormLabel className="flex items-center gap-1">
+                  Kategoria *
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Typ produktu: danie gotowe, polprodukt lub skladnik
+                    </TooltipContent>
+                  </Tooltip>
+                </FormLabel>
                 <Select
                   onValueChange={field.onChange}
                   defaultValue={field.value}
                 >
                   <FormControl>
-                    <SelectTrigger data-field="product-category">
-                      <SelectValue placeholder="Wybierz kategorie" />
+                    <SelectTrigger className="w-[150px]" data-field="product-category">
+                      <SelectValue placeholder="Wybierz" />
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
@@ -409,90 +418,92 @@ export function RecipeForm({
               </FormItem>
             )}
           />
-        </div>
 
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Opis</FormLabel>
-              <FormControl>
-                <Textarea
-                  placeholder="Opcjonalny opis receptury..."
-                  rows={2}
-                  data-field="recipe-description"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
-        {/* Yield and Time */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <FormField
-            control={form.control}
-            name="yield_quantity"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Wydajnosc *</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    data-field="yield-quantity"
-                    {...field}
-                    onChange={(e) =>
-                      field.onChange(parseFloat(e.target.value) || 0)
-                    }
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="yield_unit"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Jednostka wydajnosci *</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger data-field="yield-unit">
-                      <SelectValue />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="szt">szt (sztuki)</SelectItem>
-                    <SelectItem value="porcja">porcja</SelectItem>
-                    <SelectItem value="kg">kg</SelectItem>
-                    <SelectItem value="l">l (litry)</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="space-y-2">
+            <FormLabel className="flex items-center gap-1">
+              Wydajnosc *
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  Ile porcji/sztuk powstaje z tej receptury
+                </TooltipContent>
+              </Tooltip>
+            </FormLabel>
+            <div className="flex items-center gap-1.5">
+              <FormField
+                control={form.control}
+                name="yield_quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0.1"
+                        className="w-[70px]"
+                        data-field="yield-quantity"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseFloat(e.target.value) || 0)
+                        }
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="yield_unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-[90px]" data-field="yield-unit">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="szt">szt</SelectItem>
+                        <SelectItem value="porcja">porcja</SelectItem>
+                        <SelectItem value="kg">kg</SelectItem>
+                        <SelectItem value="l">l</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
 
           <FormField
             control={form.control}
             name="preparation_time_minutes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Czas przygotowania (min) *</FormLabel>
+                <FormLabel className="flex items-center gap-1">
+                  Czas (min) *
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top">
+                      Szacowany czas przygotowania dania w minutach
+                    </TooltipContent>
+                  </Tooltip>
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="number"
                     min="0"
                     max="1440"
+                    className="w-[80px]"
                     data-field="prep-time"
                     {...field}
                     onChange={(e) =>
@@ -505,6 +516,24 @@ export function RecipeForm({
             )}
           />
         </div>
+
+        {/* Row 2: Description */}
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <Input
+                  placeholder="Opis receptury (opcjonalny)"
+                  data-field="recipe-description"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Ingredients Checklist */}
         <IngredientChecklist
@@ -520,6 +549,11 @@ export function RecipeForm({
           setIsSavingIngredients={setIsSavingIngredients}
           watchedIngredients={watchedIngredients}
         />
+        {form.formState.errors.ingredients && (
+          <p className="text-sm text-destructive font-medium" data-status="error">
+            {(form.formState.errors.ingredients as any).message || 'Dodaj co najmniej 1 skladnik'}
+          </p>
+        )}
 
         {/* Instructions */}
         <FormField
@@ -531,7 +565,7 @@ export function RecipeForm({
               <FormControl>
                 <Textarea
                   placeholder="1. Przygotuj skladniki&#10;2. ..."
-                  rows={4}
+                  rows={3}
                   data-field="instructions"
                   {...field}
                 />
@@ -542,7 +576,7 @@ export function RecipeForm({
         />
 
         {/* Actions */}
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-3 pt-2">
           {onCancel && (
             <Button
               type="button"
@@ -566,5 +600,6 @@ export function RecipeForm({
         </div>
       </form>
     </Form>
+    </TooltipProvider>
   );
 }

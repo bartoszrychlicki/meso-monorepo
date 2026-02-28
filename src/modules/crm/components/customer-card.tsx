@@ -9,7 +9,13 @@
 import { Customer } from '@/types/crm';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, Phone, Mail, Award, ShoppingCart, TrendingUp } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Users, Phone, Mail, Award, ShoppingCart, TrendingUp, Calendar } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import {
   getTierDisplayName,
@@ -26,7 +32,26 @@ interface CustomerCardProps {
  * Customer Card
  * Displays customer summary with loyalty tier and statistics
  */
+const PRODUCT_COLORS = [
+  'bg-orange-100 text-orange-700',
+  'bg-blue-100 text-blue-700',
+  'bg-green-100 text-green-700',
+  'bg-purple-100 text-purple-700',
+  'bg-pink-100 text-pink-700',
+];
+
+function getProductInitials(name: string): string {
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+}
+
 export function CustomerCard({ customer }: CustomerCardProps) {
+  const topProducts = customer.order_history.top_ordered_products?.slice(0, 3) ?? [];
+
   return (
     <Link href={`/crm/${customer.id}`}>
       <Card
@@ -34,7 +59,7 @@ export function CustomerCard({ customer }: CustomerCardProps) {
         data-id={customer.id}
         className="hover:shadow-md transition-shadow cursor-pointer"
       >
-        <CardHeader>
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -48,11 +73,15 @@ export function CustomerCard({ customer }: CustomerCardProps) {
               {getTierDisplayName(customer.loyalty_tier)}
             </Badge>
           </div>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Calendar className="h-3 w-3" />
+            <span>od {new Date(customer.registration_date).toLocaleDateString('pl-PL')}</span>
+          </div>
         </CardHeader>
 
         <CardContent className="space-y-3">
           {/* Contact Information */}
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-sm">
               <Phone className="h-4 w-4 text-muted-foreground" />
               <span data-field="phone">{customer.phone}</span>
@@ -67,6 +96,33 @@ export function CustomerCard({ customer }: CustomerCardProps) {
               </div>
             )}
           </div>
+
+          {/* Top 3 ordered products */}
+          {topProducts.length > 0 && (
+            <TooltipProvider>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-xs text-muted-foreground">Top:</span>
+                <div className="flex -space-x-1" data-field="top-products">
+                  {topProducts.map((product, i) => (
+                    <Tooltip key={product.product_id}>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={`h-7 w-7 rounded-full flex items-center justify-center text-[10px] font-bold ring-2 ring-background cursor-default ${PRODUCT_COLORS[i % PRODUCT_COLORS.length]}`}
+                          data-product-id={product.product_id}
+                        >
+                          {getProductInitials(product.product_name)}
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top">
+                        <p>{product.product_name}</p>
+                        <p className="text-muted-foreground">{product.order_count}x zamowione</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </div>
+            </TooltipProvider>
+          )}
 
           {/* Loyalty & Stats */}
           <div className="pt-3 border-t space-y-2">

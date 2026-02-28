@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CreateRecipeInput } from '@/schemas/recipe';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
@@ -29,8 +29,6 @@ export default function EditRecipePage() {
   const params = useParams();
   const router = useRouter();
   const { updateRecipe, isLoading: storeLoading } = useRecipesStore();
-  const { toast } = useToast();
-
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   useBreadcrumbLabel(params.id as string, recipe?.name);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,18 +74,11 @@ export default function EditRecipePage() {
         'system', // changedBy - will be replaced with actual user when auth is added
         changeNotes.trim()
       );
-      toast({
-        title: 'Receptura zaktualizowana',
-        description: `"${pendingData.name}" zostala zapisana (v${recipe.version + 1})`,
-      });
+      toast.success(`Receptura "${pendingData.name}" zostala zapisana (v${recipe.version + 1})`);
       setShowChangeDialog(false);
       router.push(`/recipes/${recipe.id}`);
     } catch {
-      toast({
-        title: 'Blad',
-        description: 'Nie udalo sie zaktualizowac receptury',
-        variant: 'destructive',
-      });
+      toast.error('Nie udalo sie zaktualizowac receptury');
     } finally {
       setIsSaving(false);
     }

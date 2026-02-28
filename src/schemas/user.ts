@@ -21,9 +21,10 @@ export const CreateStaffUserSchema = z.object({
   name: z.string().min(1, 'Imię i nazwisko jest wymagane'),
   email: z.string().email('Nieprawidłowy adres email'),
   password: z.string().min(8, 'Hasło musi mieć co najmniej 8 znaków'),
+  is_admin: z.boolean().default(false),
 });
 
 export type LoginInput = z.infer<typeof LoginSchema>;
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
-export type CreateStaffUserInput = z.infer<typeof CreateStaffUserSchema>;
+export type CreateStaffUserInput = z.input<typeof CreateStaffUserSchema>;

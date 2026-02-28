@@ -24,6 +24,7 @@ import { Plus, Search, Users, Award } from 'lucide-react';
 import { LoyaltyTier } from '@/types/enums';
 import Link from 'next/link';
 import { getTierDisplayName } from '@/modules/crm/utils/loyalty-calculator';
+import { seedAll } from '@/seed';
 
 /**
  * CRM Page
@@ -42,6 +43,7 @@ export default function CRMPage() {
   } = useCRMStore();
 
   useEffect(() => {
+    seedAll();
     loadCustomers();
   }, [loadCustomers]);
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Loader2, Plus, RotateCcw, Power } from 'lucide-react';
+import { Loader2, Plus, RotateCcw, Power, Shield, ShieldOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,7 @@ import {
   createStaffUser,
   resetStaffPassword,
   toggleStaffActive,
+  toggleStaffAdmin,
 } from './actions';
 
 interface StaffUser {
@@ -49,7 +50,7 @@ export default function AdminUsersPage() {
 
   const form = useForm<CreateStaffUserInput>({
     resolver: zodResolver(CreateStaffUserSchema),
-    defaultValues: { name: '', email: '', password: '' },
+    defaultValues: { name: '', email: '', password: '', is_admin: false },
   });
 
   const loadUsers = async () => {
@@ -69,6 +70,7 @@ export default function AdminUsersPage() {
     formData.set('name', data.name);
     formData.set('email', data.email);
     formData.set('password', data.password);
+    formData.set('is_admin', String(data.is_admin));
 
     const result = await createStaffUser(formData);
 
@@ -101,6 +103,17 @@ export default function AdminUsersPage() {
       return;
     }
     toast.success(isActive ? 'Uzytkownik zostal dezaktywowany.' : 'Uzytkownik zostal aktywowany.');
+    await loadUsers();
+  };
+
+  const handleToggleAdmin = async (userId: string, currentRole: string) => {
+    const makeAdmin = currentRole !== 'admin';
+    const result = await toggleStaffAdmin(userId, makeAdmin);
+    if (result && 'error' in result && result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(makeAdmin ? 'Nadano uprawnienia administratora.' : 'Odebrano uprawnienia administratora.');
     await loadUsers();
   };
 
@@ -172,6 +185,15 @@ export default function AdminUsersPage() {
                   </p>
                 )}
               </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="create-is-admin"
+                  {...form.register('is_admin')}
+                  aria-label="Administrator"
+                />
+                <Label htmlFor="create-is-admin">Administrator</Label>
+              </div>
               <div className="flex justify-end gap-2">
                 <Button
                   type="button"
@@ -223,6 +245,20 @@ export default function AdminUsersPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        title={user.role === 'admin' ? 'Odbierz admin' : 'Nadaj admin'}
+                        onClick={() => handleToggleAdmin(user.id, user.role)}
+                        data-action="toggle-admin"
+                      >
+                        {user.role === 'admin' ? (
+                          <ShieldOff className="h-4 w-4" />
+                        ) : (
+                          <Shield className="h-4 w-4" />
+                        )}
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

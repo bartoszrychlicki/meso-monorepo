@@ -12,7 +12,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { CustomerForm } from '@/modules/crm/components/customer-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { CreateCustomerInput } from '@/schemas/crm';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 /**
  * New Customer Page
@@ -21,22 +21,14 @@ import { useToast } from '@/hooks/use-toast';
 export default function NewCustomerPage() {
   const router = useRouter();
   const { createCustomer, isLoading } = useCRMStore();
-  const { toast } = useToast();
 
   const handleSubmit = async (data: CreateCustomerInput) => {
     try {
       const customer = await createCustomer(data);
-      toast({
-        title: 'Klient utworzony',
-        description: `${customer.first_name} ${customer.last_name} został dodany do systemu`,
-      });
+      toast.success(`${customer.first_name} ${customer.last_name} zostal dodany do systemu`);
       router.push(`/crm/${customer.id}`);
     } catch (error) {
-      toast({
-        title: 'Błąd',
-        description: 'Nie udało się utworzyć klienta',
-        variant: 'destructive',
-      });
+      toast.error('Nie udalo sie utworzyc klienta');
     }
   };
 

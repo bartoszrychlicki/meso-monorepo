@@ -19,6 +19,7 @@ export async function createStaffUser(formData: FormData) {
   const name = formData.get('name') as string;
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
+  const isAdmin = formData.get('is_admin') === 'true';
 
   const serviceClient = createServiceClient();
   const { error } = await serviceClient.auth.admin.createUser({
@@ -28,7 +29,7 @@ export async function createStaffUser(formData: FormData) {
     user_metadata: {
       app_role: 'staff',
       name,
-      role: 'cashier',
+      role: isAdmin ? 'admin' : 'cashier',
     },
   });
 
@@ -60,6 +61,32 @@ export async function resetStaffPassword(userId: string) {
     return { error: 'Nie udalo sie wyslac linku resetujacego.' };
   }
 
+  return { success: true };
+}
+
+export async function toggleStaffAdmin(userId: string, makeAdmin: boolean) {
+  const serviceClient = createServiceClient();
+  const newRole = makeAdmin ? 'admin' : 'cashier';
+
+  const { error: authError } = await serviceClient.auth.admin.updateUserById(userId, {
+    user_metadata: { role: newRole },
+  });
+
+  if (authError) {
+    return { error: `Nie udalo sie zaktualizowac roli: ${authError.message}` };
+  }
+
+  const supabase = await createClient();
+  const { error: dbError } = await supabase
+    .from('users_users')
+    .update({ role: newRole })
+    .eq('id', userId);
+
+  if (dbError) {
+    return { error: `Nie udalo sie zaktualizowac roli w bazie: ${dbError.message}` };
+  }
+
+  revalidatePath('/admin/users');
   return { success: true };
 }
 

@@ -44,7 +44,11 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
       if (result?.error) {
         setError(result.error);
       }
-    } catch {
+    } catch (err: unknown) {
+      const digest = (err as { digest?: string })?.digest;
+      if (typeof digest === 'string' && digest.startsWith('NEXT_REDIRECT')) {
+        throw err;
+      }
       setError('Wystapil blad podczas logowania. Sprobuj ponownie.');
     } finally {
       setIsSubmitting(false);
