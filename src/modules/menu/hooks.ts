@@ -17,6 +17,7 @@ export function useMenu() {
     allProducts: store.products,
     categories: store.categories,
     modifierGroups: store.modifierGroups,
+    modifiers: store.modifiers,
     selectedCategoryId: store.selectedCategoryId,
     searchQuery: store.searchQuery,
     isLoading: store.isLoading,
@@ -68,5 +69,24 @@ export function useCategories() {
   return {
     categories: store.categories,
     isLoading: store.isLoading,
+  };
+}
+
+export function useModifiers() {
+  const store = useMenuStore();
+
+  useEffect(() => {
+    if (store.modifiers.length === 0 && !store.isLoading) {
+      store.loadModifiers();
+    }
+  }, []);
+
+  return {
+    modifiers: store.modifiers,
+    isLoading: store.isLoading,
+    createModifier: store.createModifier,
+    updateModifier: store.updateModifier,
+    deleteModifier: store.deleteModifier,
+    loadModifiers: store.loadModifiers,
   };
 }
