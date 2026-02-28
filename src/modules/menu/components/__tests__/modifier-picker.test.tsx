@@ -159,10 +159,10 @@ describe('ModifierPicker', () => {
     );
 
     const checkboxes = screen.getAllByRole('checkbox');
-    // mod-1 (Extra Ser) and mod-3 (Extra Bekon) should be checked
-    expect(checkboxes[0]).toHaveAttribute('data-state', 'checked');
-    expect(checkboxes[1]).toHaveAttribute('data-state', 'unchecked');
-    expect(checkboxes[2]).toHaveAttribute('data-state', 'checked');
+    // Selected modifiers sort first (mod-1, mod-3), then unselected (mod-2)
+    expect(checkboxes[0]).toHaveAttribute('data-state', 'checked');   // mod-1 (Extra Ser)
+    expect(checkboxes[1]).toHaveAttribute('data-state', 'checked');   // mod-3 (Extra Bekon)
+    expect(checkboxes[2]).toHaveAttribute('data-state', 'unchecked'); // mod-2 (Bez Cebuli)
   });
 
   it('search filters modifiers by name', async () => {

@@ -56,7 +56,7 @@ describe('getProductModifierIds', () => {
   });
 
   it('returns array of modifier IDs', async () => {
-    chain.eq.mockResolvedValue({
+    chain.order.mockResolvedValueOnce({
       data: [
         { modifier_id: 'mod-1' },
         { modifier_id: 'mod-2' },
@@ -70,10 +70,11 @@ describe('getProductModifierIds', () => {
     expect(mockFrom).toHaveBeenCalledWith('product_modifiers');
     expect(chain.select).toHaveBeenCalledWith('modifier_id');
     expect(chain.eq).toHaveBeenCalledWith('product_id', 'product-1');
+    expect(chain.order).toHaveBeenCalledWith('sort_order', { ascending: true });
   });
 
   it('returns empty array when no modifiers', async () => {
-    chain.eq.mockResolvedValue({
+    chain.order.mockResolvedValueOnce({
       data: [],
       error: null,
     });
@@ -83,7 +84,7 @@ describe('getProductModifierIds', () => {
   });
 
   it('returns empty array when data is null', async () => {
-    chain.eq.mockResolvedValue({
+    chain.order.mockResolvedValueOnce({
       data: null,
       error: null,
     });
@@ -93,7 +94,7 @@ describe('getProductModifierIds', () => {
   });
 
   it('throws on error', async () => {
-    chain.eq.mockResolvedValue({
+    chain.order.mockResolvedValueOnce({
       data: null,
       error: { message: 'connection refused' },
     });
@@ -125,8 +126,8 @@ describe('setProductModifiers', () => {
     expect(mockFrom).toHaveBeenCalledWith('product_modifiers');
     expect(chain.delete).toHaveBeenCalled();
     expect(chain.insert).toHaveBeenCalledWith([
-      { product_id: 'product-1', modifier_id: 'mod-a' },
-      { product_id: 'product-1', modifier_id: 'mod-b' },
+      { product_id: 'product-1', modifier_id: 'mod-a', sort_order: 0 },
+      { product_id: 'product-1', modifier_id: 'mod-b', sort_order: 1 },
     ]);
   });
 
@@ -174,19 +175,8 @@ describe('getProductModifiers', () => {
     mockFrom.mockReturnValue(chain);
   });
 
-  it('returns full modifier objects', async () => {
+  it('returns full modifier objects ordered by junction sort_order', async () => {
     const modifiers = [
-      {
-        id: 'mod-1',
-        name: 'Extra Cheese',
-        price: 3.5,
-        modifier_action: 'add',
-        recipe_id: null,
-        is_available: true,
-        sort_order: 0,
-        created_at: '2026-01-01T00:00:00Z',
-        updated_at: '2026-01-01T00:00:00Z',
-      },
       {
         id: 'mod-2',
         name: 'No Onion',
@@ -198,21 +188,33 @@ describe('getProductModifiers', () => {
         created_at: '2026-01-01T00:00:00Z',
         updated_at: '2026-01-01T00:00:00Z',
       },
+      {
+        id: 'mod-1',
+        name: 'Extra Cheese',
+        price: 3.5,
+        modifier_action: 'add',
+        recipe_id: null,
+        is_available: true,
+        sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      },
     ];
 
-    // First call: get modifier IDs from junction table
-    chain.eq.mockResolvedValueOnce({
+    // First call: get modifier IDs from junction table (ordered by sort_order)
+    chain.order.mockResolvedValueOnce({
       data: [{ modifier_id: 'mod-1' }, { modifier_id: 'mod-2' }],
       error: null,
     });
-    // Second call: get full modifier objects
-    chain.order.mockResolvedValueOnce({
+    // Second call: get full modifier objects (unordered from menu_modifiers)
+    chain.in.mockResolvedValueOnce({
       data: modifiers,
       error: null,
     });
 
     const result = await getProductModifiers('product-1');
     expect(result).toHaveLength(2);
+    // Should be re-sorted by junction sort_order, not menu_modifiers order
     expect(result[0].name).toBe('Extra Cheese');
     expect(result[1].name).toBe('No Onion');
     expect(mockFrom).toHaveBeenCalledWith('product_modifiers');
@@ -220,7 +222,7 @@ describe('getProductModifiers', () => {
   });
 
   it('returns empty array when no links exist', async () => {
-    chain.eq.mockResolvedValueOnce({
+    chain.order.mockResolvedValueOnce({
       data: [],
       error: null,
     });
@@ -230,7 +232,7 @@ describe('getProductModifiers', () => {
   });
 
   it('returns empty array when data is null', async () => {
-    chain.eq.mockResolvedValueOnce({
+    chain.order.mockResolvedValueOnce({
       data: null,
       error: null,
     });
@@ -240,7 +242,7 @@ describe('getProductModifiers', () => {
   });
 
   it('throws on junction table error', async () => {
-    chain.eq.mockResolvedValueOnce({
+    chain.order.mockResolvedValueOnce({
       data: null,
       error: { message: 'table not found' },
     });
@@ -251,11 +253,11 @@ describe('getProductModifiers', () => {
   });
 
   it('throws on modifiers fetch error', async () => {
-    chain.eq.mockResolvedValueOnce({
+    chain.order.mockResolvedValueOnce({
       data: [{ modifier_id: 'mod-1' }],
       error: null,
     });
-    chain.order.mockResolvedValueOnce({
+    chain.in.mockResolvedValueOnce({
       data: null,
       error: { message: 'query timeout' },
     });
