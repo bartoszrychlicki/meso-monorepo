@@ -12,6 +12,7 @@ import {
   Users,
   UserCheck,
   Settings,
+  Settings2,
   ExternalLink,
   Truck,
   Shield,
@@ -38,6 +39,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Users,
   UserCheck,
   Settings,
+  Settings2,
   Truck,
   Shield,
 };
@@ -46,6 +48,7 @@ const mainNavItems = [
   { title: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
   { title: 'Zamówienia', href: '/orders', icon: 'ShoppingCart' },
   { title: 'Menu', href: '/menu', icon: 'UtensilsCrossed' },
+  { title: 'Modyfikatory', href: '/menu/modifiers', icon: 'Settings2' },
   { title: 'Receptury', href: '/recipes', icon: 'ChefHat' },
   { title: 'Magazyn', href: '/inventory', icon: 'Warehouse' },
   { title: 'Dostawy', href: '/deliveries', icon: 'Truck' },
