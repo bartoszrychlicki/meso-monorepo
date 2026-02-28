@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MenuModifier } from '@/types/menu';
 import { ModifierAction } from '@/types/enums';
 import { Recipe } from '@/types/recipe';
@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ModifierFormDialog } from './modifier-form-dialog';
 import { formatCurrency } from '@/lib/utils';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 
 interface ModifierPickerProps {
   allModifiers: MenuModifier[];
@@ -32,9 +32,16 @@ export function ModifierPicker({
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const filtered = allModifiers.filter((m) =>
-    m.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const matching = allModifiers.filter((m) =>
+      m.name.toLowerCase().includes(search.toLowerCase())
+    );
+    const selected = matching
+      .filter((m) => selectedModifierIds.includes(m.id))
+      .sort((a, b) => selectedModifierIds.indexOf(a.id) - selectedModifierIds.indexOf(b.id));
+    const unselected = matching.filter((m) => !selectedModifierIds.includes(m.id));
+    return [...selected, ...unselected];
+  }, [allModifiers, search, selectedModifierIds]);
 
   const handleToggle = (modifierId: string) => {
     if (selectedModifierIds.includes(modifierId)) {
@@ -42,6 +49,16 @@ export function ModifierPicker({
     } else {
       onChange([...selectedModifierIds, modifierId]);
     }
+  };
+
+  const handleMove = (modifierId: string, direction: 'up' | 'down') => {
+    const idx = selectedModifierIds.indexOf(modifierId);
+    if (idx === -1) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= selectedModifierIds.length) return;
+    const newIds = [...selectedModifierIds];
+    [newIds[idx], newIds[swapIdx]] = [newIds[swapIdx], newIds[idx]];
+    onChange(newIds);
   };
 
   const handleCreateModifier = async (
@@ -71,12 +88,40 @@ export function ModifierPicker({
         ) : (
           filtered.map((modifier) => {
             const isSelected = selectedModifierIds.includes(modifier.id);
+            const selectedIdx = selectedModifierIds.indexOf(modifier.id);
             return (
               <div
                 key={modifier.id}
                 className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-muted/50"
                 data-id={modifier.id}
               >
+                {isSelected && (
+                  <div className="flex flex-col items-center gap-0.5">
+                    <GripVertical className="h-3 w-3 text-muted-foreground" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      disabled={selectedIdx === 0}
+                      onClick={() => handleMove(modifier.id, 'up')}
+                      data-action="move-modifier-up"
+                      aria-label={`Move ${modifier.name} up`}
+                    >
+                      <ChevronUp className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-5 w-5"
+                      disabled={selectedIdx === selectedModifierIds.length - 1}
+                      onClick={() => handleMove(modifier.id, 'down')}
+                      data-action="move-modifier-down"
+                      aria-label={`Move ${modifier.name} down`}
+                    >
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
                 <Checkbox
                   checked={isSelected}
                   onCheckedChange={() => handleToggle(modifier.id)}

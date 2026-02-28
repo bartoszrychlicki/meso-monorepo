@@ -4,14 +4,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import { useMenu } from '@/modules/menu/hooks';
+import { Plus, Settings2 } from 'lucide-react';
+import { useMenu, useModifiers } from '@/modules/menu/hooks';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { useRecipesStore } from '@/modules/recipes/store';
 import { CategoryList } from '@/modules/menu/components/category-list';
 import { CategoryFormDialog } from '@/modules/menu/components/category-form-dialog';
 import { MenuGrid } from '@/modules/menu/components/menu-grid';
+import { ModifierManagement } from '@/modules/menu/components/modifier-management';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Category } from '@/types/menu';
 import { toast } from 'sonner';
 
@@ -32,6 +34,8 @@ export default function MenuPage() {
     deleteCategory,
   } = useMenu();
 
+  const { modifiers, isLoading: modifiersLoading, createModifier, updateModifier, deleteModifier } = useModifiers();
+
   const stockItems = useInventoryStore((s) => s.stockItems);
   const loadStockItems = useInventoryStore((s) => s.loadStockItems);
   const recipes = useRecipesStore((s) => s.recipes);
@@ -45,6 +49,9 @@ export default function MenuPage() {
       loadRecipes();
     }
   }, []);
+
+  // Modifier sheet state
+  const [modifierSheetOpen, setModifierSheetOpen] = useState(false);
 
   // Category dialog state
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
@@ -108,13 +115,23 @@ export default function MenuPage() {
         title="Menu"
         description="Zarzadzaj produktami i kategoriami"
         actions={
-          <Button
-            onClick={() => router.push('/menu/new')}
-            data-action="new-product"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Nowy produkt
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setModifierSheetOpen(true)}
+              data-action="open-modifiers"
+            >
+              <Settings2 className="mr-2 h-4 w-4" />
+              Modyfikatory
+            </Button>
+            <Button
+              onClick={() => router.push('/menu/new')}
+              data-action="new-product"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Nowy produkt
+            </Button>
+          </div>
         }
       />
 
@@ -171,6 +188,22 @@ export default function MenuPage() {
         onConfirm={confirmDeleteCategory}
         variant="destructive"
       />
+
+      <Sheet open={modifierSheetOpen} onOpenChange={setModifierSheetOpen}>
+        <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Modyfikatory</SheetTitle>
+          </SheetHeader>
+          <ModifierManagement
+            modifiers={modifiers}
+            recipes={recipes}
+            isLoading={modifiersLoading}
+            onCreateModifier={createModifier}
+            onUpdateModifier={updateModifier}
+            onDeleteModifier={deleteModifier}
+          />
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

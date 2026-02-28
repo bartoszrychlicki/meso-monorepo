@@ -22,6 +22,13 @@ import {
   SelectItem,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { HelpCircle } from 'lucide-react';
 
 interface ModifierFormDialogProps {
   open: boolean;
@@ -109,91 +116,133 @@ export function ModifierFormDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Name */}
-          <div className="space-y-2">
-            <Label htmlFor="modifier-name">Nazwa</Label>
-            <Input
-              id="modifier-name"
-              data-field="modifier-name"
-              placeholder="Nazwa modyfikatora"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </div>
+        <TooltipProvider>
+          <div className="space-y-4 py-4">
+            {/* Name */}
+            <div className="space-y-2">
+              <Label htmlFor="modifier-name">Nazwa</Label>
+              <Input
+                id="modifier-name"
+                data-field="modifier-name"
+                placeholder="Nazwa modyfikatora"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
 
-          {/* Price */}
-          <div className="space-y-2">
-            <Label htmlFor="modifier-price">+/- PLN</Label>
-            <Input
-              id="modifier-price"
-              data-field="modifier-price"
-              type="number"
-              step={0.01}
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-            />
-          </div>
+            {/* Price */}
+            <div className="space-y-2">
+              <Label htmlFor="modifier-price" className="flex items-center gap-1">
+                +/- PLN
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Wartosc dodatnia = doplata, ujemna = rabat, 0 = bezplatnie
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Input
+                id="modifier-price"
+                data-field="modifier-price"
+                type="number"
+                step={0.01}
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+              />
+            </div>
 
-          {/* Modifier Action */}
-          <div className="space-y-2">
-            <Label htmlFor="modifier-action">Typ akcji</Label>
-            <Select
-              value={modifierAction}
-              onValueChange={(val) => setModifierAction(val as ModifierAction)}
-            >
-              <SelectTrigger id="modifier-action" data-field="modifier-action">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ModifierAction.ADD}>
-                  Dodatek (dodaj)
-                </SelectItem>
-                <SelectItem value={ModifierAction.REMOVE}>
-                  Usuniecie (usun)
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Recipe */}
-          <div className="space-y-2">
-            <Label htmlFor="modifier-recipe">Receptura</Label>
-            <Select
-              value={recipeId ?? '__none__'}
-              onValueChange={(val) =>
-                setRecipeId(val === '__none__' ? null : val)
-              }
-            >
-              <SelectTrigger id="modifier-recipe" data-field="modifier-recipe">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Brak</SelectItem>
-                {recipes.map((recipe) => (
-                  <SelectItem key={recipe.id} value={recipe.id}>
-                    {recipe.name}
+            {/* Modifier Action */}
+            <div className="space-y-2">
+              <Label htmlFor="modifier-action" className="flex items-center gap-1">
+                Typ akcji
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Dodatek = dodaje skladnik/pozycje, Usuniecie = usuwa z bazowego produktu
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Select
+                value={modifierAction}
+                onValueChange={(val) => setModifierAction(val as ModifierAction)}
+              >
+                <SelectTrigger id="modifier-action" data-field="modifier-action">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ModifierAction.ADD}>
+                    Dodatek (dodaj)
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+                  <SelectItem value={ModifierAction.REMOVE}>
+                    Usuniecie (usun)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-          {/* Available */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="modifier-available">Dostepny</Label>
-            <Switch
-              id="modifier-available"
-              data-field="modifier-available"
-              checked={isAvailable}
-              onCheckedChange={setIsAvailable}
-            />
-          </div>
+            {/* Recipe */}
+            <div className="space-y-2">
+              <Label htmlFor="modifier-recipe" className="flex items-center gap-1">
+                Receptura
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Powiaz modyfikator z receptura, aby sledzic koszty skladnikow
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Select
+                value={recipeId ?? '__none__'}
+                onValueChange={(val) =>
+                  setRecipeId(val === '__none__' ? null : val)
+                }
+              >
+                <SelectTrigger id="modifier-recipe" data-field="modifier-recipe">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Brak</SelectItem>
+                  {recipes.map((recipe) => (
+                    <SelectItem key={recipe.id} value={recipe.id}>
+                      {recipe.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-        </div>
+            {/* Available */}
+            <div className="flex items-center justify-between">
+              <Label htmlFor="modifier-available" className="flex items-center gap-1">
+                Dostepny
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    Okresla, czy modyfikator jest widoczny i dostepny w POS
+                  </TooltipContent>
+                </Tooltip>
+              </Label>
+              <Switch
+                id="modifier-available"
+                data-field="modifier-available"
+                checked={isAvailable}
+                onCheckedChange={setIsAvailable}
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+          </div>
+        </TooltipProvider>
 
         <DialogFooter>
           <Button

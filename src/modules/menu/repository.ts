@@ -30,12 +30,13 @@ export async function toggleAvailability(productId: string): Promise<Product> {
   return productsRepository.update(productId, { is_available: !product.is_available });
 }
 
-/** Get modifier IDs for a product */
+/** Get modifier IDs for a product (ordered by per-product sort_order) */
 export async function getProductModifierIds(productId: string): Promise<string[]> {
   const { data, error } = await supabase
     .from('product_modifiers')
     .select('modifier_id')
-    .eq('product_id', productId);
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true });
   if (error) throw new Error(`getProductModifierIds failed: ${error.message}`);
   return (data ?? []).map((row: { modifier_id: string }) => row.modifier_id);
 }
@@ -49,9 +50,10 @@ export async function setProductModifiers(productId: string, modifierIds: string
   if (delError) throw new Error(`setProductModifiers delete failed: ${delError.message}`);
 
   if (modifierIds.length > 0) {
-    const rows = modifierIds.map((modifier_id) => ({
+    const rows = modifierIds.map((modifier_id, index) => ({
       product_id: productId,
       modifier_id,
+      sort_order: index,
     }));
     const { error: insError } = await supabase
       .from('product_modifiers')
@@ -60,23 +62,26 @@ export async function setProductModifiers(productId: string, modifierIds: string
   }
 }
 
-/** Get modifiers for a product (full objects) */
+/** Get modifiers for a product (full objects, ordered by per-product sort_order) */
 export async function getProductModifiers(productId: string): Promise<MenuModifier[]> {
   const { data, error } = await supabase
     .from('product_modifiers')
-    .select('modifier_id')
-    .eq('product_id', productId);
+    .select('modifier_id, sort_order')
+    .eq('product_id', productId)
+    .order('sort_order', { ascending: true });
   if (error) throw new Error(`getProductModifiers failed: ${error.message}`);
   if (!data || data.length === 0) return [];
 
-  const ids = data.map((row: { modifier_id: string }) => row.modifier_id);
+  const orderedIds: string[] = data.map((row: { modifier_id: string }) => row.modifier_id);
   const { data: modifiers, error: modError } = await supabase
     .from('menu_modifiers')
     .select('*')
-    .in('id', ids)
-    .order('sort_order', { ascending: true });
+    .in('id', orderedIds);
   if (modError) throw new Error(`getProductModifiers fetch failed: ${modError.message}`);
-  return (modifiers ?? []) as MenuModifier[];
+
+  // Re-sort by junction sort_order (orderedIds preserves that order)
+  const modMap = new Map((modifiers ?? []).map((m: MenuModifier) => [m.id, m]));
+  return orderedIds.map((id: string) => modMap.get(id)).filter(Boolean) as MenuModifier[];
 }
 
 /** Count products using a modifier */
