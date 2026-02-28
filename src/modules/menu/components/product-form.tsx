@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Product, Category, ModifierGroup, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
+import { Product, Category, MenuModifier, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
 import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { Allergen, ProductType, VariantType, SalesChannel } from '@/types/enums';
@@ -40,7 +40,7 @@ import {
   Save,
 } from 'lucide-react';
 import { ImageUploader } from './image-uploader';
-import { ModifierSelector } from './modifier-selector';
+import { ModifierPicker } from './modifier-picker';
 import { formatCurrency } from '@/lib/utils';
 
 const STEPS = [
@@ -57,7 +57,10 @@ interface ProductFormProps {
   categories: Category[];
   stockItems: StockItem[];
   recipes: Recipe[];
-  onSubmit: (data: Omit<Product, 'created_at' | 'updated_at'>) => void;
+  allModifiers?: MenuModifier[];
+  initialModifierIds?: string[];
+  onCreateModifier?: (data: Omit<MenuModifier, 'id' | 'created_at' | 'updated_at'>) => Promise<MenuModifier>;
+  onSubmit: (data: Omit<Product, 'created_at' | 'updated_at'>, modifierIds: string[]) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
@@ -67,6 +70,9 @@ export function ProductForm({
   categories,
   stockItems: _stockItems,
   recipes,
+  allModifiers = [],
+  initialModifierIds,
+  onCreateModifier,
   onSubmit,
   onCancel,
   isSubmitting = false,
@@ -92,8 +98,8 @@ export function ProductForm({
   const [variants, setVariants] = useState<ProductVariant[]>(product?.variants ?? []);
 
   // Modifiers
-  const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>(
-    product?.modifier_groups ?? []
+  const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>(
+    initialModifierIds ?? []
   );
 
   // Allergens
@@ -183,7 +189,7 @@ export function ProductForm({
       allergens: selectedAllergens,
       nutritional_info: { calories, protein, carbs, fat },
       variants,
-      modifier_groups: modifierGroups,
+      modifier_groups: [],
       recipe_id: recipeId || undefined,
       ingredients,
       preparation_time_minutes: prepTime,
@@ -196,7 +202,7 @@ export function ProductForm({
       point_ids: product?.point_ids ?? [],
       pricing: product?.pricing ?? createDefaultPricing(price, 2),
     };
-    onSubmit(data);
+    onSubmit(data, selectedModifierIds);
   };
 
   const canGoNext = () => {
@@ -564,14 +570,17 @@ export function ProductForm({
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <h3 className="font-medium">Grupy modyfikatorow</h3>
+                <h3 className="font-medium">Modyfikatory</h3>
                 <p className="text-sm text-muted-foreground">
-                  Dodaj grupy dodatkow, sosow i innych modyfikatorow
+                  Wybierz modyfikatory dostepne dla tego produktu
                 </p>
               </div>
-              <ModifierSelector
-                modifierGroups={modifierGroups}
-                onChange={setModifierGroups}
+              <ModifierPicker
+                allModifiers={allModifiers}
+                selectedModifierIds={selectedModifierIds}
+                onChange={setSelectedModifierIds}
+                recipes={recipes}
+                onCreateModifier={onCreateModifier ?? (async (data) => ({ ...data, id: crypto.randomUUID(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }))}
               />
             </div>
           )}
@@ -680,8 +689,8 @@ export function ProductForm({
                       <dd className="font-medium">{variants.length}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Grupy modyfikatorow:</dt>
-                      <dd className="font-medium">{modifierGroups.length}</dd>
+                      <dt className="text-muted-foreground">Modyfikatory:</dt>
+                      <dd className="font-medium">{selectedModifierIds.length}</dd>
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">Alergeny:</dt>

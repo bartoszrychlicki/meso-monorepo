@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Trash2 } from 'lucide-react';
-import { useProduct } from '@/modules/menu/hooks';
+import { useProduct, useModifiers } from '@/modules/menu/hooks';
 import { useMenuStore } from '@/modules/menu/store';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { useRecipesStore } from '@/modules/recipes/store';
@@ -13,6 +13,7 @@ import { ProductForm } from '@/modules/menu/components/product-form';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Product } from '@/types/menu';
+import { getProductModifierIds, setProductModifiers } from '@/modules/menu/repository';
 import { toast } from 'sonner';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
@@ -31,6 +32,8 @@ export default function EditProductPage() {
   const loadStockItems = useInventoryStore((s) => s.loadStockItems);
   const recipes = useRecipesStore((s) => s.recipes);
   const loadRecipes = useRecipesStore((s) => s.loadRecipes);
+  const { modifiers: allModifiers, createModifier } = useModifiers();
+  const [initialModifierIds, setInitialModifierIds] = useState<string[]>([]);
 
   useEffect(() => {
     if (stockItems.length === 0) {
@@ -41,12 +44,17 @@ export default function EditProductPage() {
     }
   }, []);
 
-  const handleSubmit = async (data: Omit<Product, 'created_at' | 'updated_at'>) => {
+  useEffect(() => {
+    getProductModifierIds(productId).then(setInitialModifierIds).catch(console.error);
+  }, [productId]);
+
+  const handleSubmit = async (data: Omit<Product, 'created_at' | 'updated_at'>, modifierIds: string[]) => {
     setIsSubmitting(true);
     try {
       await updateProduct(productId, data);
+      await setProductModifiers(productId, modifierIds);
       toast.success('Produkt zostal zaktualizowany');
-      router.push('/menu');
+      // Stay on page (do not navigate away)
     } catch (error) {
       toast.error('Blad podczas aktualizacji produktu');
       console.error(error);
@@ -126,6 +134,9 @@ export default function EditProductPage() {
           categories={categories}
           stockItems={stockItems}
           recipes={recipes}
+          allModifiers={allModifiers}
+          initialModifierIds={initialModifierIds}
+          onCreateModifier={createModifier}
           onSubmit={handleSubmit}
           onCancel={() => router.push('/menu')}
           isSubmitting={isSubmitting}
