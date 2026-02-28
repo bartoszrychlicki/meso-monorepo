@@ -2,7 +2,7 @@ import { isSeeded, markAsSeeded, clearSeedFlag } from './check-seeded';
 import { locations } from './data/locations';
 import { users } from './data/users';
 import { categories } from './data/categories';
-import { products } from './data/products';
+import { products, modifiers, productModifierLinks } from './data/products';
 import { employees, workTimes } from './data/employees';
 import { orders } from './data/orders';
 import { stockItems, warehouses, warehouseStock, stockItemComponents } from './data/inventory';
@@ -34,6 +34,8 @@ export function seedAll(): void {
   seedCollection('users', users);
   seedCollection('categories', categories);
   seedCollection('products', products);
+  seedCollection('modifiers', modifiers);
+  seedCollection('product_modifiers', productModifierLinks);
   seedCollection('employees', employees);
   seedCollection('work_times', workTimes);
   seedCollection('customers', customers);

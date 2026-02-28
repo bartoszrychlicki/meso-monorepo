@@ -1,4 +1,4 @@
-import { Product, ProductImage, RecipeIngredient } from '@/types/menu';
+import { Product, ProductImage, RecipeIngredient, MenuModifier } from '@/types/menu';
 import {
   Allergen,
   ModifierType,
@@ -56,6 +56,19 @@ export const MODIFIER_GROUP_IDS = {
   BURGER_EXTRAS: '55555555-5555-5555-5555-555555555001',
   SAUCES: '55555555-5555-5555-5555-555555555002',
   DRINK_SIZE: '55555555-5555-5555-5555-555555555003',
+} as const;
+
+export const MODIFIER_IDS = {
+  DODATKOWY_SER: '66666666-6666-6666-6666-666666660001',
+  BEKON: '66666666-6666-6666-6666-666666660002',
+  JALAPENO: '66666666-6666-6666-6666-666666660003',
+  EXTRA_SOS: '66666666-6666-6666-6666-666666660004',
+  BBQ: '66666666-6666-6666-6666-666666660005',
+  CZOSNKOWY: '66666666-6666-6666-6666-666666660006',
+  OSTRY: '66666666-6666-6666-6666-666666660007',
+  MAJONEZ: '66666666-6666-6666-6666-666666660008',
+  MALY_03L: '66666666-6666-6666-6666-666666660009',
+  DUZY_07L: '66666666-6666-6666-6666-666666660010',
 } as const;
 
 const now = '2024-01-15T10:00:00.000Z';
@@ -780,4 +793,198 @@ export const products: Product[] = [
     created_at: now,
     updated_at: now,
   },
+];
+
+// ── STANDALONE MODIFIERS (for menu_modifiers table / localStorage) ────────
+export const modifiers: MenuModifier[] = [
+  {
+    id: MODIFIER_IDS.DODATKOWY_SER,
+    name: 'Dodatkowy ser',
+    price: 3,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 1,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.BEKON,
+    name: 'Bekon',
+    price: 5,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 2,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.JALAPENO,
+    name: 'Jalapeno',
+    price: 3,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 3,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.EXTRA_SOS,
+    name: 'Extra sos',
+    price: 2,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 4,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.BBQ,
+    name: 'BBQ',
+    price: 0,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 5,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.CZOSNKOWY,
+    name: 'Czosnkowy',
+    price: 0,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 6,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.OSTRY,
+    name: 'Ostry',
+    price: 0,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 7,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.MAJONEZ,
+    name: 'Majonez',
+    price: 0,
+    modifier_action: ModifierAction.ADD,
+    is_available: true,
+    sort_order: 8,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.MALY_03L,
+    name: 'Maly (0.3l)',
+    price: -2,
+    modifier_action: ModifierAction.SUBSTITUTE,
+    is_available: true,
+    sort_order: 9,
+    created_at: now,
+    updated_at: now,
+  },
+  {
+    id: MODIFIER_IDS.DUZY_07L,
+    name: 'Duzy (0.7l)',
+    price: 3,
+    modifier_action: ModifierAction.SUBSTITUTE,
+    is_available: true,
+    sort_order: 10,
+    created_at: now,
+    updated_at: now,
+  },
+];
+
+// ── PRODUCT ↔ MODIFIER LINKS (for product_modifiers table / localStorage) ─
+// Products with burgerExtrasGroup: CHEESEBURGER, BACON_BURGER, TRUFFLE_BURGER, DOUBLE_SMASH_BURGER, BURGER_COMBO
+// Products with saucesGroup: all above + VEGGIE_BURGER, CLASSIC_FRIES, SWEET_POTATO_FRIES, LOADED_FRIES, PREMIUM_COMBO
+// Products with drinkSizeGroup: LEMONADE
+export const productModifierLinks: Array<{ product_id: string; modifier_id: string }> = [
+  // ── Cheeseburger: burgerExtras + sauces ──
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.DODATKOWY_SER },
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.BEKON },
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.JALAPENO },
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.EXTRA_SOS },
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.CHEESEBURGER, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Bacon Burger: burgerExtras + sauces ──
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.DODATKOWY_SER },
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.BEKON },
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.JALAPENO },
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.EXTRA_SOS },
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.BACON_BURGER, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Veggie Burger: sauces only ──
+  { product_id: PRODUCT_IDS.VEGGIE_BURGER, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.VEGGIE_BURGER, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.VEGGIE_BURGER, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.VEGGIE_BURGER, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Truffle Burger: burgerExtras + sauces ──
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.DODATKOWY_SER },
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.BEKON },
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.JALAPENO },
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.EXTRA_SOS },
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.TRUFFLE_BURGER, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Double Smash Burger: burgerExtras + sauces ──
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.DODATKOWY_SER },
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.BEKON },
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.JALAPENO },
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.EXTRA_SOS },
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.DOUBLE_SMASH_BURGER, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Classic Fries: sauces only ──
+  { product_id: PRODUCT_IDS.CLASSIC_FRIES, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.CLASSIC_FRIES, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.CLASSIC_FRIES, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.CLASSIC_FRIES, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Sweet Potato Fries: sauces only ──
+  { product_id: PRODUCT_IDS.SWEET_POTATO_FRIES, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.SWEET_POTATO_FRIES, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.SWEET_POTATO_FRIES, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.SWEET_POTATO_FRIES, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Loaded Fries: sauces only ──
+  { product_id: PRODUCT_IDS.LOADED_FRIES, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.LOADED_FRIES, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.LOADED_FRIES, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.LOADED_FRIES, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Lemonade: drinkSize only ──
+  { product_id: PRODUCT_IDS.LEMONADE, modifier_id: MODIFIER_IDS.MALY_03L },
+  { product_id: PRODUCT_IDS.LEMONADE, modifier_id: MODIFIER_IDS.DUZY_07L },
+
+  // ── Burger Combo: burgerExtras + sauces ──
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.DODATKOWY_SER },
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.BEKON },
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.JALAPENO },
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.EXTRA_SOS },
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.BURGER_COMBO, modifier_id: MODIFIER_IDS.MAJONEZ },
+
+  // ── Premium Combo: sauces only ──
+  { product_id: PRODUCT_IDS.PREMIUM_COMBO, modifier_id: MODIFIER_IDS.BBQ },
+  { product_id: PRODUCT_IDS.PREMIUM_COMBO, modifier_id: MODIFIER_IDS.CZOSNKOWY },
+  { product_id: PRODUCT_IDS.PREMIUM_COMBO, modifier_id: MODIFIER_IDS.OSTRY },
+  { product_id: PRODUCT_IDS.PREMIUM_COMBO, modifier_id: MODIFIER_IDS.MAJONEZ },
 ];
