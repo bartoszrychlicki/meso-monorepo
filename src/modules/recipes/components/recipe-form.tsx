@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CreateRecipeSchema, CreateRecipeInput } from '@/schemas/recipe';
@@ -41,8 +41,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Trash2, Save, X, Search, DollarSign, HelpCircle } from 'lucide-react';
+import { Trash2, Save, X, Search, DollarSign, HelpCircle, ListPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { parseLocaleNumber } from '@/lib/utils/parse-locale-number';
+import { ProductSearchDialog } from './product-search-dialog';
 
 interface RecipeIngredientField {
   stock_item_id: string;
@@ -77,6 +79,8 @@ function IngredientChecklist({
   setIsSavingIngredients,
   watchedIngredients,
 }: IngredientChecklistProps) {
+  const [productSearchOpen, setProductSearchOpen] = useState(false);
+
   const selectedIds = useMemo(() => {
     return new Set(
       (watchedIngredients || [])
@@ -140,19 +144,31 @@ function IngredientChecklist({
               </Badge>
             )}
           </CardTitle>
-          {onSaveIngredients && (
+          <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={handleSaveIngredients}
-              disabled={isSavingIngredients}
-              data-action="save-ingredients"
+              onClick={() => setProductSearchOpen(true)}
+              data-action="add-from-list"
             >
-              <Save className="mr-1 h-4 w-4" />
-              {isSavingIngredients ? 'Zapisywanie...' : 'Zapisz skladniki'}
+              <ListPlus className="mr-1 h-4 w-4" />
+              Dodaj z listy
             </Button>
-          )}
+            {onSaveIngredients && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleSaveIngredients}
+                disabled={isSavingIngredients}
+                data-action="save-ingredients"
+              >
+                <Save className="mr-1 h-4 w-4" />
+                {isSavingIngredients ? 'Zapisywanie...' : 'Zapisz skladniki'}
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -206,15 +222,14 @@ function IngredientChecklist({
                     </span>
                     <div className="flex items-center gap-2 ml-auto">
                       <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
+                        type="text"
+                        inputMode="decimal"
                         className="w-20 h-8 text-sm"
                         value={watchedIngredients[fieldIndex]?.quantity ?? 0}
                         onChange={(e) =>
                           form.setValue(
                             `ingredients.${fieldIndex}.quantity`,
-                            parseFloat(e.target.value) || 0
+                            parseLocaleNumber(e.target.value)
                           )
                         }
                         data-field={`quantity-${stockItem.id}`}
@@ -278,6 +293,16 @@ function IngredientChecklist({
             </div>
           )}
         </div>
+
+        <ProductSearchDialog
+          open={productSearchOpen}
+          onOpenChange={setProductSearchOpen}
+          stockItems={stockItems}
+          excludeIds={Array.from(selectedIds)}
+          onSelect={(stockItem) => {
+            append({ stock_item_id: stockItem.id, quantity: 1, unit: stockItem.unit });
+          }}
+        />
       </CardContent>
     </Card>
   );
@@ -332,6 +357,46 @@ export function RecipeForm({
     name: 'ingredients',
   });
 
+  // --- Draft auto-save (sessionStorage) ---
+  const DRAFT_KEY = 'mesopos_recipe_draft';
+  const draftRestored = useRef(false);
+
+  // Restore draft on mount (only for new recipes, not edits)
+  useEffect(() => {
+    if (draftRestored.current || defaultValues?.name) return;
+    draftRestored.current = true;
+    try {
+      const saved = sessionStorage.getItem(DRAFT_KEY);
+      if (saved) {
+        const draft = JSON.parse(saved);
+        form.reset({ ...form.getValues(), ...draft });
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [defaultValues?.name, form]);
+
+  // Debounced save on form change
+  const saveTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const saveDraft = useCallback((values: Record<string, unknown>) => {
+    clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      try {
+        sessionStorage.setItem(DRAFT_KEY, JSON.stringify(values));
+      } catch {
+        // storage full or unavailable
+      }
+    }, 500);
+  }, []);
+
+  useEffect(() => {
+    if (defaultValues?.name) return; // Don't auto-save when editing existing recipe
+    const subscription = form.watch((values) => {
+      saveDraft(values as Record<string, unknown>);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, saveDraft, defaultValues?.name]);
+
   const handleFormSubmit = async (formData: Record<string, unknown>) => {
     const data = formData as unknown as CreateRecipeInput;
     // Filter out empty ingredients
@@ -339,6 +404,8 @@ export function RecipeForm({
       (ing) => ing.stock_item_id && ing.quantity > 0
     );
     await onSubmit(data);
+    // Clear draft on successful submit
+    try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
   };
 
   const handleInvalid = (errors: Record<string, { message?: string } | undefined>) => {

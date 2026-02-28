@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
-import { Loader2, Plus, RotateCcw, Power, Shield, ShieldOff } from 'lucide-react';
+import { Loader2, Plus, RotateCcw, Power, Shield, ShieldOff, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Table,
@@ -29,6 +30,7 @@ import {
   getStaffUsers,
   createStaffUser,
   resetStaffPassword,
+  deleteStaffUser,
   toggleStaffActive,
   toggleStaffAdmin,
 } from './actions';
@@ -47,6 +49,10 @@ export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resetPasswordUser, setResetPasswordUser] = useState<StaffUser | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [deleteUser, setDeleteUser] = useState<StaffUser | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   const form = useForm<CreateStaffUserInput>({
     resolver: zodResolver(CreateStaffUserSchema),
@@ -62,6 +68,17 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadUsers();
+    // Get current user ID to prevent self-deletion
+    import('@/lib/supabase/client').then(({ createClient }) => {
+      try {
+        const sb = createClient();
+        sb.auth.getUser().then(({ data }) => {
+          if (data?.user) setCurrentUserId(data.user.id);
+        }).catch(() => {});
+      } catch {
+        // Supabase client not available (e.g., test environment)
+      }
+    }).catch(() => {});
   }, []);
 
   const handleCreate = async (data: CreateStaffUserInput) => {
@@ -87,13 +104,32 @@ export default function AdminUsersPage() {
     await loadUsers();
   };
 
-  const handleResetPassword = async (userId: string) => {
-    const result = await resetStaffPassword(userId);
+  const handleResetPassword = async () => {
+    if (!resetPasswordUser || !newPassword) return;
+    setIsSubmitting(true);
+    const result = await resetStaffPassword(resetPasswordUser.id, newPassword);
+    setIsSubmitting(false);
     if (result && 'error' in result && result.error) {
       toast.error(result.error);
       return;
     }
-    toast.success('Link do resetowania hasla zostal wyslany.');
+    toast.success(`Haslo zostalo zmienione dla ${resetPasswordUser.name}.`);
+    setResetPasswordUser(null);
+    setNewPassword('');
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteUser) return;
+    setIsSubmitting(true);
+    const result = await deleteStaffUser(deleteUser.id);
+    setIsSubmitting(false);
+    if (result && 'error' in result && result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`Uzytkownik ${deleteUser.name} zostal usuniety.`);
+    setDeleteUser(null);
+    await loadUsers();
   };
 
   const handleToggleActive = async (userId: string, isActive: boolean) => {
@@ -264,7 +300,10 @@ export default function AdminUsersPage() {
                         size="icon"
                         className="h-8 w-8"
                         title="Resetuj haslo"
-                        onClick={() => handleResetPassword(user.id)}
+                        onClick={() => {
+                          setResetPasswordUser(user);
+                          setNewPassword('');
+                        }}
                         data-action="reset-password"
                       >
                         <RotateCcw className="h-4 w-4" />
@@ -279,6 +318,18 @@ export default function AdminUsersPage() {
                       >
                         <Power className="h-4 w-4" />
                       </Button>
+                      {currentUserId !== user.id && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          title="Usun uzytkownika"
+                          onClick={() => setDeleteUser(user)}
+                          data-action="delete-user"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -287,6 +338,78 @@ export default function AdminUsersPage() {
           </Table>
         </div>
       )}
+
+      {/* Reset Password Dialog */}
+      <Dialog
+        open={!!resetPasswordUser}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResetPasswordUser(null);
+            setNewPassword('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ustaw nowe haslo: {resetPasswordUser?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nowe haslo</Label>
+              <Input
+                id="new-password"
+                type="text"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Min. 6 znakow"
+                data-field="new-password"
+                autoFocus
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetPasswordUser(null)}>
+              Anuluj
+            </Button>
+            <Button
+              onClick={handleResetPassword}
+              disabled={isSubmitting || newPassword.length < 6}
+            >
+              {isSubmitting ? 'Zapisywanie...' : 'Ustaw haslo'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog
+        open={!!deleteUser}
+        onOpenChange={(open) => {
+          if (!open) setDeleteUser(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Usun uzytkownika</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Czy na pewno chcesz usunac uzytkownika <strong>{deleteUser?.name}</strong> ({deleteUser?.email})?
+            Ta operacja jest nieodwracalna.
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUser(null)}>
+              Anuluj
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteUser}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Usuwanie...' : 'Usun'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

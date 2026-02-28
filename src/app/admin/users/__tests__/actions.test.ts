@@ -4,17 +4,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockDelete = vi.fn();
 const mockEq = vi.fn();
 const mockSingle = vi.fn();
 const mockFrom = vi.fn((_table: string) => ({
   select: mockSelect,
   update: mockUpdate,
+  delete: () => mockDelete(),
 }));
 
 const mockCreateUser = vi.fn();
 const mockResetPasswordForEmail = vi.fn();
 const mockAdminGetUserById = vi.fn();
 const mockUpdateUserById = vi.fn();
+const mockDeleteUser = vi.fn();
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn().mockResolvedValue({
@@ -27,6 +30,7 @@ vi.mock('@/lib/supabase/server', () => ({
         createUser: (opts: unknown) => mockCreateUser(opts),
         getUserById: (id: string) => mockAdminGetUserById(id),
         updateUserById: (id: string, attrs: unknown) => mockUpdateUserById(id, attrs),
+        deleteUser: (id: string) => mockDeleteUser(id),
       },
       resetPasswordForEmail: mockResetPasswordForEmail,
     },
@@ -168,34 +172,24 @@ describe('resetStaffPassword', () => {
     vi.clearAllMocks();
   });
 
-  it('gets user email and calls resetPasswordForEmail', async () => {
-    mockAdminGetUserById.mockResolvedValue({
-      data: { user: { id: 'user-1', email: 'alice@test.com' } },
-      error: null,
-    });
-    mockResetPasswordForEmail.mockResolvedValue({ error: null });
+  it('sets a new password via admin.updateUserById', async () => {
+    mockUpdateUserById.mockResolvedValue({ error: null });
 
-    const result = await resetStaffPassword('user-1');
+    const result = await resetStaffPassword('user-1', 'newpass123');
 
-    expect(mockAdminGetUserById).toHaveBeenCalledWith('user-1');
-    expect(mockResetPasswordForEmail).toHaveBeenCalledWith('alice@test.com');
+    expect(mockUpdateUserById).toHaveBeenCalledWith('user-1', { password: 'newpass123' });
     expect(result).toEqual(expect.objectContaining({ success: true }));
   });
 
-  it('returns error when userId is invalid', async () => {
-    mockAdminGetUserById.mockResolvedValue({
-      data: { user: null },
-      error: { message: 'User not found' },
-    });
-
-    const result = await resetStaffPassword('nonexistent');
+  it('returns error when password is too short', async () => {
+    const result = await resetStaffPassword('user-1', '123');
 
     expect(result).toEqual(
       expect.objectContaining({
         error: expect.any(String),
       })
     );
-    expect(mockResetPasswordForEmail).not.toHaveBeenCalled();
+    expect(mockUpdateUserById).not.toHaveBeenCalled();
   });
 });
 

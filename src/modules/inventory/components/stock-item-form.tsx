@@ -23,6 +23,7 @@ import { ProductCategory, Allergen, VatRate, ConsumptionType } from '@/types/enu
 import { ALLERGEN_LABELS } from '@/lib/constants';
 import { UNIT_OPTIONS, VAT_RATE_LABELS, CONSUMPTION_TYPE_LABELS } from '@/lib/constants/inventory';
 import { toast } from 'sonner';
+import { parseLocaleNumber } from '@/lib/utils/parse-locale-number';
 
 interface StockItemFormProps {
   open: boolean;
@@ -87,8 +88,8 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
       toast.error('Podaj nazwe produktu');
       return;
     }
-    if (!sku.trim()) {
-      toast.error('Podaj SKU');
+    if (costPerUnit <= 0) {
+      toast.error('Podaj cene za jednostke');
       return;
     }
     if (!warehouseId) {
@@ -152,7 +153,7 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="stock-sku">SKU *</Label>
+              <Label htmlFor="stock-sku">SKU</Label>
               <Input
                 id="stock-sku"
                 placeholder="np. WOL-001"
@@ -198,14 +199,14 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="stock-cost">Koszt/jedn. (PLN)</Label>
+              <Label htmlFor="stock-cost">Koszt/jedn. (PLN) *</Label>
               <Input
                 id="stock-cost"
-                type="number"
-                min={0}
-                step={0.01}
-                value={costPerUnit}
-                onChange={(e) => setCostPerUnit(Number(e.target.value))}
+                type="text"
+                inputMode="decimal"
+                value={costPerUnit || ''}
+                onChange={(e) => setCostPerUnit(parseLocaleNumber(e.target.value))}
+                placeholder="0,00"
                 data-field="cost-per-unit"
               />
             </div>
@@ -289,10 +290,11 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
                 <Label htmlFor="stock-quantity">Ilosc poczatkowa</Label>
                 <Input
                   id="stock-quantity"
-                  type="number"
-                  min={0}
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={quantity || ''}
+                  onChange={(e) => setQuantity(parseLocaleNumber(e.target.value))}
+                  placeholder="0"
                   data-field="quantity"
                 />
               </div>
@@ -300,10 +302,11 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
                 <Label htmlFor="stock-min">Stan minimalny</Label>
                 <Input
                   id="stock-min"
-                  type="number"
-                  min={0}
-                  value={minQuantity}
-                  onChange={(e) => setMinQuantity(Number(e.target.value))}
+                  type="text"
+                  inputMode="decimal"
+                  value={minQuantity || ''}
+                  onChange={(e) => setMinQuantity(parseLocaleNumber(e.target.value))}
+                  placeholder="0"
                   data-field="min-quantity"
                 />
               </div>

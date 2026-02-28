@@ -42,10 +42,16 @@ describe('CreateStockItemSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects empty SKU', () => {
+  it('accepts empty SKU (optional)', () => {
     const data = { ...validData, sku: '' };
     const result = CreateStockItemSchema.safeParse(data);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts missing SKU (optional)', () => {
+    const { sku: _sku, ...dataWithoutSku } = validData;
+    const result = CreateStockItemSchema.safeParse(dataWithoutSku);
+    expect(result.success).toBe(true);
   });
 
   it('rejects negative cost_per_unit', () => {

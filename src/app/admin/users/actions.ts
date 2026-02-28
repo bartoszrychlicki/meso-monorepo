@@ -44,21 +44,18 @@ export async function createStaffUser(formData: FormData) {
   return { success: true };
 }
 
-export async function resetStaffPassword(userId: string) {
-  const serviceClient = createServiceClient();
-  const { data: userData, error: getUserError } =
-    await serviceClient.auth.admin.getUserById(userId);
-
-  if (getUserError || !userData.user?.email) {
-    return { error: 'Nie znaleziono uzytkownika.' };
+export async function resetStaffPassword(userId: string, newPassword: string) {
+  if (!newPassword || newPassword.length < 6) {
+    return { error: 'Haslo musi miec co najmniej 6 znakow.' };
   }
 
-  const { error } = await serviceClient.auth.resetPasswordForEmail(
-    userData.user.email
-  );
+  const serviceClient = createServiceClient();
+  const { error } = await serviceClient.auth.admin.updateUserById(userId, {
+    password: newPassword,
+  });
 
   if (error) {
-    return { error: 'Nie udalo sie wyslac linku resetujacego.' };
+    return { error: `Nie udalo sie ustawic nowego hasla: ${error.message}` };
   }
 
   return { success: true };
@@ -84,6 +81,28 @@ export async function toggleStaffAdmin(userId: string, makeAdmin: boolean) {
 
   if (dbError) {
     return { error: `Nie udalo sie zaktualizowac roli w bazie: ${dbError.message}` };
+  }
+
+  revalidatePath('/admin/users');
+  return { success: true };
+}
+
+export async function deleteStaffUser(userId: string) {
+  const serviceClient = createServiceClient();
+
+  const { error: authError } = await serviceClient.auth.admin.deleteUser(userId);
+  if (authError) {
+    return { error: `Nie udalo sie usunac uzytkownika z auth: ${authError.message}` };
+  }
+
+  const supabase = await createClient();
+  const { error: dbError } = await supabase
+    .from('users_users')
+    .delete()
+    .eq('id', userId);
+
+  if (dbError) {
+    return { error: `Nie udalo sie usunac uzytkownika z bazy: ${dbError.message}` };
   }
 
   revalidatePath('/admin/users');

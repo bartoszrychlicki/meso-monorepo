@@ -82,7 +82,7 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockT
 
   return (
     <>
-      <div className="rounded-md border" data-component="stock-table">
+      <div className="rounded-md border overflow-x-auto" data-component="stock-table">
         <Table>
           <TableHeader>
             <TableRow>

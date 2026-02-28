@@ -3,10 +3,10 @@ import { ProductCategory, Allergen, VatRate, ConsumptionType } from '@/types/enu
 
 export const CreateStockItemSchema = z.object({
   name: z.string().min(1, 'Nazwa jest wymagana').describe('Stock item name'),
-  sku: z.string().min(1, 'SKU jest wymagane').describe('Stock keeping unit'),
+  sku: z.string().optional().default('').describe('Stock keeping unit'),
   product_category: z.nativeEnum(ProductCategory).describe('Product category'),
   unit: z.string().min(1, 'Jednostka jest wymagana').describe('Unit of measure'),
-  cost_per_unit: z.number().min(0, 'Koszt nie moze byc ujemny').describe('Cost per unit in PLN'),
+  cost_per_unit: z.number().positive('Cena jest wymagana').describe('Cost per unit in PLN'),
   allergens: z.array(z.nativeEnum(Allergen)).default([]).describe('EU allergens list'),
   is_active: z.boolean().default(true).describe('Whether this item is active'),
   vat_rate: z.nativeEnum(VatRate).default(VatRate.PTU_B).describe('VAT rate group (PTU)'),
