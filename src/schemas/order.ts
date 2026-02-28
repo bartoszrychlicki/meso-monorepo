@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  ModifierAction,
   OrderChannel,
   OrderSource,
   OrderStatus,
@@ -10,9 +11,9 @@ import {
 const OrderItemModifierSchema = z.object({
   modifier_id: z.string().min(1),
   name: z.string().min(1),
-  price: z.number().min(0),
+  price: z.number(),
   quantity: z.number().int().min(1).default(1),
-  modifier_action: z.string().min(1).default('add'),
+  modifier_action: z.nativeEnum(ModifierAction).default(ModifierAction.ADD),
 });
 
 const CreateOrderItemSchema = z.object({

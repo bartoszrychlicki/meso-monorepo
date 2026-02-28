@@ -1,5 +1,6 @@
 import { Order } from '@/types/order';
 import {
+  ModifierAction,
   OrderStatus,
   OrderChannel,
   OrderSource,
@@ -53,7 +54,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-cheese',
-            modifier_action: 'add',
+            modifier_action: ModifierAction.ADD,
             name: 'Dodatkowy ser',
             price: 3.0,
             quantity: 1,
@@ -179,7 +180,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-avocado',
-            modifier_action: 'add',
+            modifier_action: ModifierAction.ADD,
             name: 'Dodatkowe awokado',
             price: 5.0,
             quantity: 1,
@@ -277,7 +278,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-jalapeno',
-            modifier_action: 'add',
+            modifier_action: ModifierAction.ADD,
             name: 'Jalapeno',
             price: 2.0,
             quantity: 1,
@@ -355,7 +356,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-double-meat',
-            modifier_action: 'add',
+            modifier_action: ModifierAction.ADD,
             name: 'Podwojna porcja miesa',
             price: 8.0,
             quantity: 1,
@@ -484,7 +485,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-sauce',
-            modifier_action: 'add',
+            modifier_action: ModifierAction.ADD,
             name: 'Dodatkowy sos',
             price: 2.0,
             quantity: 1,
@@ -578,7 +579,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-cheese',
-            modifier_action: 'add',
+            modifier_action: ModifierAction.ADD,
             name: 'Dodatkowy ser',
             price: 3.0,
             quantity: 1,

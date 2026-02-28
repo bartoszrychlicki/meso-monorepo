@@ -384,10 +384,6 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
           open={modifierDialog.open}
           onOpenChange={(open) => {
             if (!open) {
-              // Add without modifiers when dialog closed
-              if (modifierDialog.product) {
-                addToCart(modifierDialog.product, modifierDialog.variant ?? undefined);
-              }
               setModifierDialog({ open: false, product: null, modifiers: [] });
             }
           }}

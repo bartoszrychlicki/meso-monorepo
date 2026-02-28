@@ -89,6 +89,8 @@ export function ModifierPicker({
                 <Badge variant="outline" className="text-xs">
                   {modifier.price > 0
                     ? `+${formatCurrency(modifier.price)}`
+                    : modifier.price < 0
+                    ? formatCurrency(modifier.price)
                     : 'bezplatnie'}
                 </Badge>
                 <Badge

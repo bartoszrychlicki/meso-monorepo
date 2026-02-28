@@ -27,10 +27,13 @@ describe('MenuModifierSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects negative price', () => {
-    const data = { ...validData, price: -1 };
+  it('accepts negative price (e.g. smaller size discount)', () => {
+    const data = { ...validData, price: -2 };
     const result = MenuModifierSchema.safeParse(data);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.price).toBe(-2);
+    }
   });
 
   it('accepts price of 0 (free modifiers like sauces)', () => {

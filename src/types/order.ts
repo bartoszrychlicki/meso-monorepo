@@ -1,4 +1,5 @@
 import {
+  ModifierAction,
   OrderChannel,
   OrderSource,
   OrderStatus,
@@ -12,7 +13,7 @@ export interface OrderItemModifier {
   name: string;
   price: number;
   quantity: number;
-  modifier_action: string; // 'add' | 'remove'
+  modifier_action: ModifierAction;
 }
 
 export interface OrderItem {

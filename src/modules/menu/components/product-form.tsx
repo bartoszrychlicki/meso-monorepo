@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Product, Category, MenuModifier, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
 import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
@@ -101,6 +101,13 @@ export function ProductForm({
   const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>(
     initialModifierIds ?? []
   );
+
+  // Sync selectedModifierIds when initialModifierIds arrives asynchronously
+  useEffect(() => {
+    if (initialModifierIds && initialModifierIds.length > 0) {
+      setSelectedModifierIds(initialModifierIds);
+    }
+  }, [initialModifierIds]);
 
   // Allergens
   const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>(

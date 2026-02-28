@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ModifierFormDialog } from './modifier-form-dialog';
+import { toast } from 'sonner';
 
 interface ModifierManagementProps {
   modifiers: MenuModifier[];
@@ -67,17 +68,32 @@ export function ModifierManagement({
   };
 
   const handleSave = async (data: Omit<MenuModifier, 'id' | 'created_at' | 'updated_at'>) => {
-    if (editingModifier) {
-      await onUpdateModifier(editingModifier.id, data);
-    } else {
-      await onCreateModifier(data);
+    try {
+      if (editingModifier) {
+        await onUpdateModifier(editingModifier.id, data);
+        toast.success('Modyfikator zaktualizowany');
+      } else {
+        await onCreateModifier(data);
+        toast.success('Modyfikator utworzony');
+      }
+    } catch (error) {
+      toast.error('Blad podczas zapisywania modyfikatora');
+      console.error(error);
+      throw error;
     }
   };
 
   const handleDeleteConfirm = async () => {
     if (deleteModifierId) {
-      await onDeleteModifier(deleteModifierId);
-      setDeleteModifierId(null);
+      try {
+        await onDeleteModifier(deleteModifierId);
+        toast.success('Modyfikator usuniety');
+      } catch (error) {
+        toast.error('Blad podczas usuwania modyfikatora');
+        console.error(error);
+      } finally {
+        setDeleteModifierId(null);
+      }
     }
   };
 

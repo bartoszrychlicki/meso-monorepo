@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Product, ProductVariant, MenuModifier } from '@/types/menu';
 import { OrderItemModifier } from '@/types/order';
+import { ModifierAction } from '@/types/enums';
 import { formatCurrency } from '@/lib/utils';
 import {
   Dialog,
@@ -95,11 +96,13 @@ export function ModifierSelectionDialog({
                 aria-label={mod.name}
               />
               <span className="flex-1 text-sm font-medium">{mod.name}</span>
-              <Badge variant={mod.modifier_action === 'remove' ? 'destructive' : 'secondary'}>
-                {mod.modifier_action === 'remove'
+              <Badge variant={mod.modifier_action === ModifierAction.REMOVE ? 'destructive' : 'secondary'}>
+                {mod.modifier_action === ModifierAction.REMOVE
                   ? 'Usun'
                   : mod.price > 0
                   ? `+${formatCurrency(mod.price)}`
+                  : mod.price < 0
+                  ? formatCurrency(mod.price)
                   : 'bezplatnie'}
               </Badge>
             </label>

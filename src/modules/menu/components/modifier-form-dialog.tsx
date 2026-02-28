@@ -74,8 +74,8 @@ export function ModifierFormDialog({
     }
 
     const parsedPrice = parseFloat(price);
-    if (isNaN(parsedPrice) || parsedPrice < 0) {
-      setError('Cena musi byc liczba >= 0');
+    if (isNaN(parsedPrice)) {
+      setError('Cena musi byc liczba');
       return;
     }
 
@@ -129,7 +129,6 @@ export function ModifierFormDialog({
               id="modifier-price"
               data-field="modifier-price"
               type="number"
-              min={0}
               step={0.01}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
