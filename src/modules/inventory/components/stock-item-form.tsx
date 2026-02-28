@@ -23,7 +23,7 @@ import { ProductCategory, Allergen, VatRate, ConsumptionType } from '@/types/enu
 import { ALLERGEN_LABELS } from '@/lib/constants';
 import { UNIT_OPTIONS, VAT_RATE_LABELS, CONSUMPTION_TYPE_LABELS } from '@/lib/constants/inventory';
 import { toast } from 'sonner';
-import { parseLocaleNumber } from '@/lib/utils/parse-locale-number';
+import { DecimalInput } from '@/components/ui/decimal-input';
 
 interface StockItemFormProps {
   open: boolean;
@@ -200,12 +200,9 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="stock-cost">Koszt/jedn. (PLN) *</Label>
-              <Input
-                id="stock-cost"
-                type="text"
-                inputMode="decimal"
-                value={costPerUnit || ''}
-                onChange={(e) => setCostPerUnit(parseLocaleNumber(e.target.value))}
+              <DecimalInput
+                value={costPerUnit}
+                onChange={setCostPerUnit}
                 placeholder="0,00"
                 data-field="cost-per-unit"
               />
@@ -288,24 +285,18 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="stock-quantity">Ilosc poczatkowa</Label>
-                <Input
-                  id="stock-quantity"
-                  type="text"
-                  inputMode="decimal"
-                  value={quantity || ''}
-                  onChange={(e) => setQuantity(parseLocaleNumber(e.target.value))}
+                <DecimalInput
+                  value={quantity}
+                  onChange={setQuantity}
                   placeholder="0"
                   data-field="quantity"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="stock-min">Stan minimalny</Label>
-                <Input
-                  id="stock-min"
-                  type="text"
-                  inputMode="decimal"
-                  value={minQuantity || ''}
-                  onChange={(e) => setMinQuantity(parseLocaleNumber(e.target.value))}
+                <DecimalInput
+                  value={minQuantity}
+                  onChange={setMinQuantity}
                   placeholder="0"
                   data-field="min-quantity"
                 />

@@ -44,6 +44,7 @@ import {
 import { Trash2, Save, X, Search, DollarSign, HelpCircle, ListPlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { parseLocaleNumber } from '@/lib/utils/parse-locale-number';
+import { DecimalInput } from '@/components/ui/decimal-input';
 import { ProductSearchDialog } from './product-search-dialog';
 
 interface RecipeIngredientField {
@@ -221,15 +222,13 @@ function IngredientChecklist({
                       {stockItem.name}
                     </span>
                     <div className="flex items-center gap-2 ml-auto">
-                      <Input
-                        type="text"
-                        inputMode="decimal"
+                      <DecimalInput
                         className="w-20 h-8 text-sm"
                         value={watchedIngredients[fieldIndex]?.quantity ?? 0}
-                        onChange={(e) =>
+                        onChange={(val) =>
                           form.setValue(
                             `ingredients.${fieldIndex}.quantity`,
-                            parseLocaleNumber(e.target.value)
+                            val
                           )
                         }
                         data-field={`quantity-${stockItem.id}`}
