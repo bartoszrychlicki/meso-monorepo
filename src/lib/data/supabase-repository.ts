@@ -8,6 +8,8 @@ const TABLE_MAP: Record<string, string> = {
   categories: 'menu_categories',
   products: 'menu_products',
   modifier_groups: 'menu_modifier_groups',
+  modifiers: 'menu_modifiers',
+  product_modifiers: 'product_modifiers',
   orders: 'orders_orders',
   kitchen_tickets: 'orders_kitchen_tickets',
   customers: 'crm_customers',

@@ -41,6 +41,16 @@ export interface Modifier extends BaseEntity {
   modifier_action: ModifierAction; // NOWE: spec 3.4 - typ modyfikatora
 }
 
+/** Standalone modifier entity (stored in menu_modifiers table) */
+export interface MenuModifier extends BaseEntity {
+  name: string;
+  price: number;
+  modifier_action: ModifierAction;
+  recipe_id?: string | null;
+  is_available: boolean;
+  sort_order: number;
+}
+
 export interface ModifierGroup extends BaseEntity {
   name: string;
   type: ModifierType;

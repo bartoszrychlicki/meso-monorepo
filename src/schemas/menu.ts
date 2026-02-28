@@ -17,6 +17,18 @@ const ModifierSchema = z.object({
   modifier_action: z.nativeEnum(ModifierAction).default(ModifierAction.ADD), // NOWE
 });
 
+/** Schema for standalone menu_modifiers table */
+export const MenuModifierSchema = z.object({
+  name: z.string().min(1, 'Nazwa modyfikatora jest wymagana'),
+  price: z.number().min(0, 'Cena nie moze byc ujemna'),
+  modifier_action: z.enum(['add', 'remove']).default('add'),
+  recipe_id: z.string().uuid().nullable().optional(),
+  is_available: z.boolean().default(true),
+  sort_order: z.number().int().default(0),
+});
+
+export type CreateMenuModifierInput = z.infer<typeof MenuModifierSchema>;
+
 const ModifierGroupSchema = z.object({
   name: z.string().min(1, 'Nazwa grupy jest wymagana'),
   type: z.nativeEnum(ModifierType),
