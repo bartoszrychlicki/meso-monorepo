@@ -17,7 +17,6 @@ import { getCategoryDisplayName } from '../utils/recipe-calculator';
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -45,18 +44,24 @@ import {
 import { Trash2, Save, X, Search, DollarSign, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface RecipeIngredientField {
+  stock_item_id: string;
+  quantity: number;
+  unit: string;
+}
+
 interface IngredientChecklistProps {
   stockItems: StockItem[];
-  form: any;
-  append: (value: any) => void;
+  form: { setValue: (name: string, value: unknown) => void };
+  append: (value: RecipeIngredientField) => void;
   remove: (index: number) => void;
   ingredientSearch: string;
   setIngredientSearch: (value: string) => void;
   estimatedCost: number;
-  onSaveIngredients?: (ingredients: { stock_item_id: string; quantity: number; unit: string }[]) => Promise<void>;
+  onSaveIngredients?: (ingredients: RecipeIngredientField[]) => Promise<void>;
   isSavingIngredients: boolean;
   setIsSavingIngredients: (value: boolean) => void;
-  watchedIngredients: any[];
+  watchedIngredients: RecipeIngredientField[];
 }
 
 function IngredientChecklist({
@@ -75,7 +80,7 @@ function IngredientChecklist({
   const selectedIds = useMemo(() => {
     return new Set(
       (watchedIngredients || [])
-        .map((ing: any) => ing.stock_item_id)
+        .map((ing) => ing.stock_item_id)
         .filter(Boolean)
     );
   }, [watchedIngredients]);
@@ -96,7 +101,7 @@ function IngredientChecklist({
       append({ stock_item_id: stockItem.id, quantity: 1, unit: stockItem.unit });
     } else {
       const idx = (watchedIngredients || []).findIndex(
-        (ing: any) => ing.stock_item_id === stockItem.id
+        (ing) => ing.stock_item_id === stockItem.id
       );
       if (idx >= 0) remove(idx);
     }
@@ -107,8 +112,8 @@ function IngredientChecklist({
     setIsSavingIngredients(true);
     try {
       const ingredients = (watchedIngredients || [])
-        .filter((ing: any) => ing.stock_item_id && ing.quantity > 0)
-        .map((ing: any) => ({
+        .filter((ing) => ing.stock_item_id && ing.quantity > 0)
+        .map((ing) => ({
           stock_item_id: ing.stock_item_id,
           quantity: ing.quantity,
           unit: ing.unit,
@@ -181,7 +186,7 @@ function IngredientChecklist({
               </div>
               {filteredSelectedItems.map((stockItem) => {
                 const fieldIndex = (watchedIngredients || []).findIndex(
-                  (ing: any) => ing.stock_item_id === stockItem.id
+                  (ing) => ing.stock_item_id === stockItem.id
                 );
                 if (fieldIndex < 0) return null;
                 return (
@@ -301,7 +306,9 @@ export function RecipeForm({
     inventoryRepository.getAllStockItems().then(setStockItems);
   }, []);
 
-  const form = useForm<any>({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const form = useForm<Record<string, any>>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(CreateRecipeSchema) as any,
     defaultValues: {
       name: defaultValues?.name || '',
@@ -320,20 +327,21 @@ export function RecipeForm({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: _fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'ingredients',
   });
 
-  const handleFormSubmit = async (data: any) => {
+  const handleFormSubmit = async (formData: Record<string, unknown>) => {
+    const data = formData as unknown as CreateRecipeInput;
     // Filter out empty ingredients
     data.ingredients = data.ingredients.filter(
-      (ing: any) => ing.stock_item_id && ing.quantity > 0
+      (ing) => ing.stock_item_id && ing.quantity > 0
     );
-    await onSubmit(data as CreateRecipeInput);
+    await onSubmit(data);
   };
 
-  const handleInvalid = (errors: any) => {
+  const handleInvalid = (errors: Record<string, { message?: string } | undefined>) => {
     const messages: string[] = [];
     if (errors.name) messages.push(`Nazwa: ${errors.name.message}`);
     if (errors.ingredients) messages.push(`Skladniki: ${errors.ingredients.message || 'Dodaj co najmniej 1 skladnik'}`);
@@ -343,9 +351,10 @@ export function RecipeForm({
   };
 
   // Calculate estimated cost
+  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedIngredients = form.watch('ingredients');
   const estimatedCost = (watchedIngredients || []).reduce(
-    (sum: number, ing: any) => {
+    (sum: number, ing: { stock_item_id: string; quantity: number }) => {
       const stockItem = stockItems.find((s) => s.id === ing.stock_item_id);
       if (!stockItem || !ing.quantity) return sum;
       return sum + ing.quantity * stockItem.cost_per_unit;
@@ -551,7 +560,7 @@ export function RecipeForm({
         />
         {form.formState.errors.ingredients && (
           <p className="text-sm text-destructive font-medium" data-status="error">
-            {(form.formState.errors.ingredients as any).message || 'Dodaj co najmniej 1 skladnik'}
+            {String((form.formState.errors.ingredients as Record<string, unknown>)?.message ?? 'Dodaj co najmniej 1 skladnik')}
           </p>
         )}
 
