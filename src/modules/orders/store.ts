@@ -61,7 +61,8 @@ interface OrdersStore {
   addToCart: (
     product: Product,
     variant?: ProductVariant,
-    quantity?: number
+    quantity?: number,
+    modifiers?: OrderItemModifier[]
   ) => void;
   removeFromCart: (itemId: string) => void;
   updateCartItemQuantity: (itemId: string, quantity: number) => void;
@@ -252,38 +253,44 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
   },
 
   // Cart actions
-  addToCart: (product, variant, quantity = 1) => {
+  addToCart: (product, variant, quantity = 1, modifiers = []) => {
     const state = get();
     const price = variant?.price ?? product.price;
-    const existingIndex = state.cart.findIndex(
-      (item) =>
-        item.product_id === product.id &&
-        item.variant_id === (variant?.id ?? undefined) &&
-        item.modifiers.length === 0
-    );
+    const modifiers_price = modifiers.reduce((sum, m) => sum + m.price * m.quantity, 0);
 
-    if (existingIndex >= 0) {
-      const updated = [...state.cart];
-      const item = { ...updated[existingIndex] };
-      item.quantity += quantity;
-      item.total_price = item.quantity * (item.unit_price + item.modifiers_price);
-      updated[existingIndex] = item;
-      set({ cart: updated });
-    } else {
-      const newItem: CartItem = {
-        id: crypto.randomUUID(),
-        product_id: product.id,
-        product_name: product.name,
-        variant_id: variant?.id,
-        variant_name: variant?.name,
-        quantity,
-        unit_price: price,
-        modifiers: [],
-        modifiers_price: 0,
-        total_price: quantity * price,
-      };
-      set({ cart: [...state.cart, newItem] });
+    // Only merge with existing item if no modifiers
+    if (modifiers.length === 0) {
+      const existingIndex = state.cart.findIndex(
+        (item) =>
+          item.product_id === product.id &&
+          item.variant_id === (variant?.id ?? undefined) &&
+          item.modifiers.length === 0
+      );
+
+      if (existingIndex >= 0) {
+        const updated = [...state.cart];
+        const item = { ...updated[existingIndex] };
+        item.quantity += quantity;
+        item.total_price = item.quantity * (item.unit_price + item.modifiers_price);
+        updated[existingIndex] = item;
+        set({ cart: updated });
+        return;
+      }
     }
+
+    const newItem: CartItem = {
+      id: crypto.randomUUID(),
+      product_id: product.id,
+      product_name: product.name,
+      variant_id: variant?.id,
+      variant_name: variant?.name,
+      quantity,
+      unit_price: price,
+      modifiers,
+      modifiers_price,
+      total_price: quantity * (price + modifiers_price),
+    };
+    set({ cart: [...state.cart, newItem] });
   },
 
   removeFromCart: (itemId) => {

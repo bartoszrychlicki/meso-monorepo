@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Product, ProductVariant, Category } from '@/types/menu';
+import { Product, ProductVariant, Category, MenuModifier } from '@/types/menu';
+import { OrderItemModifier } from '@/types/order';
 import { useCart } from '../hooks';
 import { CartSidebar } from './cart-sidebar';
+import { ModifierSelectionDialog } from './modifier-selection-dialog';
+import { getProductModifiers } from '@/modules/menu/repository';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -44,6 +47,12 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
     open: boolean;
     product: Product | null;
   }>({ open: false, product: null });
+  const [modifierDialog, setModifierDialog] = useState<{
+    open: boolean;
+    product: Product | null;
+    variant?: ProductVariant | null;
+    modifiers: MenuModifier[];
+  }>({ open: false, product: null, modifiers: [] });
   const [showMobileCart, setShowMobileCart] = useState(false);
 
   useEffect(() => {
@@ -74,17 +83,44 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
     return filtered.sort((a, b) => a.sort_order - b.sort_order);
   }, [products, selectedCategory, search]);
 
-  const handleProductClick = (product: Product) => {
+  const handleProductClick = async (product: Product) => {
     if (product.variants.length > 0) {
       setVariantDialog({ open: true, product });
     } else {
-      addToCart(product);
+      // Fetch modifiers for this product
+      try {
+        const mods = await getProductModifiers(product.id);
+        if (mods.length > 0) {
+          setModifierDialog({ open: true, product, variant: null, modifiers: mods });
+        } else {
+          addToCart(product);
+        }
+      } catch {
+        // If fetching fails, add without modifiers
+        addToCart(product);
+      }
     }
   };
 
-  const handleVariantSelect = (product: Product, variant: ProductVariant) => {
-    addToCart(product, variant);
+  const handleVariantSelect = async (product: Product, variant: ProductVariant) => {
     setVariantDialog({ open: false, product: null });
+    try {
+      const mods = await getProductModifiers(product.id);
+      if (mods.length > 0) {
+        setModifierDialog({ open: true, product, variant, modifiers: mods });
+      } else {
+        addToCart(product, variant);
+      }
+    } catch {
+      addToCart(product, variant);
+    }
+  };
+
+  const handleModifierConfirm = (selectedModifiers: OrderItemModifier[]) => {
+    const { product, variant } = modifierDialog;
+    if (!product) return;
+    addToCart(product, variant ?? undefined, 1, selectedModifiers);
+    setModifierDialog({ open: false, product: null, modifiers: [] });
   };
 
   const getCategoryColor = (cat: Category): string => {
@@ -317,9 +353,19 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
             <Button
               variant="ghost"
               className="w-full justify-between h-12 text-muted-foreground"
-              onClick={() => {
-                addToCart(variantDialog.product!);
+              onClick={async () => {
+                const product = variantDialog.product!;
                 setVariantDialog({ open: false, product: null });
+                try {
+                  const mods = await getProductModifiers(product.id);
+                  if (mods.length > 0) {
+                    setModifierDialog({ open: true, product, variant: null, modifiers: mods });
+                  } else {
+                    addToCart(product);
+                  }
+                } catch {
+                  addToCart(product);
+                }
               }}
               data-action="select-base"
             >
@@ -331,6 +377,26 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modifier selection dialog */}
+      {modifierDialog.product && (
+        <ModifierSelectionDialog
+          open={modifierDialog.open}
+          onOpenChange={(open) => {
+            if (!open) {
+              // Add without modifiers when dialog closed
+              if (modifierDialog.product) {
+                addToCart(modifierDialog.product, modifierDialog.variant ?? undefined);
+              }
+              setModifierDialog({ open: false, product: null, modifiers: [] });
+            }
+          }}
+          product={modifierDialog.product}
+          modifiers={modifierDialog.modifiers}
+          variant={modifierDialog.variant}
+          onConfirm={handleModifierConfirm}
+        />
+      )}
     </div>
   );
 }

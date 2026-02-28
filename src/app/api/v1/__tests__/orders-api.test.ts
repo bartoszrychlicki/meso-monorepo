@@ -278,10 +278,10 @@ describe('POST /api/v1/orders', () => {
           modifiers: [
             {
               modifier_id: 'mod-1',
-              modifier_group_id: 'mg-1',
               name: 'Extra ser',
               price: 4.0,
               quantity: 1,
+              modifier_action: 'add',
             },
           ],
         },

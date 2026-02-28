@@ -53,7 +53,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-cheese',
-            modifier_group_id: 'mg-extras',
+            modifier_action: 'add',
             name: 'Dodatkowy ser',
             price: 3.0,
             quantity: 1,
@@ -179,7 +179,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-avocado',
-            modifier_group_id: 'mg-extras',
+            modifier_action: 'add',
             name: 'Dodatkowe awokado',
             price: 5.0,
             quantity: 1,
@@ -277,7 +277,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-jalapeno',
-            modifier_group_id: 'mg-extras',
+            modifier_action: 'add',
             name: 'Jalapeno',
             price: 2.0,
             quantity: 1,
@@ -355,7 +355,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-double-meat',
-            modifier_group_id: 'mg-extras',
+            modifier_action: 'add',
             name: 'Podwojna porcja miesa',
             price: 8.0,
             quantity: 1,
@@ -484,7 +484,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-sauce',
-            modifier_group_id: 'mg-sauces',
+            modifier_action: 'add',
             name: 'Dodatkowy sos',
             price: 2.0,
             quantity: 1,
@@ -578,7 +578,7 @@ export const orders: Order[] = [
         modifiers: [
           {
             modifier_id: 'mod-extra-cheese',
-            modifier_group_id: 'mg-extras',
+            modifier_action: 'add',
             name: 'Dodatkowy ser',
             price: 3.0,
             quantity: 1,

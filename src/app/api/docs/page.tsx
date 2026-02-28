@@ -632,10 +632,10 @@ export default function ApiDocsPage() {
       "modifiers": [                     // opcjonalne
         {
           "modifier_id": "uuid",
-          "modifier_group_id": "uuid",
           "name": "Extra ser",
           "price": 4.00,
-          "quantity": 1
+          "quantity": 1,
+          "modifier_action": "add"
         }
       ]
     }

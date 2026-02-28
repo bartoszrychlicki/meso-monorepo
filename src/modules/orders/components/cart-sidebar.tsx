@@ -131,7 +131,8 @@ export function CartSidebar({ onOrderCreated }: CartSidebarProps) {
                             key={mod.modifier_id}
                             className="text-[10px] text-muted-foreground"
                           >
-                            + {mod.name}
+                            {mod.modifier_action === 'remove' ? '\u2212' : '+'} {mod.name}
+                            {mod.price > 0 && ` (+${formatCurrency(mod.price)})`}
                           </p>
                         ))}
                       </div>

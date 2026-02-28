@@ -9,10 +9,10 @@ import {
 
 const OrderItemModifierSchema = z.object({
   modifier_id: z.string().min(1),
-  modifier_group_id: z.string().min(1),
   name: z.string().min(1),
   price: z.number().min(0),
   quantity: z.number().int().min(1).default(1),
+  modifier_action: z.string().min(1).default('add'),
 });
 
 const CreateOrderItemSchema = z.object({

@@ -9,10 +9,10 @@ import { Address, BaseEntity } from './common';
 
 export interface OrderItemModifier {
   modifier_id: string;
-  modifier_group_id: string;
   name: string;
   price: number;
   quantity: number;
+  modifier_action: string; // 'add' | 'remove'
 }
 
 export interface OrderItem {
