@@ -24,6 +24,7 @@ import {
   X,
   Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface CartSidebarProps {
   onOrderCreated: (orderId: string) => void;
@@ -56,8 +57,11 @@ export function CartSidebar({ onOrderCreated }: CartSidebarProps) {
     try {
       const order = await createOrder();
       onOrderCreated(order.id);
-    } catch {
-      // Error handled by store
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Nieznany blad';
+      toast.error('Nie udalo sie zlozyc zamowienia', {
+        description: message,
+      });
     } finally {
       setIsCreating(false);
     }
