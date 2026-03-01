@@ -30,6 +30,13 @@ vi.mock('@/modules/menu/repository', () => ({
   },
 }));
 
+const mockServerRepo = {
+  create: vi.fn(),
+};
+vi.mock('@/lib/data/server-repository-factory', () => ({
+  createServerRepository: () => mockServerRepo,
+}));
+
 import { authorizeRequest, isApiKey } from '@/lib/api/auth';
 import { ordersRepository } from '@/modules/orders/repository';
 import { productsRepository } from '@/modules/menu/repository';
@@ -188,7 +195,7 @@ describe('POST /api/v1/orders', () => {
     (ordersRepository.generateOrderNumber as ReturnType<typeof vi.fn>).mockResolvedValue(
       'ZAM-20260226-001'
     );
-    (ordersRepository.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockServerRepo.create.mockResolvedValue({
       id: 'new-order-id',
       order_number: 'ZAM-20260226-001',
       status: 'pending',
@@ -336,11 +343,9 @@ describe('POST /api/v1/orders', () => {
       'ZAM-20260226-002'
     );
 
-    let createdData: Record<string, unknown> = {};
-    (ordersRepository.create as ReturnType<typeof vi.fn>).mockImplementation(
+    mockServerRepo.create.mockImplementation(
       (data: Record<string, unknown>) => {
-        createdData = data;
-        return Promise.resolve({ id: 'order-id', ...data });
+        return Promise.resolve({ id: 'order-id', items: [], ...data });
       }
     );
 
@@ -371,6 +376,9 @@ describe('POST /api/v1/orders', () => {
       body: JSON.stringify(orderWithModifiers),
     });
     await POST(req);
+
+    // First create call is the order, second is kitchen ticket
+    const createdData = mockServerRepo.create.mock.calls[0][0];
 
     // subtotal = 2 * (29.90 + 4.00) = 67.80
     // tax = 67.80 * 0.08 = 5.42

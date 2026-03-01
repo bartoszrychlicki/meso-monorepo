@@ -2,6 +2,7 @@ import { BaseEntity } from '@/types/common';
 import { BaseRepository } from './base-repository';
 import { LocalStorageRepository } from './localStorage-backend';
 import { SupabaseRepository } from './supabase-repository';
+import { createServiceClient } from '@/lib/supabase/server';
 
 type BackendType = 'localStorage' | 'supabase';
 
@@ -28,6 +29,5 @@ export function createServerRepository<T extends BaseEntity>(
     return new LocalStorageRepository<T>(collectionName);
   }
 
-  const { createServiceClient } = require('@/lib/supabase/server');
   return new SupabaseRepository<T>(collectionName, createServiceClient());
 }

@@ -14,6 +14,14 @@ vi.mock('@/modules/orders/repository', () => ({
   },
 }));
 
+const mockServerRepo = {
+  update: vi.fn(),
+  delete: vi.fn(),
+};
+vi.mock('@/lib/data/server-repository-factory', () => ({
+  createServerRepository: () => mockServerRepo,
+}));
+
 vi.mock('@/schemas/order', () => ({
   CreateOrderSchema: {
     partial: () => ({
@@ -102,7 +110,7 @@ describe('PUT /api/v1/orders/:id', () => {
 
   it('updates an order', async () => {
     (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockOrder);
-    (ordersRepository.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockServerRepo.update.mockResolvedValue({
       ...mockOrder,
       notes: 'Bez cebuli',
     });
@@ -140,7 +148,7 @@ describe('DELETE /api/v1/orders/:id', () => {
 
   it('deletes an order', async () => {
     (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockOrder);
-    (ordersRepository.delete as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    mockServerRepo.delete.mockResolvedValue(undefined);
 
     const req = makeRequest('http://localhost:3000/api/v1/orders/order-1', {
       method: 'DELETE',
