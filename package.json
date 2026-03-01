@@ -1,0 +1,17 @@
+{
+  "name": "meso",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:pos": "turbo run dev --filter=pos",
+    "dev:delivery": "turbo run dev --filter=delivery",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "type-check": "turbo run type-check"
+  },
+  "devDependencies": {
+    "turbo": "^2"
+  },
+  "packageManager": "pnpm@9.15.0"
+}
