@@ -8,7 +8,7 @@ import { useCartStore } from '@/stores/cartStore'
 import { useAuth } from '@/hooks/useAuth'
 import { createOrderAction } from '@/app/actions/create-order'
 import type { AddressFormData, DeliveryFormData, PaymentFormData } from '@/lib/validators/checkout'
-import { OrderChannel, OrderSource, ModifierAction } from '@meso/core'
+import { OrderChannel, OrderSource, ModifierAction, PaymentMethod, PaymentStatus } from '@meso/core'
 
 type CheckoutProfileUpdate = {
     first_name?: string
@@ -128,8 +128,8 @@ export function useCheckout() {
                         modifier_action: ModifierAction.ADD,
                     })),
                 })),
-                payment_method: isPayOnPickup ? undefined : 'online' as any,
-                payment_status: isPayOnPickup ? 'paid' as any : 'pending' as any,
+                payment_method: isPayOnPickup ? PaymentMethod.PAY_ON_PICKUP : PaymentMethod.ONLINE,
+                payment_status: isPayOnPickup ? PaymentStatus.PAY_ON_PICKUP : PaymentStatus.PENDING,
                 discount: getDiscount(),
                 delivery_fee: getDeliveryFee() + getPaymentFee(),
                 tip,

@@ -207,16 +207,17 @@ test.describe('Order → Supabase', () => {
     expect(orderError, `Błąd przy pobieraniu zamówienia: ${orderError?.message}`).toBeNull()
     expect(order, 'Zamówienie powinno istnieć w bazie').toBeTruthy()
 
-    // Sprawdź kluczowe pola
+    // Sprawdź kluczowe pola (order created via POS API)
     expect(order!.customer_id).toBe(testUserId)
-    expect(order!.status).toBe('pending_payment')
+    expect(order!.status).toBe('pending')
     expect(order!.payment_status).toBe('pending')
     expect(order!.total).toBeGreaterThan(0)
     expect(order!.subtotal).toBeGreaterThan(0)
     expect(['delivery', 'pickup']).toContain(order!.delivery_type)
-    expect(order!.payment_method).toBeTruthy()
+    expect(order!.payment_method).toBe('online')
     expect(order!.location_id).toBeTruthy()
     expect(order!.created_at).toBeTruthy()
+    expect(order!.order_number).toMatch(/^WEB-/)
 
     // 11. ✅ Weryfikacja w Supabase — tabela `orders_order_items`
     const { data: items, error: itemsError } = await admin
@@ -268,17 +269,17 @@ test.describe('Order → Supabase', () => {
       .single()
     expect(product, 'Aktywny produkt musi istnieć').toBeTruthy()
 
-    // Utwórz testowe zamówienie w DB
+    // Utwórz testowe zamówienie w DB (simulates a delivery order awaiting payment)
     const { data: newOrder, error: insertError } = await admin
       .from('orders_orders')
       .insert({
         order_number: `TEST-WH-${Date.now()}`,
-        channel: 'web',
+        channel: 'delivery_app',
         customer_id: testUserId,
         location_id: location!.id,
-        status: 'pending_payment',
+        status: 'pending',
         delivery_type: 'pickup',
-        payment_method: 'blik',
+        payment_method: 'online',
         payment_status: 'pending',
         subtotal: product!.price,
         delivery_fee: 0,
@@ -338,12 +339,12 @@ test.describe('Order → Supabase', () => {
       .from('orders_orders')
       .insert({
         order_number: `TEST-RLS-${Date.now()}`,
-        channel: 'web',
+        channel: 'delivery_app',
         customer_id: testUserId,
         location_id: location!.id,
-        status: 'pending_payment',
+        status: 'pending',
         delivery_type: 'pickup',
-        payment_method: 'blik',
+        payment_method: 'online',
         payment_status: 'pending',
         subtotal: 10,
         delivery_fee: 0,

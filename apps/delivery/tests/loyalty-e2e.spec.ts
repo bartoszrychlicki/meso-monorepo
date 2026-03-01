@@ -529,7 +529,7 @@ test.describe('Loyalty Program', () => {
     const orderNum = `TEST-${Date.now()}`
     await admin.from('orders_orders').insert({
       order_number: orderNum,
-      channel: 'web',
+      channel: 'delivery_app',
       customer_id: testUserId,
       location_id: location!.id,
       status: 'delivered',

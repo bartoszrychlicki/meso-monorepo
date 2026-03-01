@@ -1,5 +1,5 @@
 import { Order } from '@/types/order';
-import { OrderStatus, LoyaltyPointReason } from '@/types/enums';
+import { OrderStatus, OrderChannel, LoyaltyPointReason } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
 import { format } from 'date-fns';
 import { crmRepository } from '@/modules/crm/repository';
@@ -246,9 +246,10 @@ async function getTodaysOrders(): Promise<Order[]> {
   );
 }
 
-async function generateOrderNumber(): Promise<string> {
+async function generateOrderNumber(channel?: OrderChannel): Promise<string> {
   const today = format(new Date(), 'yyyyMMdd');
-  const prefix = `ZAM-${today}-`;
+  const prefixCode = channel === OrderChannel.DELIVERY_APP ? 'WEB' : 'ZAM';
+  const prefix = `${prefixCode}-${today}-`;
 
   const allOrders = await baseRepo.findMany(
     (order) => order.order_number.startsWith(prefix)

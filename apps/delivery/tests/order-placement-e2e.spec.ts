@@ -19,7 +19,6 @@
 import { test, expect } from '@playwright/test'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import {
-  bypassGate,
   loginTestUser,
   addFirstProductToCart,
   ensureCheckoutIsAvailable,
@@ -214,7 +213,7 @@ test.describe.serial('Order Placement Flow', () => {
     expect(orderError, `Error fetching order: ${orderError?.message}`).toBeNull()
     expect(order, 'Order should exist in database').toBeTruthy()
 
-    // Verify pay_on_pickup specific fields
+    // Verify pay_on_pickup specific fields (order created via POS API)
     expect(order!.status).toBe('confirmed')
     expect(order!.payment_status).toBe('pay_on_pickup')
     expect(order!.payment_method).toBe('pay_on_pickup')
@@ -222,6 +221,8 @@ test.describe.serial('Order Placement Flow', () => {
     expect(order!.total).toBeGreaterThan(0)
     expect(order!.subtotal).toBeGreaterThan(0)
     expect(order!.confirmed_at).toBeTruthy()
+    // Order number should have WEB- prefix for delivery app orders
+    expect(order!.order_number).toMatch(/^WEB-/)
 
     // 13. Verify order_items exist
     const { data: items, error: itemsError } = await admin
@@ -309,7 +310,7 @@ test.describe.serial('Order Placement Flow', () => {
     expect(orderId, 'orderId should be available').toBeTruthy()
     createdOrderIds.push(orderId)
 
-    // 13. Verify in DB: order with pending_payment status
+    // 13. Verify in DB: order with pending status (POS API default)
     const { data: order, error: orderError } = await admin
       .from('orders_orders')
       .select('*')
@@ -319,10 +320,10 @@ test.describe.serial('Order Placement Flow', () => {
     expect(orderError, `Error fetching order: ${orderError?.message}`).toBeNull()
     expect(order, 'Order should exist in database').toBeTruthy()
 
-    // Online payment orders start as pending_payment/pending
-    expect(order!.status).toBe('pending_payment')
+    // Online payment orders start as pending (POS API default)
+    expect(order!.status).toBe('pending')
     expect(order!.payment_status).toBe('pending')
-    expect(order!.payment_method).not.toBe('pay_on_pickup')
+    expect(order!.payment_method).toBe('online')
     expect(order!.customer_id).toBe(testUserId)
     expect(order!.total).toBeGreaterThan(0)
 
@@ -396,104 +397,7 @@ test.describe.serial('Order Placement Flow', () => {
     console.log(`  Order confirmation page shows "ZAMOWIENIE ZLOZONE" as expected`)
   })
 
-  // ──────────────────────────────────────────────────────
-  // TEST 4: Operator status transitions
-  // ──────────────────────────────────────────────────────
-  test('operator API transitions order through preparing -> ready -> delivered', async ({ page, baseURL }) => {
-    expect(onlinePaymentOrderId, 'onlinePaymentOrderId must be set from Test 2').toBeTruthy()
-
-    // Set meso_access cookie so API requests bypass the password gate middleware
-    await bypassGate(page)
-
-    const apiUrl = `${baseURL}/api/operator/orders`
-    const operatorPin = process.env.OPERATOR_PIN || '0000'
-
-    // ── Transition 1: confirmed -> preparing ──
-    const preparingResponse = await page.request.patch(apiUrl, {
-      data: {
-        orderId: onlinePaymentOrderId,
-        status: 'preparing',
-        timestampField: 'preparing_at',
-      },
-      headers: {
-        'x-operator-pin': operatorPin,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    expect(preparingResponse.ok(), `PATCH to preparing failed: ${preparingResponse.status()}`).toBe(true)
-    const preparingBody = await preparingResponse.json()
-    expect(preparingBody.success).toBe(true)
-
-    // Verify in DB
-    const { data: preparingOrder } = await admin
-      .from('orders_orders')
-      .select('status, preparing_at')
-      .eq('id', onlinePaymentOrderId)
-      .single()
-
-    expect(preparingOrder!.status).toBe('preparing')
-    expect(preparingOrder!.preparing_at).toBeTruthy()
-
-    console.log(`  confirmed -> preparing: OK (preparing_at: ${preparingOrder!.preparing_at})`)
-
-    // ── Transition 2: preparing -> ready ──
-    const readyResponse = await page.request.patch(apiUrl, {
-      data: {
-        orderId: onlinePaymentOrderId,
-        status: 'ready',
-        timestampField: 'ready_at',
-      },
-      headers: {
-        'x-operator-pin': operatorPin,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    expect(readyResponse.ok(), `PATCH to ready failed: ${readyResponse.status()}`).toBe(true)
-    const readyBody = await readyResponse.json()
-    expect(readyBody.success).toBe(true)
-
-    // Verify in DB
-    const { data: readyOrder } = await admin
-      .from('orders_orders')
-      .select('status, ready_at')
-      .eq('id', onlinePaymentOrderId)
-      .single()
-
-    expect(readyOrder!.status).toBe('ready')
-    expect(readyOrder!.ready_at).toBeTruthy()
-
-    console.log(`  preparing -> ready: OK (ready_at: ${readyOrder!.ready_at})`)
-
-    // ── Transition 3: ready -> delivered ──
-    const deliveredResponse = await page.request.patch(apiUrl, {
-      data: {
-        orderId: onlinePaymentOrderId,
-        status: 'delivered',
-        timestampField: 'delivered_at',
-      },
-      headers: {
-        'x-operator-pin': operatorPin,
-        'Content-Type': 'application/json',
-      },
-    })
-
-    expect(deliveredResponse.ok(), `PATCH to delivered failed: ${deliveredResponse.status()}`).toBe(true)
-    const deliveredBody = await deliveredResponse.json()
-    expect(deliveredBody.success).toBe(true)
-
-    // Verify in DB
-    const { data: deliveredOrder } = await admin
-      .from('orders_orders')
-      .select('status, delivered_at')
-      .eq('id', onlinePaymentOrderId)
-      .single()
-
-    expect(deliveredOrder!.status).toBe('delivered')
-    expect(deliveredOrder!.delivered_at).toBeTruthy()
-
-    console.log(`  ready -> delivered: OK (delivered_at: ${deliveredOrder!.delivered_at})`)
-    console.log(`Order #${onlinePaymentOrderId} completed full lifecycle: confirmed -> preparing -> ready -> delivered`)
-  })
+  // NOTE: Operator status transitions (confirmed → preparing → ready → delivered)
+  // have been moved to the POS app. Status updates now go through the POS API at
+  // /api/v1/orders/:id/status. See apps/pos for operator E2E tests.
 })

@@ -30,11 +30,13 @@ export enum PaymentMethod {
   BLIK = 'blik',
   ONLINE = 'online',
   VOUCHER = 'voucher',
+  PAY_ON_PICKUP = 'pay_on_pickup',
 }
 
 export enum PaymentStatus {
   PENDING = 'pending',
   PAID = 'paid',
+  PAY_ON_PICKUP = 'pay_on_pickup',
   REFUNDED = 'refunded',
   FAILED = 'failed',
 }

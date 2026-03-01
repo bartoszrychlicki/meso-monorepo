@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const orderNumber = await ordersRepository.generateOrderNumber();
+  const orderNumber = await ordersRepository.generateOrderNumber(input.channel);
 
   // Calculate totals from items
   const items = input.items.map((item) => {
@@ -186,19 +186,20 @@ export async function POST(request: NextRequest) {
   const tip = input.tip ?? 0;
   const total = Math.round((subtotal + tax - discount + deliveryFee + tip) * 100) / 100;
 
-  // Delivery app orders with pre-paid status start as CONFIRMED
-  const isDeliveryPrePaid =
+  // Delivery app orders with pre-paid or pay-on-pickup status start as CONFIRMED
+  const isDeliveryConfirmed =
     input.channel === OrderChannel.DELIVERY_APP &&
-    input.payment_status === PaymentStatus.PAID;
+    (input.payment_status === PaymentStatus.PAID ||
+     input.payment_status === PaymentStatus.PAY_ON_PICKUP);
 
-  const initialStatus = isDeliveryPrePaid
+  const initialStatus = isDeliveryConfirmed
     ? OrderStatus.CONFIRMED
     : OrderStatus.PENDING;
-  const initialPaymentStatus = isDeliveryPrePaid
-    ? PaymentStatus.PAID
+  const initialPaymentStatus = isDeliveryConfirmed
+    ? (input.payment_status ?? PaymentStatus.PENDING)
     : PaymentStatus.PENDING;
-  const statusNote = isDeliveryPrePaid
-    ? 'Zamówienie z delivery app (opłacone)'
+  const statusNote = isDeliveryConfirmed
+    ? 'Zamówienie z delivery app (potwierdzone)'
     : 'Zamówienie utworzone przez API';
 
   const order = await ordersRepository.create({
@@ -234,7 +235,8 @@ export async function POST(request: NextRequest) {
     promo_code: input.promo_code,
     delivery_type: input.delivery_type,
     scheduled_time: input.scheduled_time,
-    paid_at: isDeliveryPrePaid ? now : undefined,
+    confirmed_at: isDeliveryConfirmed ? now : undefined,
+    paid_at: input.payment_status === PaymentStatus.PAID ? now : undefined,
   });
 
   return apiCreated(order);

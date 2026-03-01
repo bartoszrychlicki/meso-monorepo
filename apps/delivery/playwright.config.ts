@@ -16,12 +16,23 @@ export default defineConfig({
         baseURL: 'http://localhost:3003',
         trace: 'on-first-retry',
     },
-    webServer: {
-        command: 'npm run dev -- -p 3003',
-        url: 'http://localhost:3003',
-        reuseExistingServer: !process.env.CI,
-        timeout: 120 * 1000,
-    },
+    webServer: [
+        {
+            // POS API — delivery's checkout server action calls this
+            command: 'npm run dev -- -p 3000',
+            url: 'http://localhost:3000',
+            cwd: path.resolve(__dirname, '../pos'),
+            reuseExistingServer: !process.env.CI,
+            timeout: 120 * 1000,
+        },
+        {
+            // Delivery app under test
+            command: 'npm run dev -- -p 3003',
+            url: 'http://localhost:3003',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120 * 1000,
+        },
+    ],
     projects: [
         {
             name: 'chromium',
