@@ -16,9 +16,11 @@ REVOKE INSERT, UPDATE, DELETE ON orders_order_items FROM authenticated;
 REVOKE INSERT, UPDATE, DELETE ON orders_kitchen_tickets FROM anon;
 REVOKE INSERT, UPDATE, DELETE ON orders_kitchen_tickets FROM authenticated;
 
--- CRM coupons: revoke UPDATE for authenticated (delivery used to mark coupons as used directly).
--- Now handled via POS API endpoint PATCH /api/v1/crm/coupons/:id.
-REVOKE UPDATE ON crm_customer_coupons FROM authenticated;
+-- CRM coupons: keep UPDATE for authenticated.
+-- Delivery's loyalty API routes (activate-coupon, deactivate-coupon, active-coupon)
+-- use authenticated server-side sessions to manage coupon status.
+-- RLS policies should enforce auth.uid() = customer_id.
+-- The POS API coupon endpoint is an alternative path for service_role access.
 
 -- Menu tables: keep SELECT for anon and authenticated (public data for browsing).
 -- No changes needed — they should already be read-only.
