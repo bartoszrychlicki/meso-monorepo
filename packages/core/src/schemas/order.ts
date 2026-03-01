@@ -28,12 +28,18 @@ export const CreateOrderItemSchema = z.object({
 });
 
 const AddressSchema = z.object({
-  street: z.string().min(1),
-  city: z.string().min(1),
-  postal_code: z.string().min(1),
-  country: z.string().min(1),
+  street: z.string().optional(),
+  city: z.string().optional(),
+  postal_code: z.string().optional(),
+  country: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
+  // Contact info stored alongside address (used by delivery app for confirmation emails)
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  houseNumber: z.string().optional(),
 });
 
 export const CreateOrderSchema = z.object({

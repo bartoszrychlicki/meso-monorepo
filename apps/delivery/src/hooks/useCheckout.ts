@@ -108,9 +108,14 @@ export function useCheckout() {
                 customer_name: customerFields.customer_name || undefined,
                 customer_phone: customerFields.customer_phone || undefined,
                 delivery_address: {
-                    street: addressData.street || '',
-                    city: addressData.city || '',
-                    postal_code: addressData.postalCode || '',
+                    firstName: addressData.firstName,
+                    lastName: addressData.lastName,
+                    email: addressData.email,
+                    phone: addressData.phone,
+                    street: addressData.street || undefined,
+                    houseNumber: addressData.houseNumber || undefined,
+                    city: addressData.city || undefined,
+                    postal_code: addressData.postalCode || undefined,
                     country: 'PL',
                 },
                 items: items.map(item => ({
