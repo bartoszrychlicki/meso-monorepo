@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
 // ---------------------------------------------------------------------------
 // Env vars (must be set before module import)
@@ -19,6 +19,14 @@ vi.mock('@supabase/ssr', () => ({
     auth: { getUser: mockGetUser },
   })),
 }))
+
+// ---------------------------------------------------------------------------
+// Mock: NextResponse.next — Next.js 16 requires request.headers to be a
+// native Headers instance which fails in vitest/jsdom. We stub .next() to
+// return a plain NextResponse so the proxy logic can run.
+// ---------------------------------------------------------------------------
+
+vi.spyOn(NextResponse, 'next').mockImplementation(() => new NextResponse(null, { status: 200 }))
 
 // ---------------------------------------------------------------------------
 // Constants
