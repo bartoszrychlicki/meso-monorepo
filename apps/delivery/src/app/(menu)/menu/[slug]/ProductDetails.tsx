@@ -69,7 +69,7 @@ interface ProductDetailsProps {
 export function ProductDetails({ product }: ProductDetailsProps) {
   const addItem = useCartStore((state) => state.addItem)
 
-  const [quantity, setQuantity] = useState(1)
+  const quantity = 1
   const [selectedSpice, setSelectedSpice] = useState<1 | 2 | 3>(
     product.spice_level || 1
   )

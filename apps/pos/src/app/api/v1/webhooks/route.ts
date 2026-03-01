@@ -11,7 +11,7 @@ import { webhookRegistry } from '@/lib/webhooks/registry';
 import { z } from 'zod';
 import { WebhookEvent } from '@/lib/webhooks/types';
 
-const VALID_EVENTS: WebhookEvent[] = [
+const _VALID_EVENTS: WebhookEvent[] = [
   'order.status_changed',
   'order.cancelled',
 ];
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   const webhooks = await webhookRegistry.list();
 
   // Redact secrets in response
-  const redacted = webhooks.map(({ secret, ...rest }) => ({
+  const redacted = webhooks.map(({ secret: _secret, ...rest }) => ({
     ...rest,
     secret: '***',
   }));

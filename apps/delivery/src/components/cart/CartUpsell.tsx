@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { RotateCcw, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useCartStore } from '@/stores/cartStore'
-import { useAuth } from '@/hooks/useAuth'
 import { formatPrice } from '@/lib/formatters'
 import { getProductImageUrl, PRODUCT_BLUR_PLACEHOLDER, ProductImage } from '@/lib/product-image'
 
@@ -64,16 +63,9 @@ interface CartUpsellProps {
 
 export function CartUpsell({ allProducts = [] }: CartUpsellProps) {
   const items = useCartStore((s) => s.items)
-  const { isPermanent } = useAuth()
-
   if (items.length === 0 || allProducts.length === 0) return null
 
   const cartProductIds = new Set(items.map((i) => i.productId))
-  const cartCategories = new Set(
-    allProducts
-      .filter((p) => cartProductIds.has(p.id))
-      .map((p) => p.category_id)
-  )
 
   // Suggest items not in cart from categories not represented
   const suggestions = allProducts

@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { UpdateCustomerInput } from '@/schemas/crm';
 import { toast } from 'sonner';
-import { LoyaltyTransaction } from '@/types/crm';
+import { Customer, CustomerAddress, LoyaltyTransaction } from '@/types/crm';
 import { formatCurrency } from '@/lib/utils';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
@@ -43,7 +43,7 @@ export default function CustomerDetailPage() {
   const router = useRouter();
   const customerId = params.id as string;
   const { updateCustomer, deleteCustomer, loadCustomers } = useCRMStore();
-  const [customer, setCustomer] = useState<any>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
   useBreadcrumbLabel(customerId, customer ? `${customer.first_name} ${customer.last_name}` : undefined);
   const [loyaltyHistory, setLoyaltyHistory] = useState<LoyaltyTransaction[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -81,7 +81,7 @@ export default function CustomerDetailPage() {
       setCustomer(updatedCustomer);
       setIsEditing(false);
       toast.success('Dane klienta zostaly zaktualizowane');
-    } catch (error) {
+    } catch {
       toast.error('Nie udalo sie zaktualizowac klienta');
     }
   };
@@ -93,7 +93,7 @@ export default function CustomerDetailPage() {
       await deleteCustomer(customerId);
       toast.success('Klient zostal usuniety');
       router.push('/crm');
-    } catch (error) {
+    } catch {
       toast.error('Nie udalo sie usunac klienta');
     }
   };
@@ -223,7 +223,7 @@ export default function CustomerDetailPage() {
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      {customer.addresses.map((address: any) => (
+                      {customer.addresses.map((address: CustomerAddress) => (
                         <div key={address.id} className="space-y-1">
                           <div className="flex items-center gap-2">
                             <Badge variant="outline">{address.label}</Badge>

@@ -13,7 +13,7 @@ beforeAll(() => {
 
 // Valid v4 UUIDs (hardcoded, generated once)
 const STOCK_ID_1 = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
-const STOCK_ID_2 = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e';
+const _STOCK_ID_2 = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e';
 
 // Mock inventory repository
 vi.mock('@/modules/inventory/repository', () => ({
@@ -42,8 +42,8 @@ const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
 vi.mock('sonner', () => ({
   toast: {
-    error: (...args: any[]) => mockToastError(...args),
-    success: (...args: any[]) => mockToastSuccess(...args),
+    error: (...args: unknown[]) => mockToastError(...args),
+    success: (...args: unknown[]) => mockToastSuccess(...args),
   },
 }));
 

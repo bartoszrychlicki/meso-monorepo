@@ -28,7 +28,7 @@ function chain(result: MockChainResult = { data: null, error: null, count: null 
         return (resolve: (v: MockChainResult) => void) => resolve(result)
       }
       // Everything else returns the same proxy so chaining continues
-      return (..._args: unknown[]) => new Proxy({}, handler)
+      return () => new Proxy({}, handler)
     },
   }
   return new Proxy({}, handler)

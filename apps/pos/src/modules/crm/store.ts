@@ -5,7 +5,7 @@
  */
 
 import { create } from 'zustand';
-import { Customer, LoyaltyTransaction } from '@/types/crm';
+import { Customer } from '@/types/crm';
 import { LoyaltyTier } from '@/types/enums';
 import { crmRepository } from './repository';
 import { CreateCustomerInput, UpdateCustomerInput } from '@/schemas/crm';
@@ -83,7 +83,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Exclude addresses as they need metadata fields - handle separately if needed
-      const { addresses, ...customerData } = data;
+      const { addresses: _addresses, ...customerData } = data;
       const customer = await crmRepository.customers.create({
         ...customerData,
         email: data.email ?? null,
@@ -132,7 +132,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Exclude addresses from update as they need metadata fields
-      const { addresses, ...updateData } = data;
+      const { addresses: _addresses, ...updateData } = data;
       await crmRepository.customers.update(id, {
         ...updateData,
         updated_at: new Date().toISOString(),

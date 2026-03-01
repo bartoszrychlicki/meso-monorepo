@@ -61,7 +61,7 @@ describe('CreateStockItemSchema', () => {
   });
 
   it('defaults allergens to empty array', () => {
-    const { allergens, ...dataWithoutAllergens } = validData;
+    const { allergens: _allergens, ...dataWithoutAllergens } = validData;
     const result = CreateStockItemSchema.safeParse(dataWithoutAllergens);
     expect(result.success).toBe(true);
     if (result.success) {
@@ -70,7 +70,7 @@ describe('CreateStockItemSchema', () => {
   });
 
   it('defaults is_active to true', () => {
-    const { is_active, ...dataWithoutActive } = validData;
+    const { is_active: _is_active, ...dataWithoutActive } = validData;
     const result = CreateStockItemSchema.safeParse(dataWithoutActive);
     expect(result.success).toBe(true);
     if (result.success) {

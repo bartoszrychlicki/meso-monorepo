@@ -139,6 +139,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const product = await productsRepository.create(validation.data as any);
+  const product = await productsRepository.create(validation.data as Omit<Product, 'id' | 'created_at' | 'updated_at'>);
   return apiCreated(product);
 }

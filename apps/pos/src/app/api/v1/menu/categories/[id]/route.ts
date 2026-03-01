@@ -55,7 +55,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const updated = await categoriesRepository.update(id, validation.data as any);
+  const updated = await categoriesRepository.update(id, validation.data as Record<string, unknown>);
   return apiSuccess(updated);
 }
 

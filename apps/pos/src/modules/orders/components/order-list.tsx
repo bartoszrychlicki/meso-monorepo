@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { Order } from '@/types/order';
 import { OrderStatus, OrderChannel } from '@/types/enums';
-import { ORDER_STATUS_LABELS } from '@/lib/constants';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { DataTable, ColumnDef } from '@/components/shared/data-table';
 import { OrderStatusBadge } from './order-status-badge';

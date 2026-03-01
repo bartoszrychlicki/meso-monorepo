@@ -675,7 +675,7 @@ test.describe('Loyalty Program', () => {
   test('active coupon from DB is synced to cart on loyalty page visit', async ({ page }) => {
     // Setup: active coupon in DB
     await admin.from('crm_customer_coupons').delete().eq('customer_id', testUserId)
-    const { data: coupon } = await admin.from('crm_customer_coupons').insert({
+    await admin.from('crm_customer_coupons').insert({
       customer_id: testUserId,
 
       code: 'MESO-RESYNC',

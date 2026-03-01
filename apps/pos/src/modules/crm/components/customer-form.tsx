@@ -48,7 +48,8 @@ export function CustomerForm({
   onCancel,
   isLoading = false,
 }: CustomerFormProps) {
-  const form = useForm<any>({
+  const form = useForm<CreateCustomerInput>({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(CreateCustomerSchema) as any,
     defaultValues: {
       first_name: defaultValues?.first_name || '',

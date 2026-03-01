@@ -10,7 +10,7 @@
  */
 import { test, expect, Page, BrowserContext } from '@playwright/test'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
-import { bypassGate, loginPosUser, posApi } from './helpers'
+import { bypassGate, posApi } from './helpers'
 
 // Cross-app flow test — run on Chromium only (not browser-specific)
 test.use({ channel: undefined })

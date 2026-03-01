@@ -14,7 +14,6 @@ import {
   getOrderStatusSMS,
   isValidPhoneNumber,
   formatPhoneForSMS,
-  smsTemplates,
 } from '@/lib/sms/templates';
 
 const baseRepo = createRepository<Order>('orders');

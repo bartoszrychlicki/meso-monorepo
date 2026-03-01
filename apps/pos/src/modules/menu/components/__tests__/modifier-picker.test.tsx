@@ -24,7 +24,7 @@ vi.mock('../modifier-form-dialog', () => ({
   }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onSave: (data: any) => Promise<void>;
+    onSave: (data: Record<string, unknown>) => Promise<void>;
     recipes: Recipe[];
   }) =>
     open ? (
@@ -54,7 +54,7 @@ const mockRecipes: Recipe[] = [
     product_id: 'product-1',
     name: 'Sos BBQ',
     description: null,
-    product_category: 'semi_finished' as any,
+    product_category: 'semi_finished' as Recipe['product_category'],
     ingredients: [],
     yield_quantity: 1,
     yield_unit: 'szt',

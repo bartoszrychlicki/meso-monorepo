@@ -1,16 +1,14 @@
-import { Product, ProductImage, RecipeIngredient, MenuModifier } from '@/types/menu';
+import { Product, MenuModifier } from '@/types/menu';
 import {
   Allergen,
   ModifierType,
   ModifierAction,
   ProductType,
   VariantType,
-  SalesChannel,
 } from '@/types/enums';
 import { CATEGORY_IDS } from './categories';
 import { STOCK_ITEM_IDS } from './inventory';
 import { LOCATION_IDS } from './locations';
-import { generateSKU } from '@/modules/menu/utils/sku-generator';
 import { createDefaultPricing } from '@/modules/menu/utils/pricing';
 
 // Recipe IDs (mirrored from recipes.ts to avoid circular dependency)

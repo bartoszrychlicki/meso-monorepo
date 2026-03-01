@@ -3,7 +3,6 @@
 import { useEffect, useCallback } from 'react';
 import { useOrdersStore } from './store';
 import { ordersRepository } from './repository';
-import { Order } from '@/types/order';
 
 export function useOrders() {
   const {

@@ -15,7 +15,7 @@ process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'test-anon-key'
 const mockGetUser = vi.fn().mockResolvedValue({ data: { user: null }, error: null })
 
 vi.mock('@supabase/ssr', () => ({
-  createServerClient: vi.fn((_url: string, _key: string, _opts: unknown) => ({
+  createServerClient: vi.fn(() => ({
     auth: { getUser: mockGetUser },
   })),
 }))

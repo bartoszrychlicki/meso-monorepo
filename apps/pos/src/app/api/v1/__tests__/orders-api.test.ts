@@ -118,7 +118,7 @@ describe('GET /api/v1/orders', () => {
       'http://localhost:3000/api/v1/orders?date_from=2026-02-01&date_to=2026-02-28'
     );
     const res = await GET(req);
-    const body = await res.json();
+    const _body = await res.json();
 
     expect(res.status).toBe(200);
     expect(ordersRepository.findByDateRange).toHaveBeenCalledWith('2026-02-01', '2026-02-28');

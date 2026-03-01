@@ -48,7 +48,7 @@ export default function MenuPage() {
     if (recipes.length === 0) {
       loadRecipes();
     }
-  }, []);
+  }, [loadRecipes, loadStockItems, recipes.length, stockItems.length]);
 
   // Modifier sheet state
   const [modifierSheetOpen, setModifierSheetOpen] = useState(false);

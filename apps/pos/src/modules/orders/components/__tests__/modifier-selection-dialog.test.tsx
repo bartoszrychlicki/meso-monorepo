@@ -20,7 +20,7 @@ const mockProduct: Product = {
   name: 'Cheeseburger Klasyczny',
   slug: 'cheeseburger-klasyczny',
   category_id: 'cat-1',
-  type: 'simple' as any,
+  type: 'simple' as Product['type'],
   price: 24.99,
   images: [],
   is_available: true,

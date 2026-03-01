@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DeliveryStatus, DeliverySource, VatRate } from '@/types/enums';
+import { DeliverySource, VatRate } from '@/types/enums';
 
 export const CreateSupplierSchema = z.object({
   name: z.string().min(1, 'Nazwa dostawcy wymagana').max(100, 'Nazwa za dluga').describe('Supplier name'),

@@ -66,10 +66,10 @@ function SettingsContent() {
     }
   }, [currentTheme]);
 
-  const updateSetting = (key: string, value: any) => {
+  const updateSetting = (key: string, value: string | number | boolean) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
     if (key === 'theme') {
-      setTheme(value);
+      setTheme(value as string);
     }
   };
 

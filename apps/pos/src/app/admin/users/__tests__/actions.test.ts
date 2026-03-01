@@ -6,7 +6,7 @@ const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
 const mockEq = vi.fn();
-const mockSingle = vi.fn();
+const _mockSingle = vi.fn();
 const mockFrom = vi.fn((_table: string) => ({
   select: mockSelect,
   update: mockUpdate,

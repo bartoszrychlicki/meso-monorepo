@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StockItem, Warehouse, WarehouseStockItem, StockItemComponentWithDetails, StockItemUsage } from '@/types/inventory';
+import { StockItem, Warehouse, WarehouseStockItem, StockItemComponentWithDetails } from '@/types/inventory';
 import { ProductCategory, VatRate, ConsumptionType } from '@/types/enums';
 
 // Mock inventory repository

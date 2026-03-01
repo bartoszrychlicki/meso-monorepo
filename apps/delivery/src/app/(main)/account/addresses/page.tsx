@@ -72,9 +72,9 @@ export default function AddressesPage() {
 
     useEffect(() => {
         if (!authLoading && user?.id) {
-            fetchAddresses() // eslint-disable-line react-hooks/set-state-in-effect
+            fetchAddresses()
         } else if (!authLoading) {
-            setIsLoading(false) // eslint-disable-line react-hooks/set-state-in-effect
+            setIsLoading(false)
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id, authLoading])

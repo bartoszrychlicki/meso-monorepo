@@ -80,6 +80,7 @@ export function ProductCard({
               product.color || 'from-gray-400 to-gray-600'
             )}
           >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={PRODUCT_PLACEHOLDER_IMAGE}
               alt="Brak zdjecia"

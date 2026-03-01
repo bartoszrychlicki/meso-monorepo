@@ -11,7 +11,7 @@ interface TestResult {
 export default function TestIntegrationPage() {
   const [results, setResults] = useState<TestResult[]>([]);
   const [running, setRunning] = useState(false);
-  const [apiKey, setApiKey] = useState('');
+  const [_apiKey, setApiKey] = useState('');
 
   async function runTests() {
     setRunning(true);
@@ -151,7 +151,7 @@ export default function TestIntegrationPage() {
         }),
       });
       const prodData = await prodRes.json();
-      const productCreated = prodData.success;
+      const _productCreated = prodData.success;
 
       // Create another product WITHOUT delivery pricing
       await fetch('/api/v1/menu/products', {
@@ -172,8 +172,8 @@ export default function TestIntegrationPage() {
       const channelRes = await fetch('/api/v1/menu/products?channel=delivery', { headers });
       const channelData = await channelRes.json();
       const deliveryProducts = channelData.data || [];
-      const hasDeliveryOnly = deliveryProducts.every((p: any) =>
-        p.pricing?.some((pr: any) => pr.channel === 'delivery')
+      const hasDeliveryOnly = deliveryProducts.every((p: Record<string, unknown>) =>
+        (p.pricing as Array<Record<string, unknown>>)?.some((pr: Record<string, unknown>) => pr.channel === 'delivery')
       );
       if (channelData.success && deliveryProducts.length > 0 && hasDeliveryOnly) {
         log('A3a: ?channel=delivery filter', 'pass', `${deliveryProducts.length} product(s), all have delivery pricing`);

@@ -10,7 +10,7 @@ export function useMenu() {
     if (store.products.length === 0 && !store.isLoading) {
       store.loadAll();
     }
-  }, []);
+  }, [store]);
 
   return {
     products: store.filteredProducts(),
@@ -41,7 +41,7 @@ export function useProduct(id: string) {
     if (store.products.length === 0 && !store.isLoading) {
       store.loadAll();
     }
-  }, []);
+  }, [store]);
 
   const product = store.products.find((p) => p.id === id) ?? null;
   const category = product
@@ -64,7 +64,7 @@ export function useCategories() {
     if (store.categories.length === 0 && !store.isLoading) {
       store.loadAll();
     }
-  }, []);
+  }, [store]);
 
   return {
     categories: store.categories,
@@ -79,7 +79,7 @@ export function useModifiers() {
     if (store.modifiers.length === 0 && !store.isLoading) {
       store.loadModifiers();
     }
-  }, []);
+  }, [store]);
 
   return {
     modifiers: store.modifiers,

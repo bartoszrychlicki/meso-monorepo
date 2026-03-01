@@ -44,7 +44,7 @@ class SMSAPIProvider implements SMSProvider {
     this.apiToken = apiToken;
   }
 
-  async send(message: SMSMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  async send(_message: SMSMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
     // TODO: Implement SMSAPI integration
     // https://www.smsapi.pl/docs
     throw new Error('SMSAPI provider not yet implemented (Sprint 4)');
@@ -64,7 +64,7 @@ class TwilioProvider implements SMSProvider {
     this.authToken = authToken;
   }
 
-  async send(message: SMSMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  async send(_message: SMSMessage): Promise<{ success: boolean; messageId?: string; error?: string }> {
     // TODO: Implement Twilio integration
     // https://www.twilio.com/docs/sms
     throw new Error('Twilio provider not yet implemented (Sprint 4)');

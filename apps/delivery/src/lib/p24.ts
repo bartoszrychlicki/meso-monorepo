@@ -71,7 +71,7 @@ export class P24 {
 
     // For verifying notification signature
     public verifySign(notification: P24Notification): boolean {
-        const { sessionId, amount, originAmount, currency, orderId, methodId, statement, sign } = notification
+        const { sessionId, amount, currency, orderId, sign } = notification
         // Note: Check documentation if P24 sends 'amount' or 'originAmount' for verification hash
         // Usually it is: sessionId, orderId, amount, currency, crc
         const data = `{"sessionId":"${sessionId}","orderId":${orderId},"amount":${amount},"currency":"${currency}","crc":"${this.config.crcKey}"}`
@@ -142,19 +142,6 @@ export class P24 {
             console.warn('[P24 Warning] Local signature verification failed. Proceeding to remote verification as fallback.')
         } else {
             console.log('[P24] Local signature verification passed.')
-        }
-
-        const verifyPayload = {
-            merchantId: this.config.merchantId,
-            posId: this.config.posId,
-            sessionId: notification.sessionId,
-            amount: notification.amount,
-            currency: notification.currency,
-            orderId: notification.orderId,
-            sign: this.calculateSign(notification.sessionId, notification.amount, notification.currency, this.config.crcKey) // Re-calculate specifically for verify endpoint if needed? 
-            // Actually, verification endpoint often needs its own signature logic or just re-sending the received parameters + CRC?
-            // Checking docs -> Verification takes: merchantId, posId, sessionId, amount, currency, orderId, sign
-            // Sign for verification is: sessionId, orderId, amount, currency, crc
         }
 
         // To be compliant with P24 REST, we call PUT /api/v1/transaction/verify

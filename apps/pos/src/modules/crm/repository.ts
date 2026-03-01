@@ -260,8 +260,8 @@ export const crmRepository = {
    * @throws Error - Not yet implemented (Phase 2)
    */
   async updateCustomerRFMScores(
-    customerId: string,
-    scores: {
+    _customerId: string,
+    _scores: {
       recency: number;
       frequency: number;
       monetary: number;

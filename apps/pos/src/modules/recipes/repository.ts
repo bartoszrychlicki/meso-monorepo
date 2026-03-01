@@ -12,7 +12,6 @@ import {
   AllergenSource,
   IngredientUsageLog,
 } from '@/types/recipe';
-import { StockItem } from '@/types/inventory';
 import { ProductCategory, Allergen } from '@/types/enums';
 import { inventoryRepository } from '@/modules/inventory/repository';
 

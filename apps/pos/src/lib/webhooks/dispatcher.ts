@@ -2,7 +2,6 @@ import {
   WebhookPayload,
   WebhookEvent,
   WebhookDeliveryResult,
-  WebhookSubscription,
 } from './types';
 import { webhookRegistry } from './registry';
 

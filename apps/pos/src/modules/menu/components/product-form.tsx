@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Product, Category, MenuModifier, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
 import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
-import { Allergen, ProductType, VariantType, SalesChannel } from '@/types/enums';
+import { Allergen, ProductType, VariantType } from '@/types/enums';
 import { generateSKU } from '@/modules/menu/utils/sku-generator';
 import { createDefaultPricing } from '@/modules/menu/utils/pricing';
 import { ALLERGEN_LABELS } from '@/lib/constants';
@@ -122,7 +122,7 @@ export function ProductForm({
   );
 
   // Ingredients (legacy, kept for backward compatibility)
-  const [ingredients, setIngredients] = useState<RecipeIngredient[]>(
+  const [ingredients, _setIngredients] = useState<RecipeIngredient[]>(
     product?.ingredients ?? []
   );
 
@@ -223,7 +223,7 @@ export function ProductForm({
       {/* Step indicator */}
       <div className="flex items-center justify-between">
         {STEPS.map((s, i) => {
-          const Icon = s.icon;
+          const _Icon = s.icon;
           return (
             <button
               key={i}

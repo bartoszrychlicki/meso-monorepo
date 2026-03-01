@@ -73,7 +73,7 @@ function setupStores({
     allLocations: locations,
     isLoading,
     loadAllLocations: mockLoadAllLocations,
-  } as any);
+  } as ReturnType<typeof useLocationSettingsStore>);
 
   mockUseUserStore.mockReturnValue({
     currentUser: {
@@ -87,7 +87,7 @@ function setupStores({
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:00:00Z',
     },
-  } as any);
+  } as ReturnType<typeof useUserStore>);
 }
 
 // --- Tests ---

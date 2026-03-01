@@ -42,7 +42,7 @@ export default function EditProductPage() {
     if (recipes.length === 0) {
       loadRecipes();
     }
-  }, []);
+  }, [loadRecipes, loadStockItems, recipes.length, stockItems.length]);
 
   useEffect(() => {
     getProductModifierIds(productId).then(setInitialModifierIds).catch(console.error);

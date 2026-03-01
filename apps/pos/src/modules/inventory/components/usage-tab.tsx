@@ -18,7 +18,7 @@ interface UsageTabProps {
   itemId: string;
 }
 
-export function UsageTab({ itemId }: UsageTabProps) {
+export function UsageTab({ itemId: _itemId }: UsageTabProps) {
   const { currentUsage } = useInventoryStore();
 
   const inComponents = currentUsage?.in_components ?? [];

@@ -21,7 +21,7 @@ interface DeliveryAddressJson {
 export async function POST(request: Request) {
     try {
         const body = await request.json() as P24Notification
-        const { merchantId, posId, sessionId, amount, originAmount, currency, orderId, methodId, statement, sign } = body
+        const { sessionId, orderId } = body
 
         console.log('[P24 Status] Received notification:', JSON.stringify(body, null, 2))
 

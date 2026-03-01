@@ -61,7 +61,7 @@ export default function RecipeDetailPage() {
   const getStockItemName = (id: string) =>
     stockItems.find((s) => s.id === id)?.name ?? id;
 
-  const getStockItemUnit = (id: string) =>
+  const _getStockItemUnit = (id: string) =>
     stockItems.find((s) => s.id === id)?.unit ?? '';
 
   const getIngredientCost = (stockItemId: string, quantity: number) => {

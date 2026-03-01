@@ -82,7 +82,7 @@ export function ManualTimeLogDialog({
         notes: '',
       });
     }
-  }, [open, preselectedEmployeeId]);
+  }, [open, preselectedEmployeeId, form]);
 
   const watchedEmployeeId = form.watch('employee_id');
   const watchedDate = form.watch('date');

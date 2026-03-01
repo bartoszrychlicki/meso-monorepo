@@ -31,7 +31,7 @@ export default function NewProductPage() {
     if (recipes.length === 0) {
       loadRecipes();
     }
-  }, []);
+  }, [loadRecipes, loadStockItems, recipes.length, stockItems.length]);
 
   const handleSubmit = async (data: Omit<Product, 'created_at' | 'updated_at'>, modifierIds: string[]) => {
     setIsSubmitting(true);

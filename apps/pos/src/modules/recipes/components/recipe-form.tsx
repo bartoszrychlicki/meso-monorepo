@@ -43,7 +43,6 @@ import {
 } from '@/components/ui/tooltip';
 import { Trash2, Save, X, Search, DollarSign, HelpCircle, ListPlus } from 'lucide-react';
 import { toast } from 'sonner';
-import { parseLocaleNumber } from '@/lib/utils/parse-locale-number';
 import { DecimalInput } from '@/components/ui/decimal-input';
 import { ProductSearchDialog } from './product-search-dialog';
 
@@ -417,7 +416,6 @@ export function RecipeForm({
   };
 
   // Calculate estimated cost
-  // eslint-disable-next-line react-hooks/incompatible-library
   const watchedIngredients = form.watch('ingredients');
   const estimatedCost = (watchedIngredients || []).reduce(
     (sum: number, ing: { stock_item_id: string; quantity: number }) => {

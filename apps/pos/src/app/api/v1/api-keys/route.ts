@@ -11,7 +11,7 @@ import {
   revokeApiKey,
   deleteApiKey,
 } from '@/lib/api-keys';
-import { ALL_API_KEY_PERMISSIONS, ApiKeyPermission } from '@/types/api-key';
+import { ApiKeyPermission } from '@/types/api-key';
 import { z } from 'zod';
 
 const ApiKeyPermissionSchema = z.enum([

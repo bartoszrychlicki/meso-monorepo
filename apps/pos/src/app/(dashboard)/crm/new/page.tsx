@@ -27,7 +27,7 @@ export default function NewCustomerPage() {
       const customer = await createCustomer(data);
       toast.success(`${customer.first_name} ${customer.last_name} zostal dodany do systemu`);
       router.push(`/crm/${customer.id}`);
-    } catch (error) {
+    } catch {
       toast.error('Nie udalo sie utworzyc klienta');
     }
   };
