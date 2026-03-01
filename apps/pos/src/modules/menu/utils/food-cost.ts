@@ -4,7 +4,7 @@ import { StockItem } from '@/types/inventory';
 export interface FoodCostResult {
   totalCost: number;
   costPercentage: number;
-  ingredientCosts: { stock_item_id: string; cost: number }[];
+  ingredientCosts: { reference_id: string; cost: number }[];
 }
 
 export function calculateFoodCost(
@@ -15,9 +15,12 @@ export function calculateFoodCost(
   const stockItemMap = new Map(stockItems.map((s) => [s.id, s]));
 
   const ingredientCosts = ingredients.map((ingredient) => {
-    const stockItem = stockItemMap.get(ingredient.stock_item_id);
+    // Only stock_item type ingredients can be costed from stockItems
+    const stockItem = ingredient.type === 'stock_item'
+      ? stockItemMap.get(ingredient.reference_id)
+      : undefined;
     const cost = stockItem ? ingredient.quantity * stockItem.cost_per_unit : 0;
-    return { stock_item_id: ingredient.stock_item_id, cost };
+    return { reference_id: ingredient.reference_id, cost };
   });
 
   const totalCost = Math.round(ingredientCosts.reduce((sum, ic) => sum + ic.cost, 0) * 100) / 100;

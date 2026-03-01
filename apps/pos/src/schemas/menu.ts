@@ -56,8 +56,9 @@ const NutritionalInfoSchema = z.object({
 });
 
 const RecipeIngredientSchema = z.object({
-  stock_item_id: z.string().min(1),
-  stock_item_name: z.string().min(1),
+  type: z.enum(['stock_item', 'recipe']),
+  reference_id: z.string().min(1),
+  reference_name: z.string().min(1),
   quantity: z.number().positive('Ilosc musi byc wieksza niz 0'),
   unit: z.string().min(1),
 });

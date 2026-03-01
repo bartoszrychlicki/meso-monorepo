@@ -110,8 +110,9 @@ export interface Product extends BaseEntity {
 }
 
 export interface RecipeIngredient {
-  stock_item_id: string;
-  stock_item_name: string;
+  type: 'stock_item' | 'recipe';
+  reference_id: string;
+  reference_name: string;
   quantity: number;
   unit: string;
 }

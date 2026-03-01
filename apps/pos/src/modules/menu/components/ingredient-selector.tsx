@@ -40,15 +40,16 @@ export function IngredientSelector({
     [ingredients, stockItems, productPrice]
   );
 
-  const usedIds = new Set(ingredients.map((i) => i.stock_item_id));
+  const usedIds = new Set(ingredients.map((i) => i.reference_id));
 
   const addIngredient = () => {
     const available = stockItems.find((s) => !usedIds.has(s.id));
     if (!available) return;
     onChange([
       {
-        stock_item_id: available.id,
-        stock_item_name: available.name,
+        type: 'stock_item' as const,
+        reference_id: available.id,
+        reference_name: available.name,
         quantity: 0.1,
         unit: available.unit,
       },
@@ -70,8 +71,8 @@ export function IngredientSelector({
     const item = stockItemMap.get(stockItemId);
     if (!item) return;
     updateIngredient(index, {
-      stock_item_id: stockItemId,
-      stock_item_name: item.name,
+      reference_id: stockItemId,
+      reference_name: item.name,
       unit: item.unit,
     });
   };
@@ -104,7 +105,7 @@ export function IngredientSelector({
       ) : (
         <div className="space-y-3">
           {ingredients.map((ingredient, index) => {
-            const stockItem = stockItemMap.get(ingredient.stock_item_id);
+            const stockItem = stockItemMap.get(ingredient.reference_id);
             const ingredientCost = stockItem
               ? ingredient.quantity * stockItem.cost_per_unit
               : 0;
@@ -116,7 +117,7 @@ export function IngredientSelector({
               >
                 <div className="flex-1">
                   <Select
-                    value={ingredient.stock_item_id}
+                    value={ingredient.reference_id}
                     onValueChange={(v) => changeStockItem(index, v)}
                   >
                     <SelectTrigger className="w-full" data-field="ingredient-stock-item">
@@ -127,7 +128,7 @@ export function IngredientSelector({
                         <SelectItem
                           key={s.id}
                           value={s.id}
-                          disabled={usedIds.has(s.id) && s.id !== ingredient.stock_item_id}
+                          disabled={usedIds.has(s.id) && s.id !== ingredient.reference_id}
                         >
                           {s.name} ({formatCurrency(s.cost_per_unit)}/{s.unit})
                         </SelectItem>
