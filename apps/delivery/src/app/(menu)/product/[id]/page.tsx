@@ -28,8 +28,26 @@ export default async function ProductPage({ params }: PageProps) {
     notFound()
   }
 
-  // POS stores variants and modifier_groups as JSONB fields on the product
-  // No need for separate table joins — they're already in product.variants and product.modifier_groups
+  // Extract addons from modifier_groups JSONB (same extraction as menu/[slug]/page.tsx)
+  const modifierGroups = (product.modifier_groups as Array<{
+    id: string
+    name: string
+    type: string
+    required: boolean
+    min_selections: number
+    max_selections: number
+    modifiers: Array<{
+      id: string
+      name: string
+      price: number
+      is_available: boolean
+      sort_order: number
+    }>
+  }>) || []
 
-  return <ProductDetailClient product={product} />
+  const addons = modifierGroups
+    .flatMap(group => group.modifiers || [])
+    .filter(mod => mod.is_available)
+
+  return <ProductDetailClient product={{ ...product, addons }} />
 }
