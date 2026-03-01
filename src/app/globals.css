@@ -1,0 +1,282 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* MESO Design System - Cyberpunk Neon Theme */
+:root {
+  /* New Design Tokens (HSL) */
+  --background: 264 96% 5%;
+  --foreground: 220 20% 92%;
+
+  --card: 264 80% 8%;
+  --card-foreground: 220 20% 92%;
+
+  --popover: 264 80% 8%;
+  --popover-foreground: 220 20% 92%;
+
+  --primary: 330 100% 50%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 260 80% 14%;
+  --secondary-foreground: 220 20% 92%;
+
+  --muted: 264 60% 16%;
+  --muted-foreground: 260 15% 55%;
+
+  --accent: 48 100% 50%;
+  --accent-foreground: 0 0% 0%;
+
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 270 40% 20%;
+  --input: 264 50% 12%;
+  --ring: 330 100% 50%;
+
+  --radius: 0.75rem;
+
+  /* Neon accent variables */
+  --neon-pink: 330 100% 50%;
+  --neon-magenta: 330 100% 50%;
+  --neon-yellow: 48 100% 50%;
+  --neon-cyan: 185 80% 55%;
+  --surface: 264 80% 9%;
+  --surface-hover: 264 60% 14%;
+
+  /* Sidebar */
+  --sidebar-background: 264 96% 9%;
+  --sidebar-foreground: 220 20% 92%;
+  --sidebar-primary: 330 100% 50%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 260 80% 14%;
+  --sidebar-accent-foreground: 220 20% 92%;
+  --sidebar-border: 270 40% 20%;
+  --sidebar-ring: 330 100% 50%;
+
+  /* Legacy MESO colors (kept for operator panel compatibility) */
+  --meso-primary: #f425af;
+  --meso-primary-light: #f74fc4;
+  --meso-primary-dark: #c91d8c;
+  --meso-primary-glow: rgba(244, 37, 175, 0.5);
+
+  --meso-red-50: #fef2f2;
+  --meso-red-100: #fee2e2;
+  --meso-red-500: #f425af;
+  --meso-red-600: #c91d8c;
+  --meso-red-700: #a01870;
+  --meso-red-900: #5c0e41;
+
+  --meso-dark-50: #f8f5f7;
+  --meso-dark-100: #f1eef0;
+  --meso-dark-700: #3d2435;
+  --meso-dark-800: #2d1a26;
+  --meso-dark-900: #22101c;
+  --meso-dark-950: #1a0c15;
+
+  --meso-gold-400: #facc15;
+  --meso-gold-500: #eab308;
+  --meso-cream: #fef3c7;
+  --meso-charcoal: #374151;
+}
+
+@theme inline {
+  /* Semantic Colors */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Neon Colors */
+  --color-neon-cyan: hsl(var(--neon-cyan));
+
+  /* Legacy MESO Colors (operator panel) */
+  --color-meso-primary: var(--meso-primary);
+  --color-meso-primary-light: var(--meso-primary-light);
+  --color-meso-primary-dark: var(--meso-primary-dark);
+  --color-meso-red-50: var(--meso-red-50);
+  --color-meso-red-100: var(--meso-red-100);
+  --color-meso-red-500: var(--meso-red-500);
+  --color-meso-red-600: var(--meso-red-600);
+  --color-meso-red-700: var(--meso-red-700);
+  --color-meso-red-900: var(--meso-red-900);
+  --color-meso-dark-50: var(--meso-dark-50);
+  --color-meso-dark-100: var(--meso-dark-100);
+  --color-meso-dark-700: var(--meso-dark-700);
+  --color-meso-dark-800: var(--meso-dark-800);
+  --color-meso-dark-900: var(--meso-dark-900);
+  --color-meso-dark-950: var(--meso-dark-950);
+  --color-meso-gold-400: var(--meso-gold-400);
+  --color-meso-gold-500: var(--meso-gold-500);
+  --color-meso-cream: var(--meso-cream);
+  --color-meso-charcoal: var(--meso-charcoal);
+
+  /* Sidebar */
+  --color-sidebar-ring: hsl(var(--sidebar-ring));
+  --color-sidebar-border: hsl(var(--sidebar-border));
+  --color-sidebar-accent-foreground: hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-accent: hsl(var(--sidebar-accent));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-primary: hsl(var(--sidebar-primary));
+  --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  --color-sidebar: hsl(var(--sidebar-background));
+
+  /* Fonts */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Orbitron', monospace;
+  --font-japanese: 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+
+  /* Breakpoints */
+  --breakpoint-xs: 375px;
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+
+  /* Radii */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Orbitron headings - scoped to customer pages, not operator */
+  :not(.operator-layout) > h1,
+  :not(.operator-layout) > h2,
+  :not(.operator-layout) > h3,
+  :not(.operator-layout) > h4,
+  :not(.operator-layout) > h5,
+  :not(.operator-layout) > h6 {
+    font-family: var(--font-display);
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-body {
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-japanese {
+    font-family: var(--font-japanese);
+  }
+
+  /* Neon glow effects */
+  .neon-glow {
+    box-shadow: 0 0 15px hsl(var(--neon-pink) / 0.4),
+                0 0 30px hsl(var(--neon-pink) / 0.15);
+  }
+
+  .neon-glow-sm {
+    box-shadow: 0 0 8px hsl(var(--neon-pink) / 0.3),
+                0 0 16px hsl(var(--neon-pink) / 0.1);
+  }
+
+  .neon-glow-yellow {
+    box-shadow: 0 0 15px hsl(var(--neon-yellow) / 0.4),
+                0 0 30px hsl(var(--neon-yellow) / 0.15);
+  }
+
+  .neon-border {
+    border: 1px solid hsl(var(--neon-pink) / 0.3);
+  }
+
+  .neon-text {
+    text-shadow: 0 0 10px hsl(var(--neon-pink) / 0.6),
+                 0 0 20px hsl(var(--neon-pink) / 0.3);
+  }
+
+  .neon-text-yellow {
+    text-shadow: 0 0 10px hsl(var(--neon-yellow) / 0.6),
+                 0 0 20px hsl(var(--neon-yellow) / 0.3);
+  }
+
+  .glass {
+    background: hsl(var(--card) / 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Legacy glow effects (operator panel compat) */
+  .glow-primary {
+    box-shadow: 0 0 15px var(--meso-primary-glow);
+  }
+
+  .text-glow-primary {
+    text-shadow: 0 0 8px var(--meso-primary-glow);
+  }
+
+  /* Scrollbar hide */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Safe area padding for iOS */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Shake animation for error feedback */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-8px); }
+  40% { transform: translateX(8px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* Fix Chrome autofill white background on dark theme */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px hsl(264 80% 8%) inset !important;
+  -webkit-text-fill-color: hsl(220 20% 92%) !important;
+  transition: background-color 5000s ease-in-out 0s;
+  caret-color: hsl(220 20% 92%);
+}
