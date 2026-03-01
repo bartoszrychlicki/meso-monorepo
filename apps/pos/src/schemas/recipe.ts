@@ -8,20 +8,42 @@ import { z } from 'zod';
 import { ProductCategory, Allergen } from '@/types/enums';
 
 /**
- * Recipe Ingredient Schema
+ * Recipe Ingredient Schema (discriminated union: stock_item | recipe)
  */
-export const RecipeIngredientSchema = z.object({
-  stock_item_id: z.string().uuid('ID składnika musi być prawidłowym UUID'),
+const StockItemIngredientSchema = z.object({
+  type: z.literal('stock_item'),
+  reference_id: z.string().uuid('ID skladnika musi byc prawidlowym UUID'),
+  reference_name: z.string().optional(),
   quantity: z
     .number()
-    .positive('Ilość musi być większa od 0')
-    .describe('Ilość składnika potrzebna w recepturze'),
+    .positive('Ilosc musi byc wieksza od 0')
+    .describe('Ilosc skladnika potrzebna w recepturze'),
   unit: z
     .string()
     .min(1, 'Jednostka jest wymagana')
     .describe('Jednostka miary (g, ml, szt)'),
-  notes: z.string().optional().describe('Dodatkowe notatki do składnika'),
+  notes: z.string().optional().describe('Dodatkowe notatki do skladnika'),
 });
+
+const RecipeRefIngredientSchema = z.object({
+  type: z.literal('recipe'),
+  reference_id: z.string().uuid('ID receptury musi byc prawidlowym UUID'),
+  reference_name: z.string().optional(),
+  quantity: z
+    .number()
+    .positive('Ilosc musi byc wieksza od 0')
+    .describe('Ilosc polproduktu potrzebna w recepturze'),
+  unit: z
+    .string()
+    .min(1, 'Jednostka jest wymagana')
+    .describe('Jednostka miary'),
+  notes: z.string().optional().describe('Dodatkowe notatki'),
+});
+
+export const RecipeIngredientSchema = z.discriminatedUnion('type', [
+  StockItemIngredientSchema,
+  RecipeRefIngredientSchema,
+]);
 
 /**
  * Create Recipe Schema
