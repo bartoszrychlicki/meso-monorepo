@@ -21,7 +21,6 @@ import {
 import {
   Building2,
   MapPin,
-  Receipt,
   Plug,
   Save,
   Palette,
@@ -30,6 +29,7 @@ import {
 import { toast } from 'sonner';
 import { ApiKeysManager } from '@/modules/settings/components/api-keys-manager';
 import { LocationList } from '@/modules/settings/components/location-list';
+import { ReceiptDefaultsCard, KdsDefaultsCard } from '@/modules/settings/components/global-defaults-forms';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 
 function SettingsContent() {
@@ -53,11 +53,6 @@ function SettingsContent() {
     orderNotifications: true,
     lowStockAlerts: true,
     emailNotifications: true,
-
-    // Receipt
-    receiptHeader: 'MESO Restaurant\nul. Przykładowa 123\n00-001 Warszawa',
-    receiptFooter: 'Dziękujemy za zamówienie!\nZapraszamy ponownie',
-    printAutomatically: true,
   });
 
   const handleSave = () => {
@@ -92,7 +87,7 @@ function SettingsContent() {
       />
 
       <Tabs defaultValue={defaultTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-6 lg:w-auto">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto">
           <TabsTrigger value="general" className="gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">Ogólne</span>
@@ -100,10 +95,6 @@ function SettingsContent() {
           <TabsTrigger value="locations" className="gap-2">
             <MapPin className="h-4 w-4" />
             <span className="hidden sm:inline">Lokalizacje</span>
-          </TabsTrigger>
-          <TabsTrigger value="receipt" className="gap-2">
-            <Receipt className="h-4 w-4" />
-            <span className="hidden sm:inline">Paragony</span>
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2">
             <Palette className="h-4 w-4" />
@@ -266,60 +257,14 @@ function SettingsContent() {
               </div>
             </CardContent>
           </Card>
+
+          <ReceiptDefaultsCard />
+          <KdsDefaultsCard />
         </TabsContent>
 
         {/* Locations */}
         <TabsContent value="locations" className="space-y-4">
           <LocationList />
-        </TabsContent>
-
-        {/* Receipt Settings */}
-        <TabsContent value="receipt" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Ustawienia paragonów</CardTitle>
-              <CardDescription>
-                Dostosuj wygląd i treść paragonów fiskalnych
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="receiptHeader">Nagłówek paragonu</Label>
-                <textarea
-                  id="receiptHeader"
-                  className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={settings.receiptHeader}
-                  onChange={(e) => updateSetting('receiptHeader', e.target.value)}
-                  data-field="receipt-header"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="receiptFooter">Stopka paragonu</Label>
-                <textarea
-                  id="receiptFooter"
-                  className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={settings.receiptFooter}
-                  onChange={(e) => updateSetting('receiptFooter', e.target.value)}
-                  data-field="receipt-footer"
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="printAutomatically">Automatyczne drukowanie</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Drukuj paragony automatycznie po zamknięciu zamówienia
-                  </p>
-                </div>
-                <Switch
-                  id="printAutomatically"
-                  checked={settings.printAutomatically}
-                  onCheckedChange={(checked) => updateSetting('printAutomatically', checked)}
-                  data-field="print-automatically"
-                />
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Appearance */}
