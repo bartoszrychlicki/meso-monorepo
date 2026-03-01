@@ -322,9 +322,9 @@ test.describe.serial('Cross-app lifecycle: Delivery → POS', () => {
   })
 
   // ─────────────────────────────────────────────────────
-  // TEST 5: KDS workflow — start preparing
+  // TEST 5: KDS workflow — start preparing from UI
   // ─────────────────────────────────────────────────────
-  test('5. POS KDS — start preparing moves ticket', async () => {
+  test('5. POS KDS — start preparing moves ticket and updates order status', async () => {
     // Get ticket ID from DB
     const { data: tickets } = await admin
       .from('orders_kitchen_tickets')
@@ -335,14 +335,20 @@ test.describe.serial('Cross-app lifecycle: Delivery → POS', () => {
     expect(tickets).toBeTruthy()
     const ticketId = tickets!.id
 
-    // Update ticket status via admin client (KDS UI uses browser client which lacks RLS write perms)
-    const now = new Date().toISOString()
-    const { error: updateError } = await admin
-      .from('orders_kitchen_tickets')
-      .update({ status: 'preparing', started_at: now, updated_at: now })
-      .eq('id', ticketId)
+    const posPage = await posContext.newPage()
+    await posPage.goto('http://localhost:3000/kitchen', { timeout: 60_000 })
+    await expect(posPage.locator('[data-component="kds-board"]')).toBeVisible({ timeout: 15_000 })
 
-    expect(updateError).toBeNull()
+    const ticketCardInNew = posPage.locator(`[data-column="Nowe"] [data-ticket-id="${ticketId}"]`)
+    await expect(ticketCardInNew).toBeVisible({ timeout: 10_000 })
+
+    await ticketCardInNew.locator('[data-action="start-preparing"]').click()
+
+    // Ticket should move from "Nowe" to "W przygotowaniu"
+    await expect(posPage.locator(`[data-column="Nowe"] [data-ticket-id="${ticketId}"]`)).toHaveCount(0, { timeout: 10_000 })
+    await expect(posPage.locator(`[data-column="W przygotowaniu"] [data-ticket-id="${ticketId}"][data-status="preparing"]`)).toBeVisible({ timeout: 10_000 })
+
+    await posPage.close()
 
     // Verify DB state
     const { data: updatedTicket } = await admin
@@ -353,6 +359,16 @@ test.describe.serial('Cross-app lifecycle: Delivery → POS', () => {
 
     expect(updatedTicket!.status).toBe('preparing')
     expect(updatedTicket!.started_at).toBeTruthy()
+
+    // Verify linked order status is updated for delivery app
+    const { data: updatedOrder } = await admin
+      .from('orders_orders')
+      .select('status')
+      .eq('id', createdOrderId)
+      .single()
+
+    expect(updatedOrder).toBeTruthy()
+    expect(updatedOrder!.status).toBe('preparing')
   })
 
   // ─────────────────────────────────────────────────────
@@ -399,10 +415,18 @@ test.describe.serial('Cross-app lifecycle: Delivery → POS', () => {
 
   // ─────────────────────────────────────────────────────
   // TEST 7: POS API — transition order status through KDS flow
-  // (KDS and order status are independent — update via API)
+  // (API transition path, independent from UI interactions)
   // ─────────────────────────────────────────────────────
   test('7. POS API — transition order: confirmed → accepted → preparing → ready', async () => {
     expect(createdOrderId).toBeTruthy()
+
+    // Ensure deterministic start state (previous KDS tests may have changed it)
+    const { error: resetError } = await admin
+      .from('orders_orders')
+      .update({ status: 'confirmed' })
+      .eq('id', createdOrderId)
+
+    expect(resetError).toBeNull()
 
     // Verify initial status
     const getRes = await posApi(`/orders/${createdOrderId}`, 'GET')
