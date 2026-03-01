@@ -1,6 +1,7 @@
 import { BaseEntity, PaginatedResult } from '@/types/common';
 import { BaseRepository, QueryOptions } from './base-repository';
 import { supabase } from '@/lib/supabase/client';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const TABLE_MAP: Record<string, string> = {
   locations: 'users_locations',
@@ -42,10 +43,12 @@ const NUMERIC_FIELDS = new Set([
 
 export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> {
   private collectionName: string;
+  private client: SupabaseClient;
 
-  constructor(collectionName: string) {
+  constructor(collectionName: string, client?: SupabaseClient) {
     super();
     this.collectionName = collectionName;
+    this.client = client ?? supabase;
   }
 
   private getTableName(): string {
@@ -78,7 +81,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
     const from = (page - 1) * perPage;
     const to = from + perPage - 1;
 
-    let query = supabase.from(table).select('*', { count: 'exact' });
+    let query = this.client.from(table).select('*', { count: 'exact' });
 
     // Apply filters
     if (options?.filters) {
@@ -126,7 +129,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async findById(id: string): Promise<T | null> {
     const table = this.getTableName();
 
-    const { data, error } = await supabase
+    const { data, error } = await this.client
       .from(table)
       .select('*')
       .eq('id', id)
@@ -145,7 +148,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
 
     if (typeof filter === 'function') {
       // Function filter: fetch all rows, then filter in JS
-      const { data, error } = await supabase.from(table).select('*');
+      const { data, error } = await this.client.from(table).select('*');
 
       if (error) {
         throw new Error(`[${table}] findMany failed: ${error.message}`);
@@ -158,7 +161,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
     }
 
     // Object filter: build .eq() chains
-    let query = supabase.from(table).select('*');
+    let query = this.client.from(table).select('*');
 
     for (const [key, value] of Object.entries(filter)) {
       if (value === undefined || value === null) continue;
@@ -179,7 +182,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async create(data: Omit<T, 'id' | 'created_at' | 'updated_at'>): Promise<T> {
     const table = this.getTableName();
 
-    const { data: row, error } = await supabase
+    const { data: row, error } = await this.client
       .from(table)
       .insert(data as Record<string, unknown>)
       .select('*')
@@ -195,7 +198,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async update(id: string, data: Partial<T>): Promise<T> {
     const table = this.getTableName();
 
-    const { data: row, error } = await supabase
+    const { data: row, error } = await this.client
       .from(table)
       .update({
         ...(data as Record<string, unknown>),
@@ -215,7 +218,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async delete(id: string): Promise<void> {
     const table = this.getTableName();
 
-    const { error } = await supabase.from(table).delete().eq('id', id);
+    const { error } = await this.client.from(table).delete().eq('id', id);
 
     if (error) {
       throw new Error(`[${table}] delete failed: ${error.message}`);
@@ -225,7 +228,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async count(filter?: Partial<T>): Promise<number> {
     const table = this.getTableName();
 
-    let query = supabase.from(table).select('id', { count: 'exact', head: true });
+    let query = this.client.from(table).select('id', { count: 'exact', head: true });
 
     if (filter) {
       for (const [key, value] of Object.entries(filter)) {
@@ -247,7 +250,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async bulkCreate(items: T[]): Promise<void> {
     const table = this.getTableName();
 
-    const { error } = await supabase
+    const { error } = await this.client
       .from(table)
       .insert(items as unknown as Record<string, unknown>[]);
 
@@ -261,7 +264,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
     const table = this.getTableName();
 
     // Supabase requires a filter for delete; use neq on id to match all rows
-    const { error } = await supabase
+    const { error } = await this.client
       .from(table)
       .delete()
       .neq('id', '00000000-0000-0000-0000-000000000000');

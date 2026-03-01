@@ -7,6 +7,7 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { UpdateOrderStatusSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
@@ -70,7 +71,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const updated = await ordersRepository.updateStatus(id, newStatus, note);
+  // Use server repository (service role) for writes — API routes bypass RLS
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+
+  const statusEntry = {
+    status: newStatus,
+    timestamp: new Date().toISOString(),
+    note,
+  };
+
+  const updated = await serverOrdersRepo.update(id, {
+    status: newStatus,
+    status_history: [...order.status_history, statusEntry],
+  } as Partial<Order>);
 
   // Update payment status if provided (e.g., P24 payment confirmed)
   if (payment_status) {
@@ -80,8 +93,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (payment_status === 'paid') {
       paymentUpdate.paid_at = new Date().toISOString();
     }
-    await ordersRepository.update(id, paymentUpdate as Partial<Order>);
+    await serverOrdersRepo.update(id, paymentUpdate as Partial<Order>);
     Object.assign(updated, paymentUpdate);
+  }
+
+  // CRM integration: loyalty points & SMS (best-effort, uses module repo)
+  if (newStatus === OrderStatus.DELIVERED && order.customer_phone) {
+    try {
+      await ordersRepository.awardLoyaltyPoints(updated);
+    } catch {
+      // Don't fail status update if CRM fails
+    }
   }
 
   // Dispatch webhook for delivery app orders

@@ -19,7 +19,7 @@ export async function bypassGate(page: Page) {
   }])
 }
 
-function getAdminClient(): SupabaseClient {
+export function getAdminClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !key) {
@@ -157,4 +157,62 @@ export async function acceptTerms(page: Page) {
     await termsCheckbox.click()
   }
   await expect(termsCheckbox).toBeChecked()
+}
+
+// ─── POS test user credentials ──────────────────────────
+const POS_TEST_EMAIL = 'e2e-pos@meso.dev'
+const POS_TEST_PASSWORD = 'e2e-pos-password-123!'
+
+/**
+ * Ensure a POS operator test user exists and log them in via the POS UI.
+ * Idempotent — creates the user only if it doesn't already exist.
+ * The page's baseURL must be set to POS (http://localhost:3000).
+ */
+export async function loginPosUser(page: Page) {
+  const admin = getAdminClient()
+
+  const { data: { users } } = await admin.auth.admin.listUsers()
+  const existing = users?.find(u => u.email === POS_TEST_EMAIL)
+
+  if (!existing) {
+    const { error } = await admin.auth.admin.createUser({
+      email: POS_TEST_EMAIL,
+      password: POS_TEST_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
+        app_role: 'cashier',
+        first_name: 'E2E',
+        last_name: 'POS',
+      },
+    })
+    if (error && !error.message.includes('already been registered')) {
+      throw new Error(`Failed to create POS test user: ${error.message}`)
+    }
+  }
+
+  await page.goto('http://localhost:3000/login', { timeout: 60_000 })
+  await page.locator('[data-field="email"]').fill(POS_TEST_EMAIL)
+  await page.locator('[data-field="password"]').fill(POS_TEST_PASSWORD)
+  await page.locator('[data-action="login-email"]').click()
+  await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 30_000 })
+}
+
+/**
+ * Call the POS REST API with an API key.
+ */
+export async function posApi(path: string, method: string, body?: Record<string, unknown>) {
+  const POS_BASE_URL = process.env.POS_API_URL || 'http://localhost:3000'
+  const POS_API_URL = `${POS_BASE_URL.replace(/\/api\/v1\/?$/, '')}/api/v1`
+  const POS_API_KEY = process.env.POS_API_KEY || 'meso_k1_iKFzaJkxfHEwTnK4e19fOqh4sbRyN2_gjcpn8YrRGwE'
+
+  const res = await fetch(`${POS_API_URL}${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': POS_API_KEY,
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const json = await res.json()
+  return { status: res.status, ...json }
 }

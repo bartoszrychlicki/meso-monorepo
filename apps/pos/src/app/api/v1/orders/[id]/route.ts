@@ -7,7 +7,9 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { CreateOrderSchema } from '@/schemas/order';
+import type { Order } from '@/types/order';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -61,6 +63,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   const updateData = validation.data;
 
+  // Use server repository (service role) for writes — API routes bypass RLS
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+
   // If items are being updated, recalculate totals
   if (updateData.items) {
     const items = updateData.items.map((item) => {
@@ -77,18 +82,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const discount = updateData.discount ?? existing.discount;
     const total = Math.round((subtotal + tax - discount) * 100) / 100;
 
-    const updated = await ordersRepository.update(id, {
+    const updated = await serverOrdersRepo.update(id, {
       ...updateData,
       items,
       subtotal,
       tax,
       discount,
       total,
-    } as Partial<typeof existing>);
+    } as Partial<Order>);
     return apiSuccess(updated);
   }
 
-  const updated = await ordersRepository.update(id, updateData as Partial<typeof existing>);
+  const updated = await serverOrdersRepo.update(id, updateData as Partial<Order>);
   return apiSuccess(updated);
 }
 
@@ -104,6 +109,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const existing = await ordersRepository.findById(id);
   if (!existing) return apiNotFound('Zamówienie');
 
-  await ordersRepository.delete(id);
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+  await serverOrdersRepo.delete(id);
   return apiSuccess({ deleted: true });
 }

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test tests/cross-app-lifecycle.spec.ts --project=chromium"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

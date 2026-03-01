@@ -8,9 +8,12 @@ import {
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
 import { productsRepository } from '@/modules/menu/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { CreateOrderSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
 import { Product } from '@/types/menu';
+import { Order } from '@/types/order';
+import { KitchenTicket, KitchenItem } from '@/types/kitchen';
 
 /**
  * GET /api/v1/orders
@@ -79,6 +82,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/v1/orders
  * Create a new order.
+ * Uses service role client (bypasses RLS) since API routes authenticate via API key.
  */
 export async function POST(request: NextRequest) {
   const auth = await authorizeRequest(request, 'orders:write');
@@ -202,7 +206,9 @@ export async function POST(request: NextRequest) {
     ? 'Zamówienie z delivery app (potwierdzone)'
     : 'Zamówienie utworzone przez API';
 
-  const order = await ordersRepository.create({
+  // Use server repository (service role) for writes — API routes bypass RLS
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+  const order = await serverOrdersRepo.create({
     order_number: orderNumber,
     status: initialStatus,
     channel: input.channel,
@@ -238,6 +244,34 @@ export async function POST(request: NextRequest) {
     confirmed_at: isDeliveryConfirmed ? now : undefined,
     paid_at: input.payment_status === PaymentStatus.PAID ? now : undefined,
   });
+
+  // Auto-create kitchen ticket for the new order
+  try {
+    const kitchenItems: KitchenItem[] = (order.items || []).map((item) => ({
+      id: crypto.randomUUID(),
+      order_item_id: item.id,
+      product_name: item.product_name,
+      variant_name: item.variant_name,
+      quantity: item.quantity,
+      modifiers: (item.modifiers || []).map((m) => m.name),
+      notes: item.notes,
+      is_done: false,
+    }));
+
+    const kitchenRepo = createServerRepository<KitchenTicket>('kitchen_tickets');
+    await kitchenRepo.create({
+      order_id: order.id,
+      order_number: order.order_number,
+      location_id: order.location_id,
+      status: OrderStatus.PENDING,
+      items: kitchenItems,
+      priority: 0,
+      estimated_minutes: Math.max(5, kitchenItems.length * 4),
+      notes: order.notes,
+    });
+  } catch {
+    // Kitchen ticket failure should not block order creation
+  }
 
   return apiCreated(order);
 }
