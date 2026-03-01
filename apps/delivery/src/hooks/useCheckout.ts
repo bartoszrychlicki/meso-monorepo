@@ -53,7 +53,7 @@ export function useCheckout() {
     const router = useRouter()
     const supabase = createClient()
     const { user } = useAuth()
-    const { items, getTotal, getSubtotal, getDeliveryFee, getPaymentFee, getDiscount, tip, promoCode, loyaltyCoupon, clearCart } = useCartStore()
+    const { items, getDeliveryFee, getPaymentFee, getDiscount, tip, promoCode, loyaltyCoupon, clearCart } = useCartStore()
 
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
@@ -100,7 +100,7 @@ export function useCheckout() {
             const customerFields = buildOrderCustomerFields(addressData)
 
             // 1. Create order via POS API (server action)
-            const order = await createOrderAction({
+            const orderResult = await createOrderAction({
                 channel: OrderChannel.DELIVERY_APP,
                 source: OrderSource.DELIVERY,
                 location_id: locations.id,
@@ -144,6 +144,12 @@ export function useCheckout() {
                 external_order_id: externalOrderId,
                 notes: addressData.notes,
             })
+
+            if (!orderResult.success) {
+                throw new Error(orderResult.error)
+            }
+
+            const order = orderResult.data
 
             // 2. Save customer profile (still direct Supabase — delivery's own customer data)
             const profileUpdate = buildCheckoutProfileUpdate(addressData, savePhoneToProfile)
