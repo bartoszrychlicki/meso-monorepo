@@ -278,7 +278,7 @@ export function ProductCustomization({
                                 {/* Variants */}
                                 {displayProduct?.variants && displayProduct.variants.length > 0 && (
                                     <div>
-                                        <h3 className="text-lg font-bold text-white mb-3">Rozmiar</h3>
+                                        <h3 className="text-lg font-bold text-white mb-3">Wybierz opcję</h3>
                                         <div className="grid grid-cols-1 gap-2">
                                             {displayProduct.variants.map((variant) => (
                                                 <button

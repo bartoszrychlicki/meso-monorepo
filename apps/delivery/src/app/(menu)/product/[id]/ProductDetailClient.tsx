@@ -322,7 +322,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
         {sortedVariants.length > 0 && (
           <div>
             <h2 className="font-display text-lg font-bold text-foreground mb-3">
-              Rozmiar
+              Wybierz opcję
             </h2>
             <div className="grid grid-cols-2 gap-3">
               {sortedVariants.map((variant) => (

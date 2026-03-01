@@ -267,7 +267,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           {/* Size Variants */}
           {sortedVariants.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-white mb-3">Rozmiar</h2>
+              <h2 className="text-xl font-bold text-white mb-3">Wybierz opcję</h2>
               <div className="grid grid-cols-2 gap-3">
                 {sortedVariants.map((variant) => (
                   <button
