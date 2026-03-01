@@ -242,10 +242,10 @@ export function validateRecipeIngredients(
     errors.push('Receptura musi zawierać przynajmniej jeden składnik');
   }
 
-  // Check for duplicate ingredients
-  const stockItemIds = ingredients.map((i) => i.stock_item_id);
-  const duplicates = stockItemIds.filter(
-    (id, index) => stockItemIds.indexOf(id) !== index
+  // Check for duplicate ingredients (compound key: type + reference_id)
+  const ingredientKeys = ingredients.map((i) => `${i.type}:${i.reference_id}`);
+  const duplicates = ingredientKeys.filter(
+    (key, index) => ingredientKeys.indexOf(key) !== index
   );
 
   if (duplicates.length > 0) {
