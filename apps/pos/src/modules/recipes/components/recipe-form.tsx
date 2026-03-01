@@ -2,6 +2,7 @@
  * Recipe Form Component
  *
  * Form for creating and editing recipes with ingredient management.
+ * Supports nested recipes (polprodukty) as ingredients for finished goods.
  */
 
 'use client';
@@ -11,9 +12,12 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CreateRecipeSchema, CreateRecipeInput } from '@/schemas/recipe';
 import { ProductCategory } from '@/types/enums';
+import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { inventoryRepository } from '@/modules/inventory/repository';
+import { recipesRepository } from '../repository';
 import { getCategoryDisplayName } from '../utils/recipe-calculator';
+import { cn } from '@/lib/utils';
 import {
   Form,
   FormControl,
@@ -47,13 +51,17 @@ import { DecimalInput } from '@/components/ui/decimal-input';
 import { ProductSearchDialog } from './product-search-dialog';
 
 interface RecipeIngredientField {
-  stock_item_id: string;
+  type: 'stock_item' | 'recipe';
+  reference_id: string;
+  reference_name?: string;
   quantity: number;
   unit: string;
 }
 
 interface IngredientChecklistProps {
   stockItems: StockItem[];
+  semiFinishedRecipes: Recipe[];
+  productCategory: ProductCategory;
   form: { setValue: (name: string, value: unknown) => void };
   append: (value: RecipeIngredientField) => void;
   remove: (index: number) => void;
@@ -68,6 +76,8 @@ interface IngredientChecklistProps {
 
 function IngredientChecklist({
   stockItems,
+  semiFinishedRecipes,
+  productCategory,
   form,
   append,
   remove,
@@ -80,32 +90,59 @@ function IngredientChecklist({
   watchedIngredients,
 }: IngredientChecklistProps) {
   const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'stock_items' | 'recipes'>('stock_items');
+  const showRecipesTab = productCategory === ProductCategory.FINISHED_GOOD;
 
   const selectedIds = useMemo(() => {
     return new Set(
       (watchedIngredients || [])
-        .map((ing) => ing.stock_item_id)
+        .map((ing) => `${ing.type}:${ing.reference_id}`)
         .filter(Boolean)
     );
   }, [watchedIngredients]);
 
   const searchLower = ingredientSearch.toLowerCase();
 
-  const selectedItems = stockItems.filter((s) => selectedIds.has(s.id));
-  const availableItems = stockItems
-    .filter((s) => !selectedIds.has(s.id))
+  // Stock item filtering
+  const selectedStockIds = new Set(
+    (watchedIngredients || []).filter((i) => i.type === 'stock_item').map((i) => i.reference_id)
+  );
+  const selectedRecipeIds = new Set(
+    (watchedIngredients || []).filter((i) => i.type === 'recipe').map((i) => i.reference_id)
+  );
+
+  const selectedStockItems = stockItems.filter((s) => selectedStockIds.has(s.id));
+  const availableStockItems = stockItems
+    .filter((s) => !selectedStockIds.has(s.id))
     .filter((s) => !searchLower || s.name.toLowerCase().includes(searchLower));
 
-  const filteredSelectedItems = selectedItems.filter(
+  const filteredSelectedStockItems = selectedStockItems.filter(
     (s) => !searchLower || s.name.toLowerCase().includes(searchLower)
   );
 
-  const handleToggle = (stockItem: StockItem, checked: boolean) => {
+  // Recipe filtering
+  const selectedRecipes = semiFinishedRecipes.filter((r) => selectedRecipeIds.has(r.id));
+  const availableRecipes = semiFinishedRecipes
+    .filter((r) => !selectedRecipeIds.has(r.id))
+    .filter((r) => !searchLower || r.name.toLowerCase().includes(searchLower));
+
+  const handleToggleStockItem = (stockItem: StockItem, checked: boolean) => {
     if (checked) {
-      append({ stock_item_id: stockItem.id, quantity: 1, unit: stockItem.unit });
+      append({ type: 'stock_item', reference_id: stockItem.id, reference_name: stockItem.name, quantity: 1, unit: stockItem.unit });
     } else {
       const idx = (watchedIngredients || []).findIndex(
-        (ing) => ing.stock_item_id === stockItem.id
+        (ing) => ing.type === 'stock_item' && ing.reference_id === stockItem.id
+      );
+      if (idx >= 0) remove(idx);
+    }
+  };
+
+  const handleToggleRecipe = (recipe: Recipe, checked: boolean) => {
+    if (checked) {
+      append({ type: 'recipe', reference_id: recipe.id, reference_name: recipe.name, quantity: 1, unit: recipe.yield_unit });
+    } else {
+      const idx = (watchedIngredients || []).findIndex(
+        (ing) => ing.type === 'recipe' && ing.reference_id === recipe.id
       );
       if (idx >= 0) remove(idx);
     }
@@ -116,9 +153,11 @@ function IngredientChecklist({
     setIsSavingIngredients(true);
     try {
       const ingredients = (watchedIngredients || [])
-        .filter((ing) => ing.stock_item_id && ing.quantity > 0)
+        .filter((ing) => ing.reference_id && ing.quantity > 0)
         .map((ing) => ({
-          stock_item_id: ing.stock_item_id,
+          type: ing.type,
+          reference_id: ing.reference_id,
+          reference_name: ing.reference_name,
           quantity: ing.quantity,
           unit: ing.unit,
         }));
@@ -193,112 +232,208 @@ function IngredientChecklist({
           />
         </div>
 
-        <div className="max-h-[400px] overflow-y-auto space-y-1">
-          {/* Selected items */}
-          {filteredSelectedItems.length > 0 && (
-            <>
-              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b">
-                Wybrane ({selectedIds.size})
-              </div>
-              {filteredSelectedItems.map((stockItem) => {
-                const fieldIndex = (watchedIngredients || []).findIndex(
-                  (ing) => ing.stock_item_id === stockItem.id
-                );
-                if (fieldIndex < 0) return null;
-                return (
+        {/* Tab buttons */}
+        {showRecipesTab && (
+          <div className="flex gap-1 border-b">
+            <button
+              type="button"
+              className={cn(
+                'px-3 py-1.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+                activeTab === 'stock_items'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => setActiveTab('stock_items')}
+              data-action="tab-stock-items"
+            >
+              Surowce
+            </button>
+            <button
+              type="button"
+              className={cn(
+                'px-3 py-1.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+                activeTab === 'recipes'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
+              )}
+              onClick={() => setActiveTab('recipes')}
+              data-action="tab-recipes"
+            >
+              Polprodukty
+            </button>
+          </div>
+        )}
+
+        {/* Stock items tab */}
+        {(activeTab === 'stock_items' || !showRecipesTab) && (
+          <div className="max-h-[400px] overflow-y-auto space-y-1">
+            {/* Selected items */}
+            {filteredSelectedStockItems.length > 0 && (
+              <>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b">
+                  Wybrane ({selectedStockIds.size})
+                </div>
+                {filteredSelectedStockItems.map((stockItem) => {
+                  const fieldIndex = (watchedIngredients || []).findIndex(
+                    (ing) => ing.type === 'stock_item' && ing.reference_id === stockItem.id
+                  );
+                  if (fieldIndex < 0) return null;
+                  return (
+                    <div
+                      key={stockItem.id}
+                      className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50"
+                      data-ingredient-id={stockItem.id}
+                    >
+                      <Checkbox
+                        checked={true}
+                        onCheckedChange={() => handleToggleStockItem(stockItem, false)}
+                        data-action={`toggle-ingredient-${stockItem.id}`}
+                        aria-label={`Odznacz ${stockItem.name}`}
+                      />
+                      <span className="text-sm font-medium min-w-[120px] truncate">
+                        {stockItem.name}
+                      </span>
+                      <div className="flex items-center gap-2 ml-auto">
+                        <DecimalInput
+                          className="w-20 h-8 text-sm"
+                          value={watchedIngredients[fieldIndex]?.quantity ?? 0}
+                          onChange={(val) =>
+                            form.setValue(
+                              `ingredients.${fieldIndex}.quantity`,
+                              val
+                            )
+                          }
+                          data-field={`quantity-${stockItem.id}`}
+                        />
+                        <span className="text-xs text-muted-foreground w-8">
+                          {stockItem.unit}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleToggleStockItem(stockItem, false)}
+                          data-action={`remove-ingredient-${stockItem.id}`}
+                          aria-label={`Usun ${stockItem.name}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Available items */}
+            {availableStockItems.length > 0 && (
+              <>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b mt-2">
+                  Dostepne
+                </div>
+                {availableStockItems.map((stockItem) => (
                   <div
                     key={stockItem.id}
-                    className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50"
-                    data-ingredient-id={stockItem.id}
+                    className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50 cursor-pointer"
+                    data-stock-item-id={stockItem.id}
+                    onClick={() => handleToggleStockItem(stockItem, true)}
                   >
                     <Checkbox
-                      checked={true}
-                      onCheckedChange={() => handleToggle(stockItem, false)}
+                      checked={false}
+                      onCheckedChange={() => handleToggleStockItem(stockItem, true)}
                       data-action={`toggle-ingredient-${stockItem.id}`}
-                      aria-label={`Odznacz ${stockItem.name}`}
+                      aria-label={`Zaznacz ${stockItem.name}`}
                     />
-                    <span className="text-sm font-medium min-w-[120px] truncate">
+                    <span className="text-sm min-w-[120px] truncate">
                       {stockItem.name}
                     </span>
-                    <div className="flex items-center gap-2 ml-auto">
-                      <DecimalInput
-                        className="w-20 h-8 text-sm"
-                        value={watchedIngredients[fieldIndex]?.quantity ?? 0}
-                        onChange={(val) =>
-                          form.setValue(
-                            `ingredients.${fieldIndex}.quantity`,
-                            val
-                          )
-                        }
-                        data-field={`quantity-${stockItem.id}`}
-                      />
-                      <span className="text-xs text-muted-foreground w-8">
-                        {stockItem.unit}
-                      </span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => handleToggle(stockItem, false)}
-                        data-action={`remove-ingredient-${stockItem.id}`}
-                        aria-label={`Usun ${stockItem.name}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {formatCostPerUnit(stockItem)}
+                    </span>
                   </div>
-                );
-              })}
-            </>
-          )}
+                ))}
+              </>
+            )}
 
-          {/* Available items */}
-          {availableItems.length > 0 && (
-            <>
-              <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b mt-2">
-                Dostepne
+            {availableStockItems.length === 0 && filteredSelectedStockItems.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                {ingredientSearch
+                  ? 'Brak skladnikow pasujacych do wyszukiwania'
+                  : 'Brak dostepnych skladnikow'}
               </div>
-              {availableItems.map((stockItem) => (
-                <div
-                  key={stockItem.id}
-                  className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50 cursor-pointer"
-                  data-stock-item-id={stockItem.id}
-                  onClick={() => handleToggle(stockItem, true)}
-                >
-                  <Checkbox
-                    checked={false}
-                    onCheckedChange={() => handleToggle(stockItem, true)}
-                    data-action={`toggle-ingredient-${stockItem.id}`}
-                    aria-label={`Zaznacz ${stockItem.name}`}
-                  />
-                  <span className="text-sm min-w-[120px] truncate">
-                    {stockItem.name}
-                  </span>
-                  <span className="text-xs text-muted-foreground ml-auto">
-                    {formatCostPerUnit(stockItem)}
-                  </span>
-                </div>
-              ))}
-            </>
-          )}
+            )}
+          </div>
+        )}
 
-          {availableItems.length === 0 && filteredSelectedItems.length === 0 && (
-            <div className="text-sm text-muted-foreground text-center py-4">
-              {ingredientSearch
-                ? 'Brak skladnikow pasujacych do wyszukiwania'
-                : 'Brak dostepnych skladnikow'}
-            </div>
-          )}
-        </div>
+        {/* Recipes tab */}
+        {activeTab === 'recipes' && showRecipesTab && (
+          <div className="max-h-[400px] overflow-y-auto space-y-1">
+            {/* Selected recipes */}
+            {selectedRecipes.length > 0 && (
+              <>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b">
+                  Wybrane ({selectedRecipes.length})
+                </div>
+                {selectedRecipes.map((recipe) => {
+                  const fieldIndex = (watchedIngredients || []).findIndex(
+                    (ing) => ing.type === 'recipe' && ing.reference_id === recipe.id
+                  );
+                  if (fieldIndex < 0) return null;
+                  return (
+                    <div key={recipe.id} className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50" data-ingredient-id={recipe.id}>
+                      <Checkbox checked={true} onCheckedChange={() => handleToggleRecipe(recipe, false)} />
+                      <span className="text-sm font-medium min-w-[120px] truncate">{recipe.name}</span>
+                      <Badge variant="outline" className="text-[10px]">polprodukt</Badge>
+                      <div className="flex items-center gap-2 ml-auto">
+                        <DecimalInput
+                          className="w-20 h-8 text-sm"
+                          value={watchedIngredients[fieldIndex]?.quantity ?? 0}
+                          onChange={(val) => form.setValue(`ingredients.${fieldIndex}.quantity`, val)}
+                        />
+                        <span className="text-xs text-muted-foreground w-12">{recipe.yield_unit}</span>
+                        <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleToggleRecipe(recipe, false)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {/* Available recipes */}
+            {availableRecipes.length > 0 && (
+              <>
+                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide py-1 border-b mt-2">
+                  Dostepne
+                </div>
+                {availableRecipes.map((recipe) => (
+                  <div key={recipe.id} className="flex items-center gap-3 py-2 px-1 rounded hover:bg-muted/50 cursor-pointer" onClick={() => handleToggleRecipe(recipe, true)}>
+                    <Checkbox checked={false} onCheckedChange={() => handleToggleRecipe(recipe, true)} />
+                    <span className="text-sm min-w-[120px] truncate">{recipe.name}</span>
+                    <Badge variant="outline" className="text-[10px]">polprodukt</Badge>
+                    <span className="text-xs text-muted-foreground ml-auto">
+                      {recipe.cost_per_unit.toFixed(2)} PLN/{recipe.yield_unit}
+                    </span>
+                  </div>
+                ))}
+              </>
+            )}
+            {availableRecipes.length === 0 && selectedRecipes.length === 0 && (
+              <div className="text-sm text-muted-foreground text-center py-4">
+                Brak dostepnych polproduktow
+              </div>
+            )}
+          </div>
+        )}
 
         <ProductSearchDialog
           open={productSearchOpen}
           onOpenChange={setProductSearchOpen}
           stockItems={stockItems}
-          excludeIds={Array.from(selectedIds)}
+          excludeIds={Array.from(selectedStockIds)}
           onSelect={(stockItem) => {
-            append({ stock_item_id: stockItem.id, quantity: 1, unit: stockItem.unit });
+            append({ type: 'stock_item', reference_id: stockItem.id, reference_name: stockItem.name, quantity: 1, unit: stockItem.unit });
           }}
         />
       </CardContent>
@@ -311,7 +446,7 @@ interface RecipeFormProps {
   onSubmit: (data: CreateRecipeInput) => Promise<void>;
   onCancel?: () => void;
   isLoading?: boolean;
-  onSaveIngredients?: (ingredients: { stock_item_id: string; quantity: number; unit: string }[]) => Promise<void>;
+  onSaveIngredients?: (ingredients: RecipeIngredientField[]) => Promise<void>;
 }
 
 export function RecipeForm({
@@ -322,11 +457,13 @@ export function RecipeForm({
   onSaveIngredients,
 }: RecipeFormProps) {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [semiFinishedRecipes, setSemiFinishedRecipes] = useState<Recipe[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [isSavingIngredients, setIsSavingIngredients] = useState(false);
 
   useEffect(() => {
     inventoryRepository.getAllStockItems().then(setStockItems);
+    recipesRepository.getRecipesByCategory(ProductCategory.SEMI_FINISHED).then(setSemiFinishedRecipes);
   }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -399,7 +536,7 @@ export function RecipeForm({
     const data = formData as unknown as CreateRecipeInput;
     // Filter out empty ingredients
     data.ingredients = data.ingredients.filter(
-      (ing) => ing.stock_item_id && ing.quantity > 0
+      (ing) => ing.reference_id && ing.quantity > 0
     );
     await onSubmit(data);
     // Clear draft on successful submit
@@ -417,9 +554,15 @@ export function RecipeForm({
 
   // Calculate estimated cost
   const watchedIngredients = form.watch('ingredients');
+  const watchedCategory = form.watch('product_category') as ProductCategory;
   const estimatedCost = (watchedIngredients || []).reduce(
-    (sum: number, ing: { stock_item_id: string; quantity: number }) => {
-      const stockItem = stockItems.find((s) => s.id === ing.stock_item_id);
+    (sum: number, ing: RecipeIngredientField) => {
+      if (ing.type === 'recipe') {
+        const subRecipe = semiFinishedRecipes.find((r) => r.id === ing.reference_id);
+        if (!subRecipe || !ing.quantity) return sum;
+        return sum + ing.quantity * subRecipe.cost_per_unit;
+      }
+      const stockItem = stockItems.find((s) => s.id === ing.reference_id);
       if (!stockItem || !ing.quantity) return sum;
       return sum + ing.quantity * stockItem.cost_per_unit;
     },
@@ -611,6 +754,8 @@ export function RecipeForm({
         {/* Ingredients Checklist */}
         <IngredientChecklist
           stockItems={stockItems}
+          semiFinishedRecipes={semiFinishedRecipes}
+          productCategory={watchedCategory}
           form={form}
           append={append}
           remove={remove}

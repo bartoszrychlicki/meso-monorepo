@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Recipe, RecipeVersion } from '@/types/recipe';
+import { Recipe, RecipeVersion, RecipeIngredient } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { recipesRepository } from '@/modules/recipes/repository';
 import { inventoryRepository } from '@/modules/inventory/repository';
@@ -58,15 +58,20 @@ export default function RecipeDetailPage() {
     load();
   }, [params.id]);
 
-  const getStockItemName = (id: string) =>
-    stockItems.find((s) => s.id === id)?.name ?? id;
+  const getIngredientName = (ing: RecipeIngredient) => {
+    if (ing.reference_name) return ing.reference_name;
+    if (ing.type === 'stock_item') {
+      return stockItems.find((s) => s.id === ing.reference_id)?.name ?? ing.reference_id;
+    }
+    return ing.reference_id;
+  };
 
-  const _getStockItemUnit = (id: string) =>
-    stockItems.find((s) => s.id === id)?.unit ?? '';
-
-  const getIngredientCost = (stockItemId: string, quantity: number) => {
-    const item = stockItems.find((s) => s.id === stockItemId);
-    return item ? quantity * item.cost_per_unit : 0;
+  const getIngredientCost = (ing: RecipeIngredient) => {
+    if (ing.type === 'recipe') {
+      return ing.cost_per_unit ? ing.quantity * ing.cost_per_unit : 0;
+    }
+    const item = stockItems.find((s) => s.id === ing.reference_id);
+    return item ? ing.quantity * item.cost_per_unit : 0;
   };
 
   const handleDelete = async () => {
@@ -208,15 +213,18 @@ export default function RecipeDetailPage() {
               <div className="col-span-3 text-right">Koszt</div>
             </div>
             {recipe.ingredients.map((ing, i) => {
-              const cost = getIngredientCost(ing.stock_item_id, ing.quantity);
+              const cost = getIngredientCost(ing);
               return (
                 <div
                   key={ing.id || i}
                   className="grid grid-cols-12 gap-2 py-2 border-b last:border-0"
-                  data-ingredient={ing.stock_item_id}
+                  data-ingredient={ing.reference_id}
                 >
                   <div className="col-span-5 font-medium">
-                    {getStockItemName(ing.stock_item_id)}
+                    {getIngredientName(ing)}
+                    {ing.type === 'recipe' && (
+                      <Badge variant="outline" className="ml-1 text-[10px]">polprodukt</Badge>
+                    )}
                     {ing.notes && (
                       <span className="block text-xs text-muted-foreground">
                         {ing.notes}
