@@ -14,11 +14,13 @@ import { BaseEntity } from './common';
  */
 export interface RecipeIngredient {
   id?: string;
-  stock_item_id: string; // Reference to StockItem
-  quantity: number; // Amount needed
-  unit: string; // Unit of measurement (g, ml, szt)
-  cost_per_unit?: number; // Cost at time of recipe creation (cached)
-  notes?: string; // e.g., "drobno posiekana", "podgrzana"
+  type: 'stock_item' | 'recipe';
+  reference_id: string;
+  reference_name?: string;
+  quantity: number;
+  unit: string;
+  cost_per_unit?: number;
+  notes?: string;
 }
 
 /**
@@ -103,8 +105,9 @@ export interface IngredientUsageLog extends BaseEntity {
  * Maps which ingredients contain which allergens
  */
 export interface AllergenSource {
-  stock_item_id: string;
-  stock_item_name: string;
+  type: 'stock_item' | 'recipe';
+  reference_id: string;
+  reference_name: string;
   allergens: Allergen[];
 }
 
@@ -116,8 +119,9 @@ export interface RecipeCostBreakdown {
   recipe_id: string;
   recipe_name: string;
   ingredients: {
-    stock_item_id: string;
-    stock_item_name: string;
+    type: 'stock_item' | 'recipe';
+    reference_id: string;
+    reference_name: string;
     quantity: number;
     unit: string;
     cost_per_unit: number;
