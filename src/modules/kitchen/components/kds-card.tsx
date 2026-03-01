@@ -108,9 +108,9 @@ export function KdsCard({ ticket }: KdsCardProps) {
                     </span>
                   )}
                 </div>
-                {item.modifiers.length > 0 && (
+                {(item.modifiers?.length ?? 0) > 0 && (
                   <p className="mt-0.5 text-sm font-bold text-orange-700 bg-orange-50 rounded px-1.5 py-0.5 inline-block">
-                    {item.modifiers.join(', ')}
+                    {item.modifiers!.join(', ')}
                   </p>
                 )}
               </div>

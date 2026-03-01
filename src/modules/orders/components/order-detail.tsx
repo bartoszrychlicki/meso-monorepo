@@ -185,9 +185,9 @@ export function OrderDetail({
                               ({item.variant_name})
                             </span>
                           )}
-                          {item.modifiers.length > 0 && (
+                          {(item.modifiers?.length ?? 0) > 0 && (
                             <div className="mt-0.5 space-y-0.5">
-                              {item.modifiers.map((mod) => (
+                              {item.modifiers!.map((mod) => (
                                 <p
                                   key={mod.modifier_id}
                                   className="text-xs font-semibold text-orange-700"

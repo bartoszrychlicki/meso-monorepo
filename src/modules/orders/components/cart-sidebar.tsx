@@ -124,9 +124,9 @@ export function CartSidebar({ onOrderCreated }: CartSidebarProps) {
                         {item.variant_name}
                       </p>
                     )}
-                    {item.modifiers.length > 0 && (
+                    {(item.modifiers?.length ?? 0) > 0 && (
                       <div className="mt-0.5">
-                        {item.modifiers.map((mod) => (
+                        {item.modifiers!.map((mod) => (
                           <p
                             key={mod.modifier_id}
                             className="text-[10px] text-muted-foreground"
