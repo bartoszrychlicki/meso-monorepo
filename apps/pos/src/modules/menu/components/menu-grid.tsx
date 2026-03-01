@@ -55,7 +55,7 @@ export function MenuGrid({
             totalCost: recipe.cost_per_unit,
             costPercentage,
             ingredientCosts: recipe.ingredients.map((ing) => ({
-              stock_item_id: ing.stock_item_id,
+              reference_id: ing.reference_id,
               cost: ing.quantity * (ing.cost_per_unit ?? 0),
             })),
           });
