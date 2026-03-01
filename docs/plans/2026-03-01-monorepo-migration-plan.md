@@ -18,19 +18,19 @@
 |------|--------|-------|
 | 1. Initialize Monorepo Skeleton | ✅ DONE | Merged with Task 2 into single execution |
 | 2. Merge Git Histories | ✅ DONE | GitHub repo not yet created (local only). Delivery files landed at root (not meso-app/), adjusted move accordingly |
-| 3. @meso/core — Enums | ⬜ TODO | |
-| 4. @meso/core — Types | ⬜ TODO | |
-| 5. @meso/core — Zod Schemas | ⬜ TODO | |
-| 6. @meso/supabase | ⬜ TODO | |
-| 7. @meso/api-client | ⬜ TODO | |
-| 8. Wire POS to @meso/core | ⬜ TODO | |
-| 9. Extend POS API | ⬜ TODO | |
-| 10. Wire Delivery to API client | ⬜ TODO | |
-| 11. Move Operator Panel | ⬜ TODO | |
-| 12. RLS Lockdown | ⬜ TODO | |
-| 13. Cleanup | ⬜ TODO | |
-| 14. Relink Vercel | ⬜ TODO | |
-| 15. E2E Verification | ⬜ TODO | |
+| 3. @meso/core — Enums | ✅ DONE | 205 lines copied from POS, all 4 tests pass |
+| 4. @meso/core — Types | ✅ DONE | Merged with Task 5. Order type extended with delivery fields (delivery_fee, tip, promo_code, lifecycle timestamps) |
+| 5. @meso/core — Zod Schemas | ✅ DONE | CreateOrderSchema, UpdateOrderStatusSchema with delivery fields. 11 tests total |
+| 6. @meso/supabase | ✅ DONE | Added peerDependency on next>=14 (not in original plan) |
+| 7. @meso/api-client | ✅ DONE | MesoClient with retry/backoff, OrdersApi, CustomersApi, PosApiClient factory. 3 tests |
+| 8. Wire POS to @meso/core | ✅ DONE | -354 lines, +56 lines of re-exports. All 463 POS tests pass |
+| 9. Extend POS API | ✅ DONE | delivery_fee/tip in totals, payment_status in status endpoint, new coupon PATCH endpoint |
+| 10. Wire Delivery to API client | ✅ DONE | POS API client is lazy-initialized (not eager as in plan) to avoid build-time crashes. Location query kept as direct Supabase read |
+| 11. Move Operator Panel | ✅ DONE | -5,271 lines deleted. Online-orders page in POS filters by delivery_app channel |
+| 12. RLS Lockdown | ✅ DONE | Migration written. Kept UPDATE on crm_customer_coupons for authenticated (loyalty API routes need it). Migration NOT yet deployed — needs `db push` |
+| 13. Cleanup | ✅ DONE | Removed stale npm lockfiles (-26,020 lines). No remaining unauthorized direct writes found |
+| 14. Relink Vercel | ⬜ TODO | Requires: push to GitHub, Vercel dashboard config, POS_API_URL/POS_API_KEY env vars |
+| 15. E2E Verification | ⬜ TODO | Requires: live deployment, API key generation, full order flow test |
 
 ---
 
