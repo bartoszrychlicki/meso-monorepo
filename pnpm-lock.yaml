@@ -275,6 +275,19 @@ importers:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@20.19.35)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@1.8.0))(lightningcss@1.31.1)(msw@2.12.10(@types/node@20.19.35)(typescript@5.9.3))
 
+  packages/api-client:
+    dependencies:
+      '@meso/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.4
+        version: 3.2.4(@types/node@20.19.35)(jiti@2.6.1)(jsdom@27.4.0(@noble/hashes@1.8.0))(lightningcss@1.31.1)(msw@2.12.10(@types/node@20.19.35)(typescript@5.9.3))
+
   packages/core:
     dependencies:
       zod:
