@@ -7,8 +7,10 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
+import { productsRepository } from '@/modules/menu/repository';
 import { CreateOrderSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
+import { Product } from '@/types/menu';
 
 /**
  * GET /api/v1/orders
@@ -109,6 +111,55 @@ export async function POST(request: NextRequest) {
     );
     if (existing.length > 0) {
       return apiSuccess(existing[0]);
+    }
+  }
+
+  // Validate that all products exist and are available
+  const uniqueProductIds = [...new Set(input.items.map((item) => item.product_id))];
+  const productMap = new Map<string, Product>();
+
+  for (const productId of uniqueProductIds) {
+    const product = await productsRepository.findById(productId);
+    if (!product) {
+      return apiValidationError([
+        {
+          field: 'items.product_id',
+          message: `Produkt (id: ${productId}) nie istnieje`,
+        },
+      ]);
+    }
+    if (!product.is_available) {
+      return apiValidationError([
+        {
+          field: 'items.product_id',
+          message: `Produkt '${product.name}' (id: ${productId}) nie jest dostępny`,
+        },
+      ]);
+    }
+    productMap.set(productId, product);
+  }
+
+  // Validate variant_id references
+  for (const item of input.items) {
+    if (item.variant_id) {
+      const product = productMap.get(item.product_id)!;
+      const variant = product.variants?.find((v) => v.id === item.variant_id);
+      if (!variant) {
+        return apiValidationError([
+          {
+            field: 'items.variant_id',
+            message: `Wariant '${item.variant_id}' nie istnieje w produkcie '${product.name}' (id: ${item.product_id})`,
+          },
+        ]);
+      }
+      if (!variant.is_available) {
+        return apiValidationError([
+          {
+            field: 'items.variant_id',
+            message: `Wariant '${variant.name}' w produkcie '${product.name}' nie jest dostępny`,
+          },
+        ]);
+      }
     }
   }
 

@@ -13,6 +13,7 @@ const TABLE_MAP: Record<string, string> = {
   orders: 'orders_orders',
   kitchen_tickets: 'orders_kitchen_tickets',
   customers: 'crm_customers',
+  customer_addresses: 'crm_customer_addresses',
   loyalty_transactions: 'crm_loyalty_transactions',
   coupons: 'crm_coupons',
   recipes: 'recipes_recipes',

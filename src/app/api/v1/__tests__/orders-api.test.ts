@@ -22,8 +22,17 @@ vi.mock('@/modules/orders/repository', () => ({
   },
 }));
 
+vi.mock('@/modules/menu/repository', () => ({
+  productsRepository: {
+    findById: vi.fn(),
+    findAll: vi.fn(),
+    findMany: vi.fn(),
+  },
+}));
+
 import { authorizeRequest, isApiKey } from '@/lib/api/auth';
 import { ordersRepository } from '@/modules/orders/repository';
+import { productsRepository } from '@/modules/menu/repository';
 import { GET, POST } from '../orders/route';
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>;
@@ -141,10 +150,19 @@ describe('GET /api/v1/orders', () => {
 });
 
 describe('POST /api/v1/orders', () => {
+  const mockProduct = {
+    id: '550e8400-e29b-41d4-a716-446655440001',
+    name: 'Burger Classic',
+    is_available: true,
+    variants: [],
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue(validApiKey);
     mockIsApiKey.mockReturnValue(true);
+    // By default, return a valid product for any findById call
+    (productsRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockProduct);
   });
 
   const validOrderBody = {
@@ -251,6 +269,65 @@ describe('POST /api/v1/orders', () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(401);
+  });
+
+  it('returns 422 for non-existent product_id', async () => {
+    (productsRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+    const req = makeRequest('http://localhost:3000/api/v1/orders', {
+      method: 'POST',
+      body: JSON.stringify(validOrderBody),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body.success).toBe(false);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(body.error.details[0].message).toContain('nie istnieje');
+  });
+
+  it('returns 422 for unavailable product', async () => {
+    (productsRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...mockProduct,
+      is_available: false,
+    });
+
+    const req = makeRequest('http://localhost:3000/api/v1/orders', {
+      method: 'POST',
+      body: JSON.stringify(validOrderBody),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body.success).toBe(false);
+    expect(body.error.details[0].message).toContain('nie jest dostępny');
+  });
+
+  it('returns 422 for non-existent variant_id', async () => {
+    (productsRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue({
+      ...mockProduct,
+      variants: [{ id: 'var-1', name: 'Maly', is_available: true }],
+    });
+
+    const req = makeRequest('http://localhost:3000/api/v1/orders', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...validOrderBody,
+        items: [
+          {
+            ...validOrderBody.items[0],
+            variant_id: 'non-existent-variant',
+          },
+        ],
+      }),
+    });
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body.error.details[0].message).toContain('nie istnieje w produkcie');
   });
 
   it('calculates order totals correctly', async () => {

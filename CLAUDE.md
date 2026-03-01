@@ -4,109 +4,135 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MESOpos is a custom POS (Point of Sale) system for a gastronomy chain operating on a **Central Kitchen (KC) + Mobile Sales Points** model. The full functional specification is in `docs/SPECYFIKACJA_FUNKCJONALNA_POS_KOMPLETNA-2.md` (Polish language).
+MESOpos is a POS system for a Japanese comfort food franchise operating a **Central Kitchen (KC) + Mobile Sales Points** model (food trucks, kiosks, small restaurants). The full functional spec is in `docs/SPECYFIKACJA_FUNKCJONALNA_POS_KOMPLETNA-2.md` (Polish).
 
-The system handles: food trucks, small restaurants, kiosks, delivery, pickup, and a customer mobile app. It is **not yet implemented** — this repository currently contains only the specification document.
+## Commands
 
-## Architecture
+```bash
+npm run dev          # Next.js dev server (localhost:3000)
+npm run build        # Production build — run before reporting completion
+npm run lint         # ESLint (flat config v9)
+npm run test         # Vitest — all tests
+npm run test:watch   # Vitest — watch mode
+npx vitest run src/path/to/file.test.ts  # Single test file
+tsc --noEmit         # Type-check only
+```
 
-**Modular Monolith** — designed for a small team (2-5 developers), not microservices.
+### Supabase (remote only — no Docker)
+```bash
+npx supabase migration list --project-ref gyxcdrcdnnzjdmcrwbpr
+npx supabase db push --project-ref gyxcdrcdnnzjdmcrwbpr
+```
+Commands requiring Docker (`supabase start`, `db dump`, `db reset`) will fail.
 
-### Tech Stack (as specified)
+## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | Next.js 14+ (App Router) |
-| Language | TypeScript 5+ |
-| API | Next.js API Routes + tRPC |
-| ORM | Prisma 5+ |
-| Validation | Zod |
-| Database | Supabase PostgreSQL (with RLS) |
-| Auth | Supabase Auth (JWT, OAuth) |
-| State | Zustand + TanStack Query |
-| UI | Tailwind CSS + shadcn/ui |
-| Forms | React Hook Form + Zod |
-| Real-time | Supabase Realtime (WebSockets) |
-| Cache | Redis 7+ (Upstash) |
-| Task Queue | BullMQ + Redis |
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript 5.9 (strict) |
+| Database | Supabase PostgreSQL (RLS) — direct queries, no ORM |
+| Auth | Supabase Auth (JWT + API Key) |
+| Validation | Zod 4 |
+| State | Zustand 5 + TanStack React Query 5 |
+| UI | Tailwind CSS 4 + shadcn/ui (New York style) + Radix UI |
+| Forms | React Hook Form 7 + Zod resolvers |
+| Testing | Vitest 3 + Testing Library (jsdom) |
 | Hosting | Vercel |
-| Storage | Supabase Storage |
 
-### Database Schemas
+## Architecture
 
-The PostgreSQL database is organized into separate schemas:
-- `menu` — products, categories, modifiers, promotions
-- `orders` — orders, items, status history
-- `payments` — payments, transactions, refunds
-- `inventory` — stock, movements, suppliers, batches
-- `users` — users, roles, permissions, locations
-- `crm` — customers, loyalty, coupons
-- `reports` — reports, metrics, dashboards
-- `employees` — employees, work time, schedules
+**Modular Monolith** — each business domain is a self-contained module in `src/modules/`:
 
-### Modules
+```
+src/
+├── app/                    # Routes (App Router) + REST API
+│   ├── (auth)/             # Login, password reset (public)
+│   ├── (dashboard)/        # Protected POS views
+│   ├── admin/users/        # Admin-only user management
+│   └── api/v1/             # REST endpoints
+├── modules/                # Business domain modules
+│   ├── menu/               # Products, categories, modifiers, pricing
+│   ├── orders/             # Cart, order lifecycle, status transitions
+│   ├── kitchen/            # KDS queue, cooking timers
+│   ├── inventory/          # Warehouses, FEFO batches, stock movements
+│   ├── crm/                # Customers, loyalty points/tiers
+│   ├── recipes/            # BOM, ingredients, food cost calc
+│   ├── deliveries/         # Delivery tracking, fuzzy address matching
+│   ├── employees/          # Staff, time tracking
+│   ├── users/              # Auth, roles, permissions
+│   └── settings/
+├── components/ui/          # shadcn/ui primitives (34 components)
+├── lib/
+│   ├── data/               # Repository factory (localStorage ↔ Supabase)
+│   ├── supabase/           # Client, server, middleware, storage helpers
+│   ├── api/                # Auth validation, response helpers, API keys
+│   └── sms/                # SMS provider + templates
+├── schemas/                # Zod validation schemas (all inputs)
+├── types/                  # TypeScript interfaces + enums (40+ enums)
+└── seed/                   # Dev seed data with fixed UUIDs
+```
 
-| Module | Responsibility |
-|--------|---------------|
-| MenuModule | Products, categories, pricing, availability, modifiers, promotions |
-| OrderModule | Orders, items, statuses, order flow |
-| PaymentModule | Payments, transactions, refunds (Stripe integration) |
-| KitchenModule | KDS queue, preparation times, kitchen stations |
-| InventoryModule | Warehouses, stock levels, batch tracking (FEFO), suppliers, HACCP |
-| UserModule | Users, roles, permissions, locations |
-| CRMModule | Customers, loyalty program (points/tiers), RFM segmentation, coupons |
-| ReportingModule | Dashboards, KPIs, reports (sales, operations, finance, inventory) |
-| EmployeeModule | Employees, time tracking (clock-in/out), labor cost calculation |
-| IntegrationModule | External APIs, webhooks, API keys |
+### Module Convention
 
-### Inter-module Communication
+Each module follows:
+```
+modules/{feature}/
+├── components/       # React components
+│   └── __tests__/
+├── repository.ts     # Data access via createRepository<T>()
+├── store.ts          # Zustand store
+├── hooks.ts          # Custom hooks
+└── utils/            # Business logic
+```
 
-- **Synchronous (internal)**: tRPC procedures, Server Actions
-- **Asynchronous (external)**: Supabase Realtime, Redis Pub/Sub
+### Data Backend
+
+Runtime-switchable via `NEXT_PUBLIC_DATA_BACKEND` (`"localStorage"` | `"supabase"`). The `createRepository<T>(tableName)` factory in `lib/data/repository-factory.ts` returns the correct backend. All repos expose: `findAll`, `findById`, `findMany`, `create`, `update`, `delete`, `count`.
+
+### Auth & Middleware
+
+`src/middleware.ts`:
+- CORS for `/api/v1/` (whitelists delivery app)
+- Protected routes → redirect to `/login` if no session
+- Admin routes → redirect non-admins to `/dashboard`
+- API auth: Supabase JWT (cookies) + `X-API-Key` header for external apps
+- Webhooks: HMAC signatures via `X-POS-Signature`
+
+### API Response Envelope
+
+All `/api/v1/` endpoints:
+```json
+{ "success": true, "data": {}, "meta": { "total": 0, "page": 1, "per_page": 20, "timestamp": "..." }, "error": null }
+```
+
+### Database
+
+PostgreSQL schemas: `menu`, `orders`, `payments`, `inventory`, `users`, `crm`, `reports`, `employees`, `recipes`, `integrations`. Migrations in `supabase/migrations/`. Table names use `{schema}_{table}` convention (e.g., `menu_products`, `orders_orders`).
+
+### Path Alias
+
+`@/*` → `./src/*`
 
 ## Key Domain Concepts
 
-- **Central Kitchen (KC)**: Produces semi-finished goods, distributes to sales points
-- **Sales Points**: Food trucks, kiosks, small restaurants — receive stock from KC
-- **FEFO**: First Expired First Out — mandatory for batch tracking and stock issuing
-- **BOM (Bill of Materials)**: Nested recipes — finished goods use semi-finished goods which use raw materials
-- **14 EU Allergens**: Must be tracked through the recipe chain automatically
-- **Order channels**: Delivery, pickup, eat-in (future), own mobile app
-- **Order statuses**: pending -> confirmed -> accepted -> preparing -> ready -> out_for_delivery/served -> delivered
-- **Loyalty tiers**: Bronze (0-499 pts), Silver (500-1499 pts), Gold (1500+ pts)
+- **Central Kitchen (KC)**: Produces semi-finished goods for distribution to sales points
+- **FEFO**: First Expired First Out — mandatory for batch inventory
+- **BOM**: Nested recipes (finished → semi-finished → raw materials)
+- **14 EU Allergens**: Tracked through the recipe chain
+- **Order flow**: pending → confirmed → accepted → preparing → ready → out_for_delivery → delivered
+- **Loyalty**: Bronze (0-499), Silver (500-1499), Gold (1500+) — 1 PLN = 1 point
 
-## AI-Friendly Design Requirements
+## Environment Setup
 
-All UI must use semantic HTML5 with `data-*` attributes for AI agent navigation:
-- `data-action` on buttons (e.g., `data-action="create-order"`)
-- `data-field` on form inputs (e.g., `data-field="product-name"`)
-- `data-value`, `data-status`, `data-id`, `data-view` on relevant elements
-- ARIA labels and roles on all interactive elements
-- AI metadata in `<head>` via `<meta name="ai:*">` tags
-- Zod schemas should include `.describe()` for AI readability
+Copy `env.example` → `.env.local`:
+- `NEXT_PUBLIC_DATA_BACKEND=localStorage` for dev without Supabase
+- `NEXT_PUBLIC_DATA_BACKEND=supabase` for production
 
-## API Design
+## AI-Friendly UI
 
-REST API at `/api/v1/` with standard response format:
-```json
-{
-  "success": true|false,
-  "data": { ... },
-  "meta": { "total": N, "page": N, "per_page": N, "timestamp": "..." },
-  "error": { "code": "...", "message": "...", "details": [...] }
-}
-```
-
-Authentication: JWT (Supabase Auth) + API Key (`X-API-Key` header) for external apps. Webhooks use HMAC signatures (`X-POS-Signature`).
-
-## Implementation Phases
-
-1. **Phase 0** (Weeks 1-2): Project setup, CI/CD, Docker, staging
-2. **Phase 1 MVP** (Weeks 3-10): UserModule, MenuModule, OrderModule, KitchenModule, basic InventoryModule, EmployeeModule, Stripe, SMS
-3. **Phase 2** (Weeks 11-16): Full InventoryModule, CRMModule, ReportingModule, PWA
-4. **Phase 3** (Weeks 17-24): AI features (forecasting, recommendations, sentiment analysis, chatbot)
-5. **Phase 4** (Weeks 25-30): Performance, security audit, backups, documentation
+Interactive elements use `data-*` attributes (`data-action`, `data-field`, `data-value`, `data-status`, `data-id`, `data-view`). Zod schemas use `.describe()`.
 
 ## Language
 
-The specification and business domain use Polish language. Code should use English for identifiers, comments, and documentation. User-facing strings will be in Polish.
+Code in English. Specs and UI strings in Polish.
