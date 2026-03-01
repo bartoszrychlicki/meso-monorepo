@@ -27,6 +27,9 @@ interface StatusUpdate {
   note: string;
 }
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function getStatusUpdate(action: TransitionAction): StatusUpdate | null {
   switch (action) {
     case 'start_preparing':
@@ -129,23 +132,35 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ ticket: updatedTicket });
     }
 
-    const order = await ordersRepo.findById(currentTicket.order_id);
-    if (!order) {
+    const orderId = currentTicket.order_id?.trim();
+    if (!orderId || !UUID_REGEX.test(orderId)) {
       return NextResponse.json({ ticket: updatedTicket });
     }
 
-    const statusHistory = Array.isArray(order.status_history) ? order.status_history : [];
-    const statusEntry = {
-      status: statusUpdate.status,
-      timestamp: now,
-      note: statusUpdate.note,
-    };
+    try {
+      const order = await ordersRepo.findById(orderId);
+      if (!order) {
+        return NextResponse.json({ ticket: updatedTicket });
+      }
 
-    await ordersRepo.update(order.id, {
-      status: statusUpdate.status,
-      status_history: [...statusHistory, statusEntry],
-      ...getOrderTimestampPatch(statusUpdate.status, now),
-    } as Partial<Order>);
+      const statusHistory = Array.isArray(order.status_history) ? order.status_history : [];
+      const statusEntry = {
+        status: statusUpdate.status,
+        timestamp: now,
+        note: statusUpdate.note,
+      };
+
+      await ordersRepo.update(order.id, {
+        status: statusUpdate.status,
+        status_history: [...statusHistory, statusEntry],
+        ...getOrderTimestampPatch(statusUpdate.status, now),
+      } as Partial<Order>);
+    } catch (error) {
+      console.warn(
+        `[KDS transition] Ticket ${id} transitioned, but linked order sync was skipped:`,
+        error
+      );
+    }
 
     return NextResponse.json({ ticket: updatedTicket });
   } catch (error) {

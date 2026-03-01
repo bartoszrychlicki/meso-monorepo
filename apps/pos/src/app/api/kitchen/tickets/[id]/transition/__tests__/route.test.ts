@@ -43,11 +43,12 @@ function makeParams(id = 'ticket-1') {
 }
 
 describe('POST /api/kitchen/tickets/:id/transition', () => {
+  const orderId = '11111111-1111-4111-8111-111111111111';
   const baseTicket = {
     id: 'ticket-1',
     created_at: '2026-03-01T10:00:00.000Z',
     updated_at: '2026-03-01T10:00:00.000Z',
-    order_id: 'order-1',
+    order_id: orderId,
     order_number: 'ORD-001',
     location_id: 'loc-1',
     status: OrderStatus.PENDING,
@@ -74,7 +75,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
       started_at: '2026-03-01T10:05:00.000Z',
     });
     mockOrdersRepo.findById.mockResolvedValue({
-      id: 'order-1',
+      id: orderId,
       status_history: [],
     });
     mockOrdersRepo.update.mockResolvedValue({});
@@ -97,7 +98,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
       })
     );
     expect(mockOrdersRepo.update).toHaveBeenCalledWith(
-      'order-1',
+      orderId,
       expect.objectContaining({
         status: OrderStatus.PREPARING,
       })
@@ -122,5 +123,21 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
 
     expect(response.status).toBe(400);
     expect(body.error).toBe('Missing itemId or isDone for toggle_item');
+  });
+
+  it('still transitions ticket when order_id is missing (legacy tickets)', async () => {
+    mockKitchenRepo.findById.mockResolvedValueOnce({
+      ...baseTicket,
+      order_id: null as unknown as string,
+    });
+
+    const request = makeRequest({ action: 'start_preparing' });
+    const response = await POST(request, makeParams('ticket-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.status).toBe(OrderStatus.PREPARING);
+    expect(mockOrdersRepo.findById).not.toHaveBeenCalled();
+    expect(mockOrdersRepo.update).not.toHaveBeenCalled();
   });
 });
