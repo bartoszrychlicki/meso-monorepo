@@ -116,7 +116,7 @@ export async function GET() {
       .eq('id', spicyMiso.id)
       .single()
 
-    const largeVariant = productWithVariants?.variants?.find((v: { name?: string; price_modifier?: number; id?: string }) => v.name?.toLowerCase().includes('duży')) || null
+    const largeVariant = productWithVariants?.variants?.find((v: { name?: string; price?: number; id?: string }) => v.name?.toLowerCase().includes('duży')) || null
 
     // 5. Delete existing seed orders for this customer (idempotent)
     await supabase.from('orders_orders').delete().eq('customer_id', customerId)
@@ -128,7 +128,7 @@ export async function GET() {
     // Order 1: confirmed - 2x Spicy Miso (large) + 1x Gyoza chicken
     const sm = bySlug('spicy-miso')
     const gc = bySlug('gyoza-chicken')
-    const smLargePrice = sm.price + (largeVariant?.price_modifier || 8)
+    const smLargePrice = sm.price + (largeVariant?.price || 8)
     const order1Subtotal = smLargePrice * 2 + gc.price
 
     // Order 2: preparing - 1x Tonkotsu + 1x Edamame + 1x Ramune

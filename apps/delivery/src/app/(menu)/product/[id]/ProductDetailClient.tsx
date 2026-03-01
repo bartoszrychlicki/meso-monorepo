@@ -17,8 +17,8 @@ import { toast } from 'sonner'
 interface Variant {
   id: string
   name: string
-  price_modifier: number
-  is_default: boolean
+  price: number
+  is_available: boolean
   sort_order: number
 }
 
@@ -26,7 +26,7 @@ interface Addon {
   id: string
   name: string
   price: number
-  is_active: boolean
+  is_available: boolean
 }
 
 interface Product {
@@ -97,7 +97,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
     product.spice_level || 2
   )
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
-    product.variants?.find((v) => v.is_default) || product.variants?.[0] || null
+    product.variants?.[0] || null
   )
   const [selectedAddons, setSelectedAddons] = useState<Addon[]>([])
   const [notes, setNotes] = useState('')
@@ -105,7 +105,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   const sortedVariants = [...(product.variants || [])].sort(
     (a, b) => a.sort_order - b.sort_order
   )
-  const activeAddons = (product.addons || []).filter((a) => a.is_active)
+  const activeAddons = (product.addons || []).filter((a) => a.is_available)
 
   const handleAddonToggle = (addon: Addon) => {
     setSelectedAddons((prev) =>
@@ -117,7 +117,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
 
   const calculateTotal = () => {
     const basePrice = product.price
-    const variantPrice = selectedVariant?.price_modifier || 0
+    const variantPrice = selectedVariant?.price || 0
     const addonsPrice = selectedAddons.reduce((sum, a) => sum + a.price, 0)
     return (basePrice + variantPrice + addonsPrice) * quantity
   }
@@ -138,7 +138,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
       spiceLevel: product.has_spice_level ? selectedSpice : undefined,
       variantId: selectedVariant?.id,
       variantName: selectedVariant?.name,
-      variantPrice: selectedVariant?.price_modifier,
+      variantPrice: selectedVariant?.price,
       addons: cartAddons,
       notes: notes.trim() || undefined,
     })
@@ -319,7 +319,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
         )}
 
         {/* Variant selector */}
-        {product.has_variants && sortedVariants.length > 0 && (
+        {sortedVariants.length > 0 && (
           <div>
             <h2 className="font-display text-lg font-bold text-foreground mb-3">
               Rozmiar
@@ -338,9 +338,9 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
                   )}
                 >
                   <p className="font-medium text-foreground">{variant.name}</p>
-                  {variant.price_modifier > 0 && (
+                  {variant.price > 0 && (
                     <p className="text-sm text-primary mt-1">
-                      +{formatPrice(variant.price_modifier)}
+                      +{formatPrice(variant.price)}
                     </p>
                   )}
                 </button>
@@ -350,7 +350,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
         )}
 
         {/* Addon selector */}
-        {product.has_addons && activeAddons.length > 0 && (
+        {activeAddons.length > 0 && (
           <div>
             <h2 className="font-display text-lg font-bold text-foreground mb-3">
               Dodatki

@@ -49,18 +49,18 @@ export interface Product {
 
 export interface ProductVariant {
   id: string
-  product_id: string
   name: string
-  price_modifier: number
-  is_default: boolean
+  price: number
+  is_available: boolean
   sort_order: number
+  variant_type?: string
 }
 
 export interface Addon {
   id: string
   name: string
   price: number
-  is_active: boolean
+  is_available: boolean
 }
 
 export interface ProductAddon {

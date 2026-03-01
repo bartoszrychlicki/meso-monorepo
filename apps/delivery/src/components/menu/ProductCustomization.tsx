@@ -16,8 +16,8 @@ import { ALLERGENS, type AllergenKey } from '@/types/menu'
 interface Variant {
     id: string
     name: string
-    price_modifier: number
-    is_default: boolean
+    price: number
+    is_available: boolean
     sort_order: number
 }
 
@@ -25,8 +25,7 @@ interface Addon {
     id: string
     name: string
     price: number
-    is_active: boolean
-    is_available?: boolean
+    is_available: boolean
 }
 
 export interface Product {
@@ -110,7 +109,6 @@ export function ProductCustomization({
                 // Initialize state
                 setSelectedSpice(fullProduct.spice_level || 1)
                 setSelectedVariant(
-                    fullProduct.variants?.find((v) => v.is_default) ||
                     fullProduct.variants?.[0] ||
                     null
                 )
@@ -126,7 +124,7 @@ export function ProductCustomization({
     const calculateTotal = () => {
         if (!product) return 0
         const basePrice = product.price
-        const variantPrice = selectedVariant?.price_modifier || 0
+        const variantPrice = selectedVariant?.price || 0
         const addonsPrice = selectedAddons.reduce((sum, addon) => sum + addon.price, 0)
         return (basePrice + variantPrice + addonsPrice) * quantity
     }
@@ -158,7 +156,7 @@ export function ProductCustomization({
             spiceLevel: product.has_spice_level ? selectedSpice : undefined,
             variantId: selectedVariant?.id,
             variantName: selectedVariant?.name,
-            variantPrice: selectedVariant?.price_modifier,
+            variantPrice: selectedVariant?.price,
             addons: cartAddons,
         })
 
@@ -294,9 +292,9 @@ export function ProductCustomization({
                                                     )}
                                                 >
                                                     <span className="font-medium text-white">{variant.name}</span>
-                                                    {variant.price_modifier > 0 && (
+                                                    {variant.price > 0 && (
                                                         <span className="text-sm text-primary">
-                                                            +{formatPrice(variant.price_modifier)}
+                                                            +{formatPrice(variant.price)}
                                                         </span>
                                                     )}
                                                 </button>

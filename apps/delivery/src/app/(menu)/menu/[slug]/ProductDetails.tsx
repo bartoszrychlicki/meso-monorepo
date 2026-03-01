@@ -16,8 +16,8 @@ import { PRODUCT_BLUR_PLACEHOLDER } from '@/lib/product-image'
 interface Variant {
   id: string
   name: string
-  price_modifier: number
-  is_default: boolean
+  price: number
+  is_available: boolean
   sort_order: number
 }
 
@@ -25,7 +25,7 @@ interface Addon {
   id: string
   name: string
   price: number
-  is_active: boolean
+  is_available: boolean
 }
 
 interface Product {
@@ -74,7 +74,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
     product.spice_level || 1
   )
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
-    product.variants?.find((v) => v.is_default) || product.variants?.[0] || null
+    product.variants?.[0] || null
   )
   const [selectedAddons, setSelectedAddons] = useState<Addon[]>([])
 
@@ -82,7 +82,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
 
   const calculateTotal = () => {
     const basePrice = product.price
-    const variantPrice = selectedVariant?.price_modifier || 0
+    const variantPrice = selectedVariant?.price || 0
     const addonsPrice = selectedAddons.reduce((sum, addon) => sum + addon.price, 0)
     return (basePrice + variantPrice + addonsPrice) * quantity
   }
@@ -113,7 +113,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       spiceLevel: (product.has_spice_level || product.is_spicy) ? selectedSpice : undefined,
       variantId: selectedVariant?.id,
       variantName: selectedVariant?.name,
-      variantPrice: selectedVariant?.price_modifier,
+      variantPrice: selectedVariant?.price,
       addons: cartAddons,
     })
 
@@ -281,9 +281,9 @@ export function ProductDetails({ product }: ProductDetailsProps) {
                     )}
                   >
                     <p className="font-medium">{variant.name}</p>
-                    {variant.price_modifier > 0 && (
+                    {variant.price > 0 && (
                       <p className="text-sm text-primary mt-1">
-                        +{formatPrice(variant.price_modifier)}
+                        +{formatPrice(variant.price)}
                       </p>
                     )}
                   </button>
