@@ -47,7 +47,21 @@ vi.mock('@/lib/p24', () => ({
 }))
 
 // ---------------------------------------------------------------------------
-// Mock: @supabase/supabase-js (direct admin client in status route)
+// Mock: @/lib/pos-api (POS API client — replaces direct Supabase writes)
+// ---------------------------------------------------------------------------
+
+const mockUpdateStatus = vi.fn()
+
+vi.mock('@/lib/pos-api', () => ({
+  getPosApi: vi.fn(() => ({
+    orders: {
+      updateStatus: mockUpdateStatus,
+    },
+  })),
+}))
+
+// ---------------------------------------------------------------------------
+// Mock: @supabase/supabase-js (still used for email data query — read-only)
 // ---------------------------------------------------------------------------
 
 const mockFrom = vi.fn()
@@ -152,47 +166,35 @@ describe('POST /api/payments/p24/status (webhook)', () => {
     expect(json.error).toBe('Invalid session ID format')
   })
 
-  // ---- 500: DB update fails ----
-  it('returns 500 when database update fails', async () => {
+  // ---- 500: POS API update fails ----
+  it('returns 500 when POS API update fails', async () => {
     mockVerifyTransaction.mockResolvedValue(true)
 
-    mockFrom.mockImplementation(() =>
-      chain({ data: null, error: { message: 'DB update error' } })
-    )
+    mockUpdateStatus.mockResolvedValue({
+      success: false,
+      error: { code: 'INTERNAL_ERROR', message: 'POS API error' },
+    })
 
     const res = await POST(makeRequest(makeP24Notification()))
     expect(res.status).toBe(500)
 
     const json = await res.json()
-    expect(json.error).toBe('Database update failed')
+    expect(json.error).toBe('Order update failed')
   })
 
   // ---- 200: Successful payment confirmation ----
   it('returns 200 with status OK on successful payment confirmation', async () => {
     mockVerifyTransaction.mockResolvedValue(true)
 
-    let callN = 0
-    mockFrom.mockImplementation(() => {
-      callN++
-      if (callN === 1) {
-        // First call: order update (confirmed, paid)
-        return chain({
-          data: {
-            id: ORDER_ID,
-            status: 'confirmed',
-            payment_status: 'paid',
-            total: 50.0,
-            subtotal: 42.01,
-            delivery_fee: 7.99,
-            delivery_type: 'delivery',
-            payment_method: 'blik',
-            delivery_address: { firstName: 'Jan', email: 'jan@test.pl' },
-          },
-          error: null,
-        })
-      }
-      // Second call: full order query for email
-      return chain({
+    // POS API update succeeds
+    mockUpdateStatus.mockResolvedValue({
+      success: true,
+      data: { id: ORDER_ID, status: 'confirmed', payment_status: 'paid' },
+    })
+
+    // Supabase query for email data (read-only)
+    mockFrom.mockImplementation(() =>
+      chain({
         data: {
           id: ORDER_ID,
           status: 'confirmed',
@@ -207,7 +209,7 @@ describe('POST /api/payments/p24/status (webhook)', () => {
         },
         error: null,
       })
-    })
+    )
 
     const res = await POST(makeRequest(makeP24Notification()))
     expect(res.status).toBe(200)
@@ -220,20 +222,15 @@ describe('POST /api/payments/p24/status (webhook)', () => {
   it('correctly extracts orderId from sessionId with UUID format', async () => {
     mockVerifyTransaction.mockResolvedValue(true)
 
-    // The sessionId is "abc-def-123-1234567890"
-    // After stripping `-\d+$` we should get "abc-def-123"
-    let callN = 0
-    const fromCalls: { table: string; callN: number }[] = []
-    mockFrom.mockImplementation((table: string) => {
-      callN++
-      fromCalls.push({ table, callN })
-      if (callN === 1) {
-        return chain({
-          data: { id: ORDER_ID, status: 'confirmed' },
-          error: null,
-        })
-      }
-      return chain({
+    // POS API update succeeds
+    mockUpdateStatus.mockResolvedValue({
+      success: true,
+      data: { id: ORDER_ID, status: 'confirmed' },
+    })
+
+    // Supabase query for email data
+    mockFrom.mockImplementation(() =>
+      chain({
         data: {
           id: ORDER_ID,
           delivery_address: {},
@@ -242,13 +239,16 @@ describe('POST /api/payments/p24/status (webhook)', () => {
         },
         error: null,
       })
-    })
+    )
 
     const sessionId = 'abc-def-123-1234567890'
     const res = await POST(makeRequest(makeP24Notification({ sessionId })))
     expect(res.status).toBe(200)
 
-    // Verify that from('orders_orders') was called — the order ID was correctly parsed
-    expect(fromCalls[0].table).toBe('orders_orders')
+    // Verify POS API was called with the correctly extracted order ID
+    expect(mockUpdateStatus).toHaveBeenCalledWith(
+      ORDER_ID,
+      expect.objectContaining({ status: 'confirmed' })
+    )
   })
 })
