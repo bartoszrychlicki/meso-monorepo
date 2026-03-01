@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { P24, P24Notification } from '@/lib/p24'
 import { sendOrderConfirmationEmail, type OrderEmailData } from '@/lib/email'
 import { getPosApi } from '@/lib/pos-api'
+import type { OrderStatus, PaymentStatus } from '@meso/core'
 
 interface DeliveryAddressJson {
     firstName?: string
@@ -57,8 +58,8 @@ export async function POST(request: Request) {
 
         // Update order status via POS API (instead of direct Supabase write)
         const updateResult = await getPosApi().orders.updateStatus(paramOrderId, {
-            status: 'confirmed' as any,
-            payment_status: 'paid' as any,
+            status: 'confirmed' as OrderStatus,
+            payment_status: 'paid' as PaymentStatus,
             note: `P24 payment verified. Transaction: ${orderId}`,
         })
 
