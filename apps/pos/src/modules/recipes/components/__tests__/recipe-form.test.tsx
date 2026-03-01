@@ -37,6 +37,13 @@ vi.mock('@/modules/inventory/repository', () => ({
   },
 }));
 
+// Mock recipes repository
+vi.mock('@/modules/recipes/repository', () => ({
+  recipesRepository: {
+    getRecipesByCategory: vi.fn().mockResolvedValue([]),
+  },
+}));
+
 // Mock sonner toast
 const mockToastError = vi.fn();
 const mockToastSuccess = vi.fn();
@@ -101,7 +108,8 @@ describe('RecipeForm', () => {
     const submittedData = mockSubmit.mock.calls[0][0];
     expect(submittedData.name).toBe('Test Recipe Name');
     expect(submittedData.ingredients.length).toBe(1);
-    expect(submittedData.ingredients[0].stock_item_id).toBe(STOCK_ID_1);
+    expect(submittedData.ingredients[0].type).toBe('stock_item');
+    expect(submittedData.ingredients[0].reference_id).toBe(STOCK_ID_1);
     expect(submittedData.ingredients[0].quantity).toBe(1);
   });
 
