@@ -58,34 +58,57 @@ export const recipesRepository = {
   /**
    * Calculate recipe cost from ingredients
    *
-   * Fetches current stock item costs and computes total cost.
+   * Handles both stock_item and recipe ingredient types.
+   * For stock_item: looks up cost from inventory.
+   * For recipe: looks up cost_per_unit from the referenced sub-recipe.
    *
    * @param recipe - Recipe to calculate cost for
    * @returns Cost breakdown with totals
    */
   async calculateRecipeCost(recipe: Recipe): Promise<RecipeCostBreakdown> {
+    // Fetch all stock items once into a Map for efficiency
+    const allStockItems = await inventoryRepository.getAllStockItems();
+    const stockItemMap = new Map(allStockItems.map((s) => [s.id, s]));
+
     const ingredientDetails = await Promise.all(
       recipe.ingredients.map(async (ing) => {
-        const stockItem = await inventoryRepository.getAllStockItems().then((items) =>
-          items.find((s) => s.id === ing.stock_item_id)
-        );
-
-        if (!stockItem) {
-          throw new Error(`Stock item not found: ${ing.stock_item_id}`);
+        if (ing.type === 'recipe') {
+          // Look up sub-recipe cost_per_unit
+          const subRecipe = await recipesRepo.findById(ing.reference_id);
+          if (!subRecipe) {
+            throw new Error(`Sub-recipe not found: ${ing.reference_id}`);
+          }
+          const costPerUnit = subRecipe.cost_per_unit;
+          const totalCost = ing.quantity * costPerUnit;
+          return {
+            type: 'recipe' as const,
+            reference_id: subRecipe.id,
+            reference_name: subRecipe.name,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            cost_per_unit: costPerUnit,
+            total_cost: totalCost,
+            percentage_of_total: 0,
+          };
+        } else {
+          // stock_item type
+          const stockItem = stockItemMap.get(ing.reference_id);
+          if (!stockItem) {
+            throw new Error(`Stock item not found: ${ing.reference_id}`);
+          }
+          const costPerUnit = stockItem.cost_per_unit;
+          const totalCost = ing.quantity * costPerUnit;
+          return {
+            type: 'stock_item' as const,
+            reference_id: stockItem.id,
+            reference_name: stockItem.name,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            cost_per_unit: costPerUnit,
+            total_cost: totalCost,
+            percentage_of_total: 0,
+          };
         }
-
-        const costPerUnit = stockItem.cost_per_unit;
-        const totalCost = ing.quantity * costPerUnit;
-
-        return {
-          stock_item_id: stockItem.id,
-          stock_item_name: stockItem.name,
-          quantity: ing.quantity,
-          unit: ing.unit,
-          cost_per_unit: costPerUnit,
-          total_cost: totalCost,
-          percentage_of_total: 0, // Calculated below
-        };
       })
     );
 
@@ -96,7 +119,7 @@ export const recipesRepository = {
 
     // Calculate percentages
     ingredientDetails.forEach((ing) => {
-      ing.percentage_of_total = (ing.total_cost / totalCost) * 100;
+      ing.percentage_of_total = totalCost > 0 ? (ing.total_cost / totalCost) * 100 : 0;
     });
 
     const costPerUnit = totalCost / recipe.yield_quantity;
@@ -134,23 +157,21 @@ export const recipesRepository = {
     const allergenSet = new Set<Allergen>();
 
     for (const ingredient of recipe.ingredients) {
-      // Get stock item
-      const stockItem = await inventoryRepository
-        .getAllStockItems()
-        .then((items) => items.find((s) => s.id === ingredient.stock_item_id));
-
-      if (!stockItem) continue;
-
-      // Add direct allergens from stock item
-      stockItem.allergens.forEach((a) => allergenSet.add(a));
-
-      // If this ingredient is a semi-finished product, get its recipe
-      if (stockItem.product_category === ProductCategory.SEMI_FINISHED) {
-        const subRecipe = await this.getRecipeByProductId(stockItem.id);
+      if (ingredient.type === 'recipe') {
+        // Read sub-recipe's stored allergens
+        const subRecipe = await recipesRepo.findById(ingredient.reference_id);
         if (subRecipe) {
-          const subAllergens = await this.getAllergensInRecipe(subRecipe);
-          subAllergens.forEach((a) => allergenSet.add(a));
+          subRecipe.allergens.forEach((a) => allergenSet.add(a));
         }
+      } else {
+        // stock_item type — get allergens from stock item
+        const stockItem = await inventoryRepository
+          .getAllStockItems()
+          .then((items) => items.find((s) => s.id === ingredient.reference_id));
+
+        if (!stockItem) continue;
+
+        stockItem.allergens.forEach((a) => allergenSet.add(a));
       }
     }
 
@@ -169,17 +190,32 @@ export const recipesRepository = {
     const sources: AllergenSource[] = [];
 
     for (const ingredient of recipe.ingredients) {
-      const stockItem = await inventoryRepository
-        .getAllStockItems()
-        .then((items) => items.find((s) => s.id === ingredient.stock_item_id));
+      if (ingredient.type === 'recipe') {
+        // Read sub-recipe's stored allergens
+        const subRecipe = await recipesRepo.findById(ingredient.reference_id);
+        if (!subRecipe || subRecipe.allergens.length === 0) continue;
 
-      if (!stockItem || stockItem.allergens.length === 0) continue;
+        sources.push({
+          type: 'recipe',
+          reference_id: subRecipe.id,
+          reference_name: subRecipe.name,
+          allergens: subRecipe.allergens,
+        });
+      } else {
+        // stock_item type
+        const stockItem = await inventoryRepository
+          .getAllStockItems()
+          .then((items) => items.find((s) => s.id === ingredient.reference_id));
 
-      sources.push({
-        stock_item_id: stockItem.id,
-        stock_item_name: stockItem.name,
-        allergens: stockItem.allergens,
-      });
+        if (!stockItem || stockItem.allergens.length === 0) continue;
+
+        sources.push({
+          type: 'stock_item',
+          reference_id: stockItem.id,
+          reference_name: stockItem.name,
+          allergens: stockItem.allergens,
+        });
+      }
     }
 
     return sources;
@@ -235,9 +271,26 @@ export const recipesRepository = {
   },
 
   /**
+   * Find all active recipes that use a given recipe as a sub-recipe ingredient
+   *
+   * @param recipeId - The sub-recipe ID to search for
+   * @returns List of parent recipes that reference this recipe
+   */
+  async findRecipesUsingSubRecipe(recipeId: string): Promise<Recipe[]> {
+    return recipesRepo.findMany(
+      (r) =>
+        r.is_active &&
+        r.ingredients.some(
+          (ing) => ing.type === 'recipe' && ing.reference_id === recipeId
+        )
+    );
+  },
+
+  /**
    * Update recipe with versioning
    *
-   * Creates new version and recalculates costs.
+   * Creates new version, recalculates costs, and propagates
+   * cost changes to parent recipes that use this as a sub-recipe.
    *
    * @param recipeId - Recipe ID
    * @param data - Updated recipe data
@@ -278,6 +331,20 @@ export const recipesRepository = {
         food_cost_percentage: costBreakdown.food_cost_percentage,
         updated_at: new Date().toISOString(),
       });
+
+      // Propagate cost changes to parent recipes that use this as a sub-recipe
+      const parentRecipes = await this.findRecipesUsingSubRecipe(recipeId);
+      for (const parent of parentRecipes) {
+        const parentAllergens = await this.getAllergensInRecipe(parent);
+        const parentCostBreakdown = await this.calculateRecipeCost(parent);
+        await recipesRepo.update(parent.id, {
+          allergens: parentAllergens,
+          total_cost: parentCostBreakdown.total_cost,
+          cost_per_unit: parentCostBreakdown.cost_per_unit,
+          food_cost_percentage: parentCostBreakdown.food_cost_percentage,
+          updated_at: new Date().toISOString(),
+        });
+      }
     }
 
     // Create version history
