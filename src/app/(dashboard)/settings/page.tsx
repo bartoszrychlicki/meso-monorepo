@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { PageHeader } from '@/components/layout/page-header';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,8 +29,12 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ApiKeysManager } from '@/modules/settings/components/api-keys-manager';
+import { LocationList } from '@/modules/settings/components/location-list';
+import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 
-export default function SettingsPage() {
+function SettingsContent() {
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get('tab') || 'general';
   const { theme: currentTheme, setTheme } = useTheme();
   const [settings, setSettings] = useState({
     // General
@@ -86,7 +91,7 @@ export default function SettingsPage() {
         }
       />
 
-      <Tabs defaultValue="general" className="space-y-4">
+      <Tabs defaultValue={defaultTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6 lg:w-auto">
           <TabsTrigger value="general" className="gap-2">
             <Building2 className="h-4 w-4" />
@@ -265,21 +270,7 @@ export default function SettingsPage() {
 
         {/* Locations */}
         <TabsContent value="locations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Lokalizacje</CardTitle>
-              <CardDescription>
-                Zarządzaj punktami sprzedaży i magazynami
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                <MapPin className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="font-medium mb-1">Zarządzanie lokalizacjami</p>
-                <p>Funkcja dostępna wkrótce - będzie można dodawać i edytować punkty sprzedaży</p>
-              </div>
-            </CardContent>
-          </Card>
+          <LocationList />
         </TabsContent>
 
         {/* Receipt Settings */}
@@ -398,5 +389,13 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<LoadingSkeleton variant="page" />}>
+      <SettingsContent />
+    </Suspense>
   );
 }
