@@ -144,10 +144,8 @@ export const useRecipesStore = create<RecipesStore>((set, get) => ({
         notes
       );
 
-      // Clear cost cache for this recipe
-      const costBreakdowns = get().costBreakdowns;
-      costBreakdowns.delete(id);
-      set({ costBreakdowns });
+      // Clear all cost/allergen caches so parent recipe caches are invalidated
+      set({ costBreakdowns: new Map(), allergenSources: new Map() });
 
       await get().loadRecipes();
     } catch (error) {
