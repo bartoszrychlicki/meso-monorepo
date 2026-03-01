@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  transpilePackages: ["@meso/core", "@meso/api-client", "@meso/supabase"],
 };
 
 export default nextConfig;
