@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js' // Direct client for Service Role
+import { createClient } from '@supabase/supabase-js'
 import { P24, P24Notification } from '@/lib/p24'
 import { sendOrderConfirmationEmail, type OrderEmailData } from '@/lib/email'
+import { getPosApi } from '@/lib/pos-api'
 
 interface DeliveryAddressJson {
     firstName?: string
@@ -54,7 +55,21 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 })
         }
 
-        // Initialize Admin Client to bypass RLS for status updates
+        // Update order status via POS API (instead of direct Supabase write)
+        const updateResult = await getPosApi().orders.updateStatus(paramOrderId, {
+            status: 'confirmed' as any,
+            payment_status: 'paid' as any,
+            note: `P24 payment verified. Transaction: ${orderId}`,
+        })
+
+        if (!updateResult.success) {
+            console.error('[P24 Status] Failed to update order via POS API:', updateResult.error)
+            return NextResponse.json({ error: 'Order update failed' }, { status: 500 })
+        }
+
+        console.log('[P24 Status] Order updated successfully via POS API')
+
+        // Query full order data for confirmation email (direct Supabase read — allowed)
         const supabaseAdmin = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -66,30 +81,6 @@ export async function POST(request: Request) {
             }
         )
 
-
-        // Update order status with Admin/Service Role client
-        const { error: updateError, data: updatedOrder } = await supabaseAdmin
-            .from('orders_orders')
-            .update({
-                status: 'confirmed',
-                payment_status: 'paid',
-                paid_at: new Date().toISOString(),
-                confirmed_at: new Date().toISOString(),
-                // Optionally store P24 transaction ID
-                // p24_transaction_id: orderId
-            })
-            .eq('id', paramOrderId)
-            .select() // Select to verify update
-            .single()
-
-        if (updateError) {
-            console.error('[P24 Status] Failed to update order status:', updateError)
-            return NextResponse.json({ error: 'Database update failed' }, { status: 500 })
-        }
-
-        console.log('[P24 Status] Order updated successfully:', updatedOrder)
-
-        // Query full order data for confirmation email
         const { data: fullOrder } = await supabaseAdmin
             .from('orders_orders')
             .select(`
