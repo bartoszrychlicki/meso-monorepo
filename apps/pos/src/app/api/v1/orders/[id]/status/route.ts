@@ -9,6 +9,7 @@ import {
 import { ordersRepository } from '@/modules/orders/repository';
 import { UpdateOrderStatusSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus } from '@/types/enums';
+import type { Order } from '@/types/order';
 import { dispatchWebhook } from '@/lib/webhooks/dispatcher';
 import { OrderStatusChangedData } from '@/lib/webhooks/types';
 
@@ -57,7 +58,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const { status: newStatus, note } = validation.data;
+  const { status: newStatus, note, payment_status } = validation.data;
 
   // Validate status transition
   const allowedTransitions = VALID_TRANSITIONS[order.status];
@@ -70,6 +71,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   const updated = await ordersRepository.updateStatus(id, newStatus, note);
+
+  // Update payment status if provided (e.g., P24 payment confirmed)
+  if (payment_status) {
+    const paymentUpdate: Record<string, unknown> = {
+      payment_status,
+    };
+    if (payment_status === 'paid') {
+      paymentUpdate.paid_at = new Date().toISOString();
+    }
+    await ordersRepository.update(id, paymentUpdate as Partial<Order>);
+    Object.assign(updated, paymentUpdate);
+  }
 
   // Dispatch webhook for delivery app orders
   if (updated.channel === OrderChannel.DELIVERY_APP) {

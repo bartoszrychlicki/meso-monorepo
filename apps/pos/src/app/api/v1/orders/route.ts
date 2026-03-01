@@ -182,7 +182,9 @@ export async function POST(request: NextRequest) {
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
   const tax = Math.round(subtotal * 0.08 * 100) / 100; // 8% VAT
   const discount = input.discount ?? 0;
-  const total = Math.round((subtotal + tax - discount) * 100) / 100;
+  const deliveryFee = input.delivery_fee ?? 0;
+  const tip = input.tip ?? 0;
+  const total = Math.round((subtotal + tax - discount + deliveryFee + tip) * 100) / 100;
 
   // Delivery app orders with pre-paid status start as CONFIRMED
   const isDeliveryPrePaid =
@@ -213,6 +215,8 @@ export async function POST(request: NextRequest) {
     subtotal,
     tax,
     discount,
+    delivery_fee: deliveryFee || undefined,
+    tip: tip || undefined,
     total,
     payment_method: input.payment_method,
     payment_status: initialPaymentStatus,
@@ -227,6 +231,10 @@ export async function POST(request: NextRequest) {
     external_order_id: input.external_order_id,
     external_channel: input.external_channel,
     metadata: input.metadata,
+    promo_code: input.promo_code,
+    delivery_type: input.delivery_type,
+    scheduled_time: input.scheduled_time,
+    paid_at: isDeliveryPrePaid ? now : undefined,
   });
 
   return apiCreated(order);
