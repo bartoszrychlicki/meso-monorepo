@@ -7,11 +7,11 @@ import { motion } from 'framer-motion'
 import { CheckCircle2, ChefHat, Package, MapPin, Navigation, Loader2, XCircle, CreditCard, AlertTriangle, Banknote, Star } from 'lucide-react'
 import { useOrderConfirmationStore } from '@/stores/orderConfirmationStore'
 import { formatPriceExact } from '@/lib/formatters'
-import { getProductImageUrl } from '@/lib/product-image'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import type { OrderConfirmation } from '@/stores/orderConfirmationStore'
 import { PAYMENT_TIMEOUT_MS, getPickupStepIndex, isPaymentPending } from '@/lib/order-confirmation-utils'
+import { mapConfirmationItems } from '@/lib/order-confirmation-mapper'
 
 // Step definitions for pickup orders
 const pickupSteps = [
@@ -35,21 +35,7 @@ function buildConfirmation(order: Record<string, any>, waitMinutes = 20): OrderC
     return {
         orderId: order.id.toString(),
         orderNumber: order.order_number || order.id.toString().slice(-8).toUpperCase(),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        items: order.items.map((item: any) => ({
-            id: item.id,
-            productId: item.product_id,
-            name: item.product?.name || item.custom_name || 'Produkt',
-            price: item.unit_price,
-            variantPrice: 0,
-            image: getProductImageUrl(item.product),
-            quantity: item.quantity,
-            spiceLevel: item.spice_level,
-            variantId: item.variant_id,
-            variantName: item.variant_name,
-            addons: item.addons || [],
-            notes: item.notes
-        })),
+        items: mapConfirmationItems(order),
         deliveryType: order.delivery_type,
         deliveryAddress: order.delivery_type === 'delivery' ? {
             street: deliveryAddress?.street,
@@ -107,7 +93,7 @@ function OrderConfirmationContent() {
                         .select(`
                             *,
                             location:users_locations(name, address, phone),
-                            items:orders_order_items(
+                            order_items:orders_order_items(
                                 *,
                                 product:menu_products(*)
                             )
