@@ -1,0 +1,160 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { OrderStatus } from '@/types/enums';
+import type { KitchenTicket } from '@/types/kitchen';
+import type { Order } from '@/types/order';
+
+interface RouteParams {
+  params: Promise<{ id: string }>;
+}
+
+type TransitionAction =
+  | 'start_preparing'
+  | 'mark_ready'
+  | 'mark_served'
+  | 'toggle_item'
+  | 'set_priority';
+
+interface TransitionBody {
+  action: TransitionAction;
+  itemId?: string;
+  isDone?: boolean;
+  priority?: number;
+}
+
+interface StatusUpdate {
+  status: OrderStatus;
+  note: string;
+}
+
+function getStatusUpdate(action: TransitionAction): StatusUpdate | null {
+  switch (action) {
+    case 'start_preparing':
+      return { status: OrderStatus.PREPARING, note: 'Rozpoczęto przygotowanie (KDS)' };
+    case 'mark_ready':
+      return { status: OrderStatus.READY, note: 'Zamówienie gotowe do wydania (KDS)' };
+    case 'mark_served':
+      return { status: OrderStatus.DELIVERED, note: 'Zamówienie wydane (KDS)' };
+    default:
+      return null;
+  }
+}
+
+function getTicketStatusPatch(action: TransitionAction, now: string): Partial<KitchenTicket> {
+  switch (action) {
+    case 'start_preparing':
+      return {
+        status: OrderStatus.PREPARING,
+        started_at: now,
+      };
+    case 'mark_ready':
+      return {
+        status: OrderStatus.READY,
+        completed_at: now,
+      };
+    case 'mark_served':
+      return {
+        status: OrderStatus.DELIVERED,
+      };
+    default:
+      return {};
+  }
+}
+
+function getOrderTimestampPatch(status: OrderStatus, now: string): Partial<Order> {
+  switch (status) {
+    case OrderStatus.PREPARING:
+      return { preparing_at: now };
+    case OrderStatus.READY:
+      return { ready_at: now };
+    case OrderStatus.DELIVERED:
+      return { delivered_at: now };
+    default:
+      return {};
+  }
+}
+
+export async function POST(request: NextRequest, { params }: RouteParams) {
+  try {
+    const body = (await request.json()) as TransitionBody;
+    if (!body?.action) {
+      return NextResponse.json({ error: 'Missing action' }, { status: 400 });
+    }
+
+    const { id } = await params;
+    const now = new Date().toISOString();
+
+    const kitchenRepo = createServerRepository<KitchenTicket>('kitchen_tickets');
+    const ordersRepo = createServerRepository<Order>('orders');
+
+    const currentTicket = await kitchenRepo.findById(id);
+    if (!currentTicket) {
+      return NextResponse.json({ error: 'Kitchen ticket not found' }, { status: 404 });
+    }
+
+    let updatedTicket: KitchenTicket;
+
+    if (body.action === 'toggle_item') {
+      if (!body.itemId || typeof body.isDone !== 'boolean') {
+        return NextResponse.json({ error: 'Missing itemId or isDone for toggle_item' }, { status: 400 });
+      }
+
+      const itemExists = currentTicket.items.some((item) => item.id === body.itemId);
+      if (!itemExists) {
+        return NextResponse.json({ error: 'Kitchen ticket item not found' }, { status: 404 });
+      }
+
+      const updatedItems = currentTicket.items.map((item) =>
+        item.id === body.itemId ? { ...item, is_done: body.isDone } : item
+      );
+
+      updatedTicket = await kitchenRepo.update(id, { items: updatedItems } as Partial<KitchenTicket>);
+      return NextResponse.json({ ticket: updatedTicket });
+    }
+
+    if (body.action === 'set_priority') {
+      if (typeof body.priority !== 'number' || Number.isNaN(body.priority)) {
+        return NextResponse.json({ error: 'Missing priority for set_priority' }, { status: 400 });
+      }
+
+      updatedTicket = await kitchenRepo.update(id, { priority: body.priority } as Partial<KitchenTicket>);
+      return NextResponse.json({ ticket: updatedTicket });
+    }
+
+    const ticketStatusPatch = getTicketStatusPatch(body.action, now);
+    updatedTicket = await kitchenRepo.update(id, ticketStatusPatch);
+
+    const statusUpdate = getStatusUpdate(body.action);
+    if (!statusUpdate) {
+      return NextResponse.json({ ticket: updatedTicket });
+    }
+
+    const order = await ordersRepo.findById(currentTicket.order_id);
+    if (!order) {
+      return NextResponse.json({ ticket: updatedTicket });
+    }
+
+    const statusHistory = Array.isArray(order.status_history) ? order.status_history : [];
+    const statusEntry = {
+      status: statusUpdate.status,
+      timestamp: now,
+      note: statusUpdate.note,
+    };
+
+    await ordersRepo.update(order.id, {
+      status: statusUpdate.status,
+      status_history: [...statusHistory, statusEntry],
+      ...getOrderTimestampPatch(statusUpdate.status, now),
+    } as Partial<Order>);
+
+    return NextResponse.json({ ticket: updatedTicket });
+  } catch (error) {
+    console.error('[KDS transition] Failed:', error);
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : 'Internal server error',
+      },
+      { status: 500 }
+    );
+  }
+}

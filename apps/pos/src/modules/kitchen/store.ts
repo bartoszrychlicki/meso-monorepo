@@ -4,6 +4,7 @@ import { create } from 'zustand';
 import { KitchenTicket } from '@/types/kitchen';
 import { OrderStatus } from '@/types/enums';
 import { kitchenRepository } from './repository';
+import { toast } from 'sonner';
 
 interface KitchenStore {
   tickets: KitchenTicket[];
@@ -44,10 +45,15 @@ export const useKitchenStore = create<KitchenStore>((set, get) => ({
   },
 
   startPreparing: async (ticketId: string) => {
-    const updated = await kitchenRepository.startPreparing(ticketId);
-    set({
-      tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
-    });
+    try {
+      const updated = await kitchenRepository.startPreparing(ticketId);
+      set({
+        tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
+      });
+    } catch (error) {
+      console.error('Failed to start preparing ticket:', error);
+      toast.error('Nie udało się rozpocząć przygotowania zamówienia.');
+    }
   },
 
   markItemDone: async (ticketId: string, itemId: string) => {
@@ -57,49 +63,73 @@ export const useKitchenStore = create<KitchenStore>((set, get) => ({
     const item = ticket.items.find((i) => i.id === itemId);
     if (!item) return;
 
-    const updated = await kitchenRepository.updateItem(ticketId, itemId, !item.is_done);
-    set({
-      tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
-    });
+    try {
+      const updated = await kitchenRepository.updateItem(ticketId, itemId, !item.is_done);
+      set({
+        tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
+      });
+    } catch (error) {
+      console.error('Failed to toggle kitchen item state:', error);
+      toast.error('Nie udało się zaktualizować pozycji.');
+    }
   },
 
   markReady: async (ticketId: string) => {
-    const updated = await kitchenRepository.markReady(ticketId);
-    set({
-      tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
-    });
+    try {
+      const updated = await kitchenRepository.markReady(ticketId);
+      set({
+        tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
+      });
+    } catch (error) {
+      console.error('Failed to mark ticket as ready:', error);
+      toast.error('Nie udało się oznaczyć zamówienia jako gotowe.');
+    }
   },
 
   markServed: async (ticketId: string) => {
-    set({
-      tickets: get().tickets.filter((t) => t.id !== ticketId),
-    });
-    await kitchenRepository.markServed(ticketId);
+    try {
+      await kitchenRepository.markServed(ticketId);
+      set({
+        tickets: get().tickets.filter((t) => t.id !== ticketId),
+      });
+    } catch (error) {
+      console.error('Failed to mark ticket as served:', error);
+      toast.error('Nie udało się oznaczyć zamówienia jako wydane.');
+    }
   },
 
   bumpOrder: async (ticketId: string) => {
     const ticket = get().tickets.find((t) => t.id === ticketId);
     if (!ticket) return;
 
-    if (ticket.status === OrderStatus.READY) {
-      // Bumping from ready = served, remove from board
-      set({
-        tickets: get().tickets.filter((t) => t.id !== ticketId),
-      });
-      await kitchenRepository.bumpOrder(ticketId);
-    } else {
-      const updated = await kitchenRepository.bumpOrder(ticketId);
-      set({
-        tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
-      });
+    try {
+      if (ticket.status === OrderStatus.READY) {
+        await kitchenRepository.bumpOrder(ticketId);
+        set({
+          tickets: get().tickets.filter((t) => t.id !== ticketId),
+        });
+      } else {
+        const updated = await kitchenRepository.bumpOrder(ticketId);
+        set({
+          tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to bump ticket status:', error);
+      toast.error('Nie udało się przesunąć zamówienia dalej.');
     }
   },
 
   setPriority: async (ticketId: string, priority: number) => {
-    const updated = await kitchenRepository.setPriority(ticketId, priority);
-    set({
-      tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
-    });
+    try {
+      const updated = await kitchenRepository.setPriority(ticketId, priority);
+      set({
+        tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
+      });
+    } catch (error) {
+      console.error('Failed to update ticket priority:', error);
+      toast.error('Nie udało się zmienić priorytetu.');
+    }
   },
 }));
 

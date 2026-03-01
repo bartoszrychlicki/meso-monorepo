@@ -3,12 +3,51 @@ import { OrderStatus } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
 
 const baseRepo = createRepository<KitchenTicket>('kitchen_tickets');
+const isSupabaseBackend = process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+
+type TransitionAction =
+  | 'start_preparing'
+  | 'mark_ready'
+  | 'mark_served'
+  | 'toggle_item'
+  | 'set_priority';
+
+interface TransitionPayload {
+  itemId?: string;
+  isDone?: boolean;
+  priority?: number;
+}
+
+async function callTransition(
+  id: string,
+  action: TransitionAction,
+  payload: TransitionPayload = {}
+): Promise<KitchenTicket> {
+  const response = await fetch(`/api/kitchen/tickets/${id}/transition`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ action, ...payload }),
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(json.error || `KDS transition failed (${response.status})`);
+  }
+
+  return json.ticket as KitchenTicket;
+}
 
 async function getByStatus(status: OrderStatus): Promise<KitchenTicket[]> {
   return baseRepo.findMany((ticket) => ticket.status === status);
 }
 
 async function startPreparing(id: string): Promise<KitchenTicket> {
+  if (isSupabaseBackend) {
+    return callTransition(id, 'start_preparing');
+  }
+
   const ticket = await baseRepo.findById(id);
   if (!ticket) throw new Error(`Kitchen ticket with id ${id} not found`);
 
@@ -19,6 +58,10 @@ async function startPreparing(id: string): Promise<KitchenTicket> {
 }
 
 async function markReady(id: string): Promise<KitchenTicket> {
+  if (isSupabaseBackend) {
+    return callTransition(id, 'mark_ready');
+  }
+
   const ticket = await baseRepo.findById(id);
   if (!ticket) throw new Error(`Kitchen ticket with id ${id} not found`);
 
@@ -29,6 +72,10 @@ async function markReady(id: string): Promise<KitchenTicket> {
 }
 
 async function markServed(id: string): Promise<KitchenTicket> {
+  if (isSupabaseBackend) {
+    return callTransition(id, 'mark_served');
+  }
+
   const ticket = await baseRepo.findById(id);
   if (!ticket) throw new Error(`Kitchen ticket with id ${id} not found`);
 
@@ -40,6 +87,18 @@ async function markServed(id: string): Promise<KitchenTicket> {
 async function bumpOrder(id: string): Promise<KitchenTicket> {
   const ticket = await baseRepo.findById(id);
   if (!ticket) throw new Error(`Kitchen ticket with id ${id} not found`);
+
+  if (isSupabaseBackend) {
+    const actionByStatus: Record<string, TransitionAction> = {
+      [OrderStatus.PENDING]: 'start_preparing',
+      [OrderStatus.PREPARING]: 'mark_ready',
+      [OrderStatus.READY]: 'mark_served',
+    };
+
+    const action = actionByStatus[ticket.status];
+    if (!action) throw new Error(`Cannot bump ticket in status ${ticket.status}`);
+    return callTransition(id, action);
+  }
 
   const statusFlow: Record<string, OrderStatus> = {
     [OrderStatus.PENDING]: OrderStatus.PREPARING,
@@ -87,6 +146,10 @@ async function updateItem(
   itemId: string,
   isDone: boolean
 ): Promise<KitchenTicket> {
+  if (isSupabaseBackend) {
+    return callTransition(ticketId, 'toggle_item', { itemId, isDone });
+  }
+
   const ticket = await baseRepo.findById(ticketId);
   if (!ticket) throw new Error(`Kitchen ticket with id ${ticketId} not found`);
 
@@ -98,6 +161,10 @@ async function updateItem(
 }
 
 async function setPriority(id: string, priority: number): Promise<KitchenTicket> {
+  if (isSupabaseBackend) {
+    return callTransition(id, 'set_priority', { priority });
+  }
+
   return baseRepo.update(id, { priority } as Partial<KitchenTicket>);
 }
 
