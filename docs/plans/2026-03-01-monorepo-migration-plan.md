@@ -12,7 +12,29 @@
 
 ---
 
-## Task 1: Initialize Monorepo Skeleton
+## Progress Tracker
+
+| Task | Status | Notes |
+|------|--------|-------|
+| 1. Initialize Monorepo Skeleton | ✅ DONE | Merged with Task 2 into single execution |
+| 2. Merge Git Histories | ✅ DONE | GitHub repo not yet created (local only). Delivery files landed at root (not meso-app/), adjusted move accordingly |
+| 3. @meso/core — Enums | ⬜ TODO | |
+| 4. @meso/core — Types | ⬜ TODO | |
+| 5. @meso/core — Zod Schemas | ⬜ TODO | |
+| 6. @meso/supabase | ⬜ TODO | |
+| 7. @meso/api-client | ⬜ TODO | |
+| 8. Wire POS to @meso/core | ⬜ TODO | |
+| 9. Extend POS API | ⬜ TODO | |
+| 10. Wire Delivery to API client | ⬜ TODO | |
+| 11. Move Operator Panel | ⬜ TODO | |
+| 12. RLS Lockdown | ⬜ TODO | |
+| 13. Cleanup | ⬜ TODO | |
+| 14. Relink Vercel | ⬜ TODO | |
+| 15. E2E Verification | ⬜ TODO | |
+
+---
+
+## Task 1: Initialize Monorepo Skeleton ✅ DONE
 
 **Files:**
 - Create: `package.json` (workspace root)
@@ -112,13 +134,17 @@ git add package.json pnpm-workspace.yaml turbo.json tsconfig.base.json pnpm-lock
 git commit -m "chore: initialize monorepo with Turborepo and pnpm workspaces"
 ```
 
+> **Implementation note:** Task 1 and Task 2 were executed together. Root `package.json` also includes `dev:pos` and `dev:delivery` filter scripts not in the original plan. Turbo version installed: 2.8.12.
+
 ---
 
-## Task 2: Merge Git Histories into Monorepo
+## Task 2: Merge Git Histories into Monorepo ✅ DONE
 
 **Step 1: Create GitHub repo**
 
 Run: `gh repo create bartoszrychlicki/meso --private --confirm`
+
+> **Implementation note:** GitHub repo not yet created — working locally in `/Users/bartoszrychlicki/Development/Clients/Meso/meso-monorepo/`. Will push to GitHub before Vercel relinking (Task 14).
 
 **Step 2: Initialize repo and merge POS history**
 
@@ -151,7 +177,7 @@ git merge delivery-origin/main --allow-unrelated-histories -m "merge: meso-deliv
 
 **Step 5: Move delivery files into `apps/delivery/`**
 
-After merge, delivery files land in `meso-app/`. Move them:
+After merge, delivery files land at root (NOT in `meso-app/` as planned). Move them:
 
 ```bash
 mkdir -p apps/delivery
@@ -159,6 +185,8 @@ git mv meso-app/* apps/delivery/
 # Also move delivery docs/screens if present at root
 git commit -m "refactor: move meso-delivery into apps/delivery/"
 ```
+
+> **Implementation note:** Delivery repo structure had files directly at root (not inside `meso-app/`). Used `git ls-files | grep -v '^apps/'` to identify and move all non-POS files. Delivery's `supabase/` dir also moved to `apps/delivery/supabase/` (kept as reference; root `supabase/` is POS source of truth).
 
 **Step 6: Move supabase migrations to root**
 
