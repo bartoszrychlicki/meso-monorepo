@@ -1,19 +1,8 @@
-import { LocationType } from './enums';
+export type { BaseEntity, Address, PaginatedResult } from '@meso/core';
 
-export interface BaseEntity {
-  id: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Address {
-  street: string;
-  city: string;
-  postal_code: string;
-  country: string;
-  lat?: number;
-  lng?: number;
-}
+// POS-specific types (not in @meso/core)
+import type { LocationType } from '@meso/core';
+import type { BaseEntity, Address } from '@meso/core';
 
 export interface Location extends BaseEntity {
   name: string;
@@ -84,14 +73,6 @@ export interface LocationWithConfigs extends Location {
   delivery_config: DeliveryConfig | null;
   receipt_config: ReceiptConfig | null;
   kds_config: KdsConfig | null;
-}
-
-export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
-  page: number;
-  per_page: number;
-  total_pages: number;
 }
 
 export interface ApiResponse<T> {
