@@ -110,7 +110,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
       price: product.price,
       quantity,
       image: product.image_url,
-      spiceLevel: product.has_spice_level ? selectedSpice : undefined,
+      spiceLevel: (product.has_spice_level || product.is_spicy) ? selectedSpice : undefined,
       variantId: selectedVariant?.id,
       variantName: selectedVariant?.name,
       variantPrice: selectedVariant?.price_modifier,
@@ -230,7 +230,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
         {/* Customization Section */}
         <div className="py-2 space-y-6">
           {/* Spiciness Level */}
-          {product.has_spice_level && (
+          {(product.has_spice_level || product.is_spicy) && (
             <div>
               <h2 className="text-xl font-bold text-white mb-3">Poziom Ostrości</h2>
               <div className="grid grid-cols-3 gap-3">
@@ -265,7 +265,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           )}
 
           {/* Size Variants */}
-          {product.has_variants && sortedVariants.length > 0 && (
+          {sortedVariants.length > 0 && (
             <div>
               <h2 className="text-xl font-bold text-white mb-3">Rozmiar</h2>
               <div className="grid grid-cols-2 gap-3">
@@ -293,7 +293,7 @@ export function ProductDetails({ product }: ProductDetailsProps) {
           )}
 
           {/* Add-ons */}
-          {product.has_addons && product.addons && product.addons.length > 0 && (
+          {product.addons && product.addons.length > 0 && (
             <div>
               <h2 className="text-xl font-bold text-white mb-3">Dodatki</h2>
               <div className="space-y-3">
