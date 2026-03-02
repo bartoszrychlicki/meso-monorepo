@@ -506,7 +506,10 @@ export function ProductForm({
                 <div>
                   <h3 className="font-medium">Warianty cenowe</h3>
                   <p className="text-sm text-muted-foreground">
-                    Dodaj warianty z modyfikacją ceny (np. Mały: -5 PLN, Średni: +0 PLN, Duży: +10 PLN)
+                    Podaj korektę ceny względem ceny bazowej produktu (to nie jest cena końcowa wariantu).
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Cena końcowa wariantu = cena bazowa ({formatCurrency(price)}) + korekta (+/- PLN).
                   </p>
                 </div>
                 <Button
@@ -538,23 +541,28 @@ export function ProductForm({
                         className="flex-1"
                         data-field="variant-name"
                       />
-                      <div className="flex items-center gap-1">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">
-                          +/- PLN:
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={variant.price}
-                          onChange={(e) =>
-                            updateVariant(variant.id, {
-                              price: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          placeholder="0"
-                          className="w-28"
-                          data-field="variant-price"
-                        />
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="flex items-center gap-1">
+                          <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                            Korekta (+/- PLN):
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={variant.price}
+                            onChange={(e) =>
+                              updateVariant(variant.id, {
+                                price: parseFloat(e.target.value) || 0,
+                              })
+                            }
+                            placeholder="0.00"
+                            className="w-28"
+                            data-field="variant-price"
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Cena końcowa: {formatCurrency(price + (variant.price || 0))}
+                        </p>
                       </div>
                       <Button
                         variant="ghost"
