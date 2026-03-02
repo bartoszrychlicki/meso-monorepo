@@ -41,6 +41,34 @@ interface LocationSettingsStore {
   saveKdsDefaults: (data: KdsDefaults) => Promise<void>;
 }
 
+type LocationConfigType = 'delivery' | 'receipt' | 'kds';
+
+function isRlsError(message: string): boolean {
+  return /row-level security/i.test(message);
+}
+
+async function saveLocationConfigViaApi<T>(
+  type: LocationConfigType,
+  locationId: string,
+  data: Record<string, unknown>
+): Promise<T> {
+  const response = await fetch('/api/settings/location-config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, locationId, data }),
+  });
+
+  const payload = await response
+    .json()
+    .catch(() => null) as { data?: T; error?: string } | null;
+
+  if (!response.ok || !payload?.data) {
+    throw new Error(payload?.error ?? 'Nie udalo sie zapisac konfiguracji');
+  }
+
+  return payload.data;
+}
+
 export const useLocationSettingsStore = create<LocationSettingsStore>()((set, get) => ({
   allLocations: [],
   isLoading: false,
@@ -158,7 +186,18 @@ export const useLocationSettingsStore = create<LocationSettingsStore>()((set, ge
         .from('orders_delivery_config')
         .update(data)
         .eq('location_id', locationId);
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (isRlsError(error.message)) {
+          const saved = await saveLocationConfigViaApi<DeliveryConfig>(
+            'delivery',
+            locationId,
+            data as Record<string, unknown>
+          );
+          set({ deliveryConfig: saved });
+          return;
+        }
+        throw new Error(error.message);
+      }
       set({ deliveryConfig: { ...existing, ...data } as DeliveryConfig });
     } else {
       const { data: created, error } = await supabase
@@ -166,7 +205,18 @@ export const useLocationSettingsStore = create<LocationSettingsStore>()((set, ge
         .insert({ ...data, location_id: locationId })
         .select()
         .single();
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (isRlsError(error.message)) {
+          const saved = await saveLocationConfigViaApi<DeliveryConfig>(
+            'delivery',
+            locationId,
+            data as Record<string, unknown>
+          );
+          set({ deliveryConfig: saved });
+          return;
+        }
+        throw new Error(error.message);
+      }
       set({ deliveryConfig: created as DeliveryConfig });
     }
   },
@@ -180,7 +230,18 @@ export const useLocationSettingsStore = create<LocationSettingsStore>()((set, ge
         .from('location_receipt_config')
         .update(data)
         .eq('location_id', locationId);
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (isRlsError(error.message)) {
+          const saved = await saveLocationConfigViaApi<ReceiptConfig>(
+            'receipt',
+            locationId,
+            data as Record<string, unknown>
+          );
+          set({ receiptConfig: saved });
+          return;
+        }
+        throw new Error(error.message);
+      }
       set({ receiptConfig: { ...existing, ...data } as ReceiptConfig });
     } else {
       const { data: created, error } = await supabase
@@ -188,7 +249,18 @@ export const useLocationSettingsStore = create<LocationSettingsStore>()((set, ge
         .insert({ ...data, location_id: locationId })
         .select()
         .single();
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (isRlsError(error.message)) {
+          const saved = await saveLocationConfigViaApi<ReceiptConfig>(
+            'receipt',
+            locationId,
+            data as Record<string, unknown>
+          );
+          set({ receiptConfig: saved });
+          return;
+        }
+        throw new Error(error.message);
+      }
       set({ receiptConfig: created as ReceiptConfig });
     }
   },
@@ -202,7 +274,18 @@ export const useLocationSettingsStore = create<LocationSettingsStore>()((set, ge
         .from('location_kds_config')
         .update(data)
         .eq('location_id', locationId);
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (isRlsError(error.message)) {
+          const saved = await saveLocationConfigViaApi<KdsConfig>(
+            'kds',
+            locationId,
+            data as Record<string, unknown>
+          );
+          set({ kdsConfig: saved });
+          return;
+        }
+        throw new Error(error.message);
+      }
       set({ kdsConfig: { ...existing, ...data } as KdsConfig });
     } else {
       const { data: created, error } = await supabase
@@ -210,7 +293,18 @@ export const useLocationSettingsStore = create<LocationSettingsStore>()((set, ge
         .insert({ ...data, location_id: locationId })
         .select()
         .single();
-      if (error) throw new Error(error.message);
+      if (error) {
+        if (isRlsError(error.message)) {
+          const saved = await saveLocationConfigViaApi<KdsConfig>(
+            'kds',
+            locationId,
+            data as Record<string, unknown>
+          );
+          set({ kdsConfig: saved });
+          return;
+        }
+        throw new Error(error.message);
+      }
       set({ kdsConfig: created as KdsConfig });
     }
   },
