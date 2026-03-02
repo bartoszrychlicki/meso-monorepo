@@ -14,11 +14,11 @@ vi.mock('@/lib/supabase/middleware', () => ({
 }));
 
 // Import the middleware under test. The implementation will be created later
-// (TDD — tests first). Once implemented, the middleware at src/middleware.ts
+// (TDD — tests first). Once implemented, the middleware at src/proxy.ts
 // will import updateSession from @/lib/supabase/middleware and use it for
 // auth checks on protected/auth routes while skipping API routes and
 // unrelated routes.
-import { middleware } from '@/middleware';
+import { proxy } from '@/proxy';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,7 +75,7 @@ describe('Middleware auth guard', () => {
         origin: 'https://meso-delivery.vercel.app',
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(mockUpdateSession).not.toHaveBeenCalled();
       expect(response.headers.get('Access-Control-Allow-Origin')).toBe(
@@ -92,7 +92,7 @@ describe('Middleware auth guard', () => {
         origin: 'https://meso-delivery.vercel.app',
       });
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(response.status).toBe(204);
       expect(mockUpdateSession).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe('Middleware auth guard', () => {
       mockUnauthenticatedUser();
       const request = createMockRequest('/dashboard');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(mockUpdateSession).toHaveBeenCalledWith(request);
       expect(response.status).toBe(307);
@@ -129,7 +129,7 @@ describe('Middleware auth guard', () => {
       mockUnauthenticatedUser();
       const request = createMockRequest('/admin/users');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(mockUpdateSession).toHaveBeenCalledWith(request);
       expect(response.status).toBe(307);
@@ -157,7 +157,7 @@ describe('Middleware auth guard', () => {
         mockUnauthenticatedUser();
         const request = createMockRequest(route);
 
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         const location = new URL(response.headers.get('location')!);
@@ -175,7 +175,7 @@ describe('Middleware auth guard', () => {
       const supabaseResponse = mockAuthenticatedUser();
       const request = createMockRequest('/dashboard');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(mockUpdateSession).toHaveBeenCalledWith(request);
       expect(response).toBe(supabaseResponse);
@@ -190,7 +190,7 @@ describe('Middleware auth guard', () => {
       mockAuthenticatedUser();
       const request = createMockRequest('/login');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(mockUpdateSession).toHaveBeenCalledWith(request);
       expect(response.status).toBe(307);
@@ -206,7 +206,7 @@ describe('Middleware auth guard', () => {
         mockAuthenticatedUser();
         const request = createMockRequest(route);
 
-        const response = await middleware(request);
+        const response = await proxy(request);
 
         expect(response.status).toBe(307);
         const location = new URL(response.headers.get('location')!);
@@ -223,7 +223,7 @@ describe('Middleware auth guard', () => {
       const supabaseResponse = mockUnauthenticatedUser();
       const request = createMockRequest('/login');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(mockUpdateSession).toHaveBeenCalledWith(request);
       expect(response).toBe(supabaseResponse);
@@ -238,7 +238,7 @@ describe('Middleware auth guard', () => {
       const supabaseResponse = mockAuthenticatedUser({ role: 'admin' });
       const request = createMockRequest('/admin/users');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(response).toBe(supabaseResponse);
     });
@@ -247,7 +247,7 @@ describe('Middleware auth guard', () => {
       const supabaseResponse = mockAuthenticatedUser({ role: 'cashier' });
       const request = createMockRequest('/admin/users');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(response).toBe(supabaseResponse);
     });
@@ -256,7 +256,7 @@ describe('Middleware auth guard', () => {
       const supabaseResponse = mockAuthenticatedUser({ role: 'manager' });
       const request = createMockRequest('/admin/users');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(response).toBe(supabaseResponse);
     });
@@ -265,7 +265,7 @@ describe('Middleware auth guard', () => {
       const supabaseResponse = mockAuthenticatedUser();
       const request = createMockRequest('/admin/users');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(response).toBe(supabaseResponse);
     });
@@ -278,7 +278,7 @@ describe('Middleware auth guard', () => {
     it('should pass through /kitchen without calling updateSession', async () => {
       const request = createMockRequest('/kitchen');
 
-      const response = await middleware(request);
+      const response = await proxy(request);
 
       expect(mockUpdateSession).not.toHaveBeenCalled();
       expect(response.status).toBe(200);

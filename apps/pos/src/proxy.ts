@@ -33,7 +33,7 @@ const PROTECTED_ROUTES = [
 
 const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get('origin');
 
