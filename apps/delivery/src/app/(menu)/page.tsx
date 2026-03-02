@@ -22,10 +22,9 @@ async function getMenuData() {
         slug,
         description,
         price,
+        original_price,
         image_url,
         images,
-        is_spicy,
-        spice_level,
         is_vegetarian,
         is_vegan,
         is_bestseller,
@@ -33,10 +32,10 @@ async function getMenuData() {
         is_new,
         has_variants,
         has_addons,
-        has_spice_level,
-        original_price,
         allergens,
-        tags
+        tags,
+        variants,
+        modifier_groups
       `)
       .eq('is_active', true)
       .eq('is_available', true)
