@@ -3,7 +3,19 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "dist/**"]
+      "outputs": [".next/**", "dist/**"],
+      "env": [
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "P24_MERCHANT_ID",
+        "P24_POS_ID",
+        "P24_CRC_KEY",
+        "P24_API_KEY",
+        "P24_MODE",
+        "RESEND_API_KEY",
+        "POS_API_URL",
+        "POS_API_KEY"
+      ]
     },
     "dev": {
       "cache": false,
