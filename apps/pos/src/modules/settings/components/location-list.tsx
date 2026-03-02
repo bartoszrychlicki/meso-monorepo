@@ -58,9 +58,9 @@ export function LocationList() {
 
   const isAdmin = currentUser?.role === UserRole.ADMIN;
 
-  const filteredLocations = isAdmin
+  const filteredLocations = !currentUser || isAdmin
     ? allLocations
-    : allLocations.filter((loc) => loc.id === currentUser?.location_id);
+    : allLocations.filter((loc) => loc.id === currentUser.location_id);
 
   if (isLoading) {
     return <LoadingSkeleton variant="table" />;

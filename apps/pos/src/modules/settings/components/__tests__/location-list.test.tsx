@@ -63,11 +63,23 @@ function setupStores({
   isLoading = false,
   role = UserRole.ADMIN,
   locationId = 'loc-1',
+  currentUser = {
+    id: 'user-1',
+    username: 'admin',
+    name: 'Admin User',
+    email: 'admin@test.com',
+    role,
+    location_id: locationId,
+    is_active: true,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  },
 }: {
   locations?: Location[];
   isLoading?: boolean;
   role?: UserRole;
   locationId?: string;
+  currentUser?: ReturnType<typeof useUserStore>['currentUser'];
 } = {}) {
   mockUseLocationSettingsStore.mockReturnValue({
     allLocations: locations,
@@ -76,17 +88,7 @@ function setupStores({
   } as ReturnType<typeof useLocationSettingsStore>);
 
   mockUseUserStore.mockReturnValue({
-    currentUser: {
-      id: 'user-1',
-      username: 'admin',
-      name: 'Admin User',
-      email: 'admin@test.com',
-      role,
-      location_id: locationId,
-      is_active: true,
-      created_at: '2024-01-01T00:00:00Z',
-      updated_at: '2024-01-01T00:00:00Z',
-    },
+    currentUser,
   } as ReturnType<typeof useUserStore>);
 }
 
@@ -218,5 +220,18 @@ describe('LocationList', () => {
     render(<LocationList />);
 
     expect(screen.getByText('Brak lokalizacji')).toBeInTheDocument();
+  });
+
+  it('shows all locations when currentUser is missing', () => {
+    const locations = [
+      makeLocation({ id: 'loc-1', name: 'Location One' }),
+      makeLocation({ id: 'loc-2', name: 'Location Two' }),
+    ];
+    setupStores({ locations, currentUser: null });
+
+    render(<LocationList />);
+
+    expect(screen.getByText('Location One')).toBeInTheDocument();
+    expect(screen.getByText('Location Two')).toBeInTheDocument();
   });
 });

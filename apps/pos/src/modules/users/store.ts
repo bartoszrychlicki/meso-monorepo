@@ -33,36 +33,51 @@ export const useUserStore = create<UserStore>()((set, get) => ({
       return;
     }
 
-    const { data: staffUser } = await supabase
-      .from('users_users')
-      .select('*')
-      .eq('id', authUser.id)
-      .single();
-
-    if (!staffUser) {
-      set({ currentUser: null, isAuthenticated: false, isLoading: false });
-      return;
-    }
-
-    let location: Location | null = null;
-    if (staffUser.location_id) {
-      const { data: loc } = await supabase
-        .from('users_locations')
-        .select('*')
-        .eq('id', staffUser.location_id)
-        .single();
-      location = loc;
-    }
-
-    const { data: locations } = await supabase
+    const { data: activeLocations } = await supabase
       .from('users_locations')
       .select('*')
       .eq('is_active', true);
 
+    const { data: staffUserById } = await supabase
+      .from('users_users')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    let staffUser = (staffUserById as User | null) ?? null;
+
+    // Fallback for legacy data where users_users.id may not match auth.users.id.
+    if (!staffUser && authUser.email) {
+      const { data: staffUserByEmail } = await supabase
+        .from('users_users')
+        .select('*')
+        .eq('email', authUser.email)
+        .maybeSingle();
+      staffUser = (staffUserByEmail as User | null) ?? null;
+    }
+
+    let location: Location | null = null;
+    if (staffUser?.location_id) {
+      const assignedLocationId = staffUser.location_id;
+      location =
+        ((activeLocations || []) as Location[]).find((loc) => loc.id === assignedLocationId) ||
+        null;
+
+      // Assigned location may be inactive, fetch it directly when absent in active list.
+      if (!location) {
+        const { data: loc } = await supabase
+          .from('users_locations')
+          .select('*')
+          .eq('id', assignedLocationId)
+          .maybeSingle();
+        location = (loc as Location | null) ?? null;
+      }
+    }
+
     set({
-      currentUser: staffUser as User,
+      currentUser: staffUser,
       currentLocation: location,
-      locations: (locations || []) as Location[],
+      locations: (activeLocations || []) as Location[],
       isAuthenticated: true,
       isLoading: false,
     });
