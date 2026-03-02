@@ -286,6 +286,10 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
     // 2) Login in delivery and add product via UI (more robust than localStorage injection on hosted env)
     await loginDeliveryUser(page)
 
+    // Validate live menu endpoint/rendering first — prevents false green when menu is broken.
+    await page.goto(`${DELIVERY_BASE_URL}/menu`, { timeout: 60_000 })
+    await expect(page.locator('a[href^="/product/"]').first()).toBeVisible({ timeout: 20_000 })
+
     const { data: product, error: productError } = await admin
       .from('menu_products')
       .select('id, name, price')
