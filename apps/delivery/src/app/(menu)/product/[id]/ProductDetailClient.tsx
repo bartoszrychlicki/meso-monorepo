@@ -4,14 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Minus, Plus } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Clock, Minus, Plus } from 'lucide-react'
 import { useCartStore, type CartItemAddon } from '@/stores/cartStore'
 import { formatPrice } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { PRODUCT_BLUR_PLACEHOLDER } from '@/lib/product-image'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Textarea } from '@/components/ui/textarea'
-import { ALLERGENS, type AllergenKey } from '@/types/menu'
+import { Badge } from '@/components/ui/badge'
+import { getAllergenLabel } from '@/types/menu'
 import { toast } from 'sonner'
 
 interface Variant {
@@ -29,7 +28,32 @@ interface Addon {
   is_available: boolean
 }
 
-interface Product {
+interface ModifierOption {
+  id: string
+  name: string
+  price: number
+  is_available?: boolean
+  sort_order?: number
+}
+
+interface ModifierGroup {
+  id: string
+  name: string
+  required?: boolean
+  min_selections?: number
+  max_selections?: number
+  modifiers: ModifierOption[]
+}
+
+interface NutritionalInfo {
+  calories?: number
+  protein?: number
+  carbs?: number
+  fat?: number
+  fiber?: number
+}
+
+export interface ProductDetailProduct {
   id: string
   name: string
   name_jp?: string
@@ -37,55 +61,106 @@ interface Product {
   description?: string
   story?: string
   price: number
-  original_price?: number
   image_url?: string
-  is_spicy?: boolean
-  spice_level?: 1 | 2 | 3
   is_vegetarian?: boolean
   is_vegan?: boolean
-  is_bestseller?: boolean
-  is_signature?: boolean
-  is_new?: boolean
-  has_variants?: boolean
-  has_addons?: boolean
-  has_spice_level?: boolean
+  is_gluten_free?: boolean
   allergens?: string[]
   calories?: number
+  nutritional_info?: NutritionalInfo | null
   prep_time_min?: number
   prep_time_max?: number
+  preparation_time_minutes?: number
   variants?: Variant[] | null
   addons?: Addon[] | null
+  tags?: string[] | null
+  modifier_groups?: ModifierGroup[] | null
   category?: {
     id: string
     name: string
     slug: string
-    icon?: string
+    icon?: string | null
   } | null
 }
 
 interface ProductDetailClientProps {
-  product: Product
+  product: ProductDetailProduct
 }
-
-const badgeStyles: Record<string, string> = {
-  bestseller: 'bg-primary/20 text-primary border-primary/30',
-  premium: 'bg-accent/20 text-accent border-accent/30',
-  nowosc: 'bg-neon-cyan/20 text-neon-cyan border-neon-cyan/30',
-  ostre: 'bg-destructive/20 text-destructive border-destructive/30',
-}
-
-const spiceLevels = [
-  { level: 1 as const, label: 'Łagodny', emoji: '\u{1F525}' },
-  { level: 2 as const, label: 'Średni', emoji: '\u{1F525}\u{1F525}' },
-  { level: 3 as const, label: 'Piekielny', emoji: '\u{1F525}\u{1F525}\u{1F525}' },
-]
 
 const categoryEmojiMap: Record<string, string> = {
   ramen: '\u{1F35C}',
+  rameny: '\u{1F35C}',
   gyoza: '\u{1F95F}',
   karaage: '\u{1F357}',
   dodatki: '\u{1F35A}',
+  przekaski: '\u{1F95F}',
   napoje: '\u{1F964}',
+  desery: '\u{1F361}',
+}
+
+function toPositiveNumber(value: unknown): number | null {
+  const parsed =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string'
+      ? Number(value)
+      : NaN
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function formatNutritionValue(value: number): string {
+  return value.toLocaleString('pl-PL', { maximumFractionDigits: 1 })
+}
+
+function resolvePrepTimeLabel(product: ProductDetailProduct): string | null {
+  const prepTime = toPositiveNumber(product.preparation_time_minutes)
+  const prepMin = toPositiveNumber(product.prep_time_min)
+  const prepMax = toPositiveNumber(product.prep_time_max)
+
+  if (prepMin !== null && prepMax !== null) {
+    return prepMin === prepMax ? `${prepMin} min` : `${prepMin}-${prepMax} min`
+  }
+
+  if (prepMin !== null) return `${prepMin} min`
+  if (prepMax !== null) return `${prepMax} min`
+  if (prepTime !== null) return `${prepTime} min`
+
+  return null
+}
+
+function normalizeModifierGroups(product: ProductDetailProduct): ModifierGroup[] {
+  const groups = product.modifier_groups || []
+
+  const normalizedGroups = groups
+    .map((group) => ({
+      ...group,
+      modifiers: [...(group.modifiers || [])]
+        .filter((option) => option.is_available !== false)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0)),
+    }))
+    .filter((group) => group.modifiers.length > 0)
+
+  if (normalizedGroups.length > 0) return normalizedGroups
+
+  const activeAddons = (product.addons || []).filter((addon) => addon.is_available !== false)
+  if (activeAddons.length === 0) return []
+
+  return [
+    {
+      id: 'addons',
+      name: 'Dodatki',
+      required: false,
+      min_selections: 0,
+      max_selections: activeAddons.length,
+      modifiers: activeAddons.map((addon) => ({
+        id: addon.id,
+        name: addon.name,
+        price: addon.price,
+        is_available: addon.is_available,
+      })),
+    },
+  ]
 }
 
 export function ProductDetailClient({ product }: ProductDetailClientProps) {
@@ -93,40 +168,121 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   const addItem = useCartStore((state) => state.addItem)
 
   const [quantity, setQuantity] = useState(1)
-  const [selectedSpice, setSelectedSpice] = useState<1 | 2 | 3>(
-    product.spice_level || 2
-  )
+  const [storyOpen, setStoryOpen] = useState(false)
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(
     product.variants?.[0] || null
   )
-  const [selectedAddons, setSelectedAddons] = useState<Addon[]>([])
-  const [notes, setNotes] = useState('')
 
   const sortedVariants = [...(product.variants || [])].sort(
     (a, b) => a.sort_order - b.sort_order
   )
-  const activeAddons = (product.addons || []).filter((a) => a.is_available)
 
-  const handleAddonToggle = (addon: Addon) => {
-    setSelectedAddons((prev) =>
-      prev.some((a) => a.id === addon.id)
-        ? prev.filter((a) => a.id !== addon.id)
-        : [...prev, addon]
-    )
-  }
+  const modifierGroups = normalizeModifierGroups(product)
+  const [selectedModifiers, setSelectedModifiers] = useState<Record<string, ModifierOption[]>>(
+    () => {
+      const defaults: Record<string, ModifierOption[]> = {}
+
+      for (const group of modifierGroups) {
+        const minSelections = Math.max(0, group.min_selections ?? (group.required ? 1 : 0))
+        if (minSelections === 0) continue
+
+        const maxSelections = Math.max(1, group.max_selections ?? 1)
+        const selected = group.modifiers.slice(0, Math.min(minSelections, maxSelections))
+        if (selected.length > 0) {
+          defaults[group.id] = selected
+        }
+      }
+
+      return defaults
+    }
+  )
+
+  const calories =
+    toPositiveNumber(product.calories) ??
+    toPositiveNumber(product.nutritional_info?.calories)
+  const prepTimeLabel = resolvePrepTimeLabel(product)
+  const hasDietBadges = Boolean(
+    product.is_vegetarian || product.is_vegan || product.is_gluten_free
+  )
+
+  const tags = (product.tags || []).filter(Boolean)
+
+  const nutritionItems = [
+    calories !== null ? { label: 'kcal', value: formatNutritionValue(calories) } : null,
+    toPositiveNumber(product.nutritional_info?.protein) !== null
+      ? {
+          label: 'białko',
+          value: `${formatNutritionValue(toPositiveNumber(product.nutritional_info?.protein) || 0)}g`,
+        }
+      : null,
+    toPositiveNumber(product.nutritional_info?.carbs) !== null
+      ? {
+          label: 'węgle',
+          value: `${formatNutritionValue(toPositiveNumber(product.nutritional_info?.carbs) || 0)}g`,
+        }
+      : null,
+    toPositiveNumber(product.nutritional_info?.fat) !== null
+      ? {
+          label: 'tłuszcz',
+          value: `${formatNutritionValue(toPositiveNumber(product.nutritional_info?.fat) || 0)}g`,
+        }
+      : null,
+    toPositiveNumber(product.nutritional_info?.fiber) !== null
+      ? {
+          label: 'błonnik',
+          value: `${formatNutritionValue(toPositiveNumber(product.nutritional_info?.fiber) || 0)}g`,
+        }
+      : null,
+  ].filter((item): item is { label: string; value: string } => item !== null)
+
+  const nutritionGridColsClass =
+    nutritionItems.length >= 5
+      ? 'grid-cols-5'
+      : nutritionItems.length === 4
+      ? 'grid-cols-4'
+      : nutritionItems.length === 3
+      ? 'grid-cols-3'
+      : nutritionItems.length === 2
+      ? 'grid-cols-2'
+      : 'grid-cols-1'
+
+  const selectedAddons = Object.values(selectedModifiers).flat()
 
   const calculateTotal = () => {
     const basePrice = product.price
     const variantPrice = selectedVariant?.price || 0
-    const addonsPrice = selectedAddons.reduce((sum, a) => sum + a.price, 0)
+    const addonsPrice = selectedAddons.reduce((sum, addon) => sum + addon.price, 0)
     return (basePrice + variantPrice + addonsPrice) * quantity
   }
 
+  const toggleModifier = (
+    groupId: string,
+    option: ModifierOption,
+    maxSelections: number
+  ) => {
+    setSelectedModifiers((prev) => {
+      const current = prev[groupId] || []
+      const exists = current.some((selected) => selected.id === option.id)
+
+      if (exists) {
+        return { ...prev, [groupId]: current.filter((selected) => selected.id !== option.id) }
+      }
+
+      if (maxSelections <= 1) {
+        return { ...prev, [groupId]: [option] }
+      }
+
+      if (current.length >= maxSelections) return prev
+
+      return { ...prev, [groupId]: [...current, option] }
+    })
+  }
+
   const handleAddToCart = () => {
-    const cartAddons: CartItemAddon[] = selectedAddons.map((a) => ({
-      id: a.id,
-      name: a.name,
-      price: a.price,
+    const cartAddons: CartItemAddon[] = selectedAddons.map((addon) => ({
+      id: addon.id,
+      name: addon.name,
+      price: addon.price,
     }))
 
     addItem({
@@ -135,12 +291,10 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
       price: product.price,
       quantity,
       image: product.image_url,
-      spiceLevel: product.has_spice_level ? selectedSpice : undefined,
       variantId: selectedVariant?.id,
       variantName: selectedVariant?.name,
       variantPrice: selectedVariant?.price,
       addons: cartAddons,
-      notes: notes.trim() || undefined,
     })
 
     toast.success(`${product.name} dodano do koszyka`, {
@@ -151,292 +305,248 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
     router.back()
   }
 
-  const badges: { key: string; label: string }[] = []
-  if (product.is_bestseller) badges.push({ key: 'bestseller', label: 'Bestseller' })
-  if (product.is_signature) badges.push({ key: 'premium', label: 'Premium' })
-  if (product.is_new) badges.push({ key: 'nowosc', label: 'Nowość' })
-
   const fallbackEmoji = product.category?.slug
     ? categoryEmojiMap[product.category.slug] || '\u{1F35C}'
     : '\u{1F35C}'
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="mx-auto max-w-2xl min-h-screen pb-32 bg-background"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="mx-auto min-h-screen max-w-2xl px-4 py-4 pb-40"
     >
-      {/* Back button */}
-      <div className="sticky top-0 z-50 flex items-center bg-background/80 backdrop-blur-sm p-4 pb-2">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          <span>Wróć</span>
-        </button>
-      </div>
+      <button
+        onClick={() => router.back()}
+        className="mb-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Wróć
+      </button>
 
-      {/* Hero image */}
-      <div className="px-4 pb-4">
-        <div className="relative aspect-video overflow-hidden rounded-2xl bg-secondary">
-          {product.image_url ? (
-            <Image
-              src={product.image_url}
-              alt={product.name}
-              fill
-              className="object-cover"
-              priority
-              sizes="(max-width: 768px) 100vw, 672px"
-              placeholder="blur"
-              blurDataURL={PRODUCT_BLUR_PLACEHOLDER}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-card to-background">
-              <span className="text-8xl">{fallbackEmoji}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="px-4 space-y-6">
-        {/* Badges */}
-        {badges.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {badges.map((badge) => (
-              <span
-                key={badge.key}
-                className={cn(
-                  'inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold',
-                  badgeStyles[badge.key]
-                )}
-              >
-                {badge.label}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Name & Japanese name */}
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">
-            {product.name}
-          </h1>
-          {product.name_jp && (
-            <p className="mt-1 font-japanese text-sm text-muted-foreground">
-              {product.name_jp}
-            </p>
-          )}
-        </div>
-
-        {/* Description */}
-        {product.description && (
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            {product.description}
-          </p>
-        )}
-
-        {/* Price */}
-        <div className="flex items-baseline gap-3">
-          <span className="text-2xl font-bold text-primary">
-            {formatPrice(product.price)}
-          </span>
-          {product.original_price && product.original_price > product.price && (
-            <span className="text-lg text-muted-foreground line-through">
-              {formatPrice(product.original_price)}
-            </span>
-          )}
-        </div>
-
-        {/* Calories */}
-        {product.calories && (
-          <p className="text-sm text-muted-foreground">
-            {product.calories} kcal
-          </p>
-        )}
-
-        {/* Allergens */}
-        {product.allergens && product.allergens.length > 0 && (
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-            {product.allergens.map((allergen) => (
-              <span
-                key={allergen}
-                className="shrink-0 rounded-lg bg-primary/20 px-3 py-1.5 text-xs font-medium text-primary"
-              >
-                {ALLERGENS[allergen as AllergenKey] || allergen}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Story / Chef Quote */}
-        {product.story && (
-          <div className="p-4 bg-card/50 border-l-4 border-primary rounded-r-lg">
-            <p className="italic text-sm leading-relaxed text-muted-foreground mb-2">
-              &ldquo;{product.story}&rdquo;
-            </p>
-            <p className="text-primary text-xs font-medium">
-              -- Maciej Krawczun, Szef Kuchni MESO
-            </p>
-          </div>
-        )}
-
-        {/* Spice level selector */}
-        {product.has_spice_level && (
-          <div>
-            <h2 className="font-display text-lg font-bold text-foreground mb-3">
-              Poziom Ostrości
-            </h2>
-            <div className="grid grid-cols-3 gap-3">
-              {spiceLevels.map((option) => (
-                <button
-                  key={option.level}
-                  type="button"
-                  onClick={() => setSelectedSpice(option.level)}
-                  className={cn(
-                    'flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-3 transition-all',
-                    selectedSpice === option.level
-                      ? 'border-primary bg-primary/20 text-primary'
-                      : 'border-border text-muted-foreground hover:border-primary/50'
-                  )}
-                >
-                  <span className="text-2xl">{option.emoji}</span>
-                  <span className="text-sm font-semibold">{option.label}</span>
-                </button>
-              ))}
-            </div>
-            {selectedSpice === 3 && (
-              <div className="mt-3 p-3 bg-destructive/10 border border-destructive/30 rounded-lg flex items-start gap-2">
-                <span className="text-lg">&#9888;&#65039;</span>
-                <p className="text-destructive text-sm">
-                  <strong>Poziom Piekielny to nie żart!</strong> Bardzo ostra wersja dla doświadczonych fanów chilli.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Variant selector */}
-        {sortedVariants.length > 0 && (
-          <div>
-            <h2 className="font-display text-lg font-bold text-foreground mb-3">
-              Wybierz opcję
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              {sortedVariants.map((variant) => (
-                <button
-                  key={variant.id}
-                  type="button"
-                  onClick={() => setSelectedVariant(variant)}
-                  className={cn(
-                    'p-4 rounded-xl border-2 text-left transition-all',
-                    selectedVariant?.id === variant.id
-                      ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-border text-muted-foreground hover:border-primary/50'
-                  )}
-                >
-                  <p className="font-medium text-foreground">{variant.name}</p>
-                  {variant.price > 0 && (
-                    <p className="text-sm text-primary mt-1">
-                      +{formatPrice(variant.price)}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Addon selector */}
-        {activeAddons.length > 0 && (
-          <div>
-            <h2 className="font-display text-lg font-bold text-foreground mb-3">
-              Dodatki
-            </h2>
-            <div className="space-y-3">
-              {activeAddons.map((addon) => (
-                <label
-                  key={addon.id}
-                  className={cn(
-                    'flex items-center justify-between rounded-xl p-4 cursor-pointer transition-all',
-                    selectedAddons.some((a) => a.id === addon.id)
-                      ? 'bg-primary/10 border border-primary/50'
-                      : 'bg-secondary/30 border border-transparent hover:border-border'
-                  )}
-                >
-                  <span className="text-foreground">
-                    {addon.name}{' '}
-                    <span className="text-muted-foreground">
-                      (+{formatPrice(addon.price)})
-                    </span>
-                  </span>
-                  <Checkbox
-                    checked={selectedAddons.some((a) => a.id === addon.id)}
-                    onCheckedChange={() => handleAddonToggle(addon)}
-                    className="h-6 w-6 rounded border-border bg-secondary data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Notes textarea */}
-        <div>
-          <h2 className="font-display text-lg font-bold text-foreground mb-3">
-            Uwagi do zamówienia
-          </h2>
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Np. bez cebuli, dodatkowy sos..."
-            className="bg-secondary/30 border-border text-foreground placeholder:text-muted-foreground resize-none"
-            rows={3}
+      <div className="relative mb-6 aspect-video overflow-hidden rounded-2xl bg-secondary">
+        {product.image_url ? (
+          <Image
+            src={product.image_url}
+            alt={product.name}
+            fill
+            className="object-cover"
+            priority
+            sizes="(max-width: 768px) 100vw, 672px"
+            placeholder="blur"
+            blurDataURL={PRODUCT_BLUR_PLACEHOLDER}
           />
-        </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-card to-background">
+            <span className="text-8xl">{fallbackEmoji}</span>
+          </div>
+        )}
       </div>
 
-      {/* Sticky bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-gradient-to-t from-background via-background/95 to-transparent p-4 pb-6">
-        <div className="mx-auto max-w-2xl flex items-center gap-4">
-          {/* Quantity selector */}
-          <div className="flex items-center gap-3 rounded-xl bg-secondary px-3 py-2.5">
-            <button
-              type="button"
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              <Minus className="h-4 w-4" />
-            </button>
-            <span className="w-6 text-center font-display font-bold text-foreground">
-              {quantity}
-            </span>
-            <button
-              type="button"
-              onClick={() => setQuantity(quantity + 1)}
-              className="text-foreground hover:text-primary transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-            </button>
-          </div>
+      <h1 className="mb-1 font-display text-2xl font-bold text-foreground">{product.name}</h1>
+      {product.name_jp && (
+        <p className="mb-2 font-japanese text-sm text-muted-foreground/70">{product.name_jp}</p>
+      )}
 
-          {/* Add to cart button */}
+      {product.description && (
+        <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{product.description}</p>
+      )}
+
+      {(hasDietBadges || prepTimeLabel) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          {product.is_vegan && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+              🌿 Vegan
+            </span>
+          )}
+          {product.is_vegetarian && !product.is_vegan && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2.5 py-1 text-xs font-medium text-green-400">
+              🌱 Vege
+            </span>
+          )}
+          {product.is_gluten_free && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-400">
+              🚫 Gluten Free
+            </span>
+          )}
+          {prepTimeLabel && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {prepTimeLabel}
+            </span>
+          )}
+        </div>
+      )}
+
+      {tags.length > 0 && (
+        <div className="mb-4 flex flex-wrap gap-1.5">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {product.allergens && product.allergens.length > 0 && (
+        <div className="mb-4">
+          <h3 className="mb-2 font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Alergeny
+          </h3>
+          <div className="flex flex-wrap gap-1.5">
+            {product.allergens.map((allergen) => (
+              <Badge key={allergen} variant="destructive" className="text-[11px] font-normal">
+                {getAllergenLabel(allergen)}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {nutritionItems.length > 0 && (
+        <div className="mb-6">
+          <h3 className="mb-2 font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Wartości odżywcze
+          </h3>
+          <div className={cn('grid gap-2', nutritionGridColsClass)}>
+            {nutritionItems.map((nutrition) => (
+              <div key={nutrition.label} className="rounded-xl bg-secondary/50 p-2 text-center">
+                <div className="font-display text-sm font-bold text-foreground">
+                  {nutrition.value}
+                </div>
+                <div className="text-[10px] text-muted-foreground">{nutrition.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {product.story && (
+        <div className="mb-6">
           <button
             type="button"
-            data-testid="product-detail-add-to-cart"
-            aria-label="Dodaj produkt do koszyka"
-            onClick={handleAddToCart}
-            className={cn(
-              'flex-1 rounded-xl py-3.5 font-display text-sm font-semibold tracking-wider',
-              'bg-accent text-accent-foreground',
-              'neon-glow-yellow',
-              'transition-all hover:scale-[1.02] active:scale-[0.98]'
-            )}
+            onClick={() => setStoryOpen((value) => !value)}
+            className="flex w-full items-center justify-between rounded-xl bg-secondary/30 px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary/50"
           >
-            DODAJ &bull; {formatPrice(calculateTotal())}
+            <span className="font-display text-xs font-semibold uppercase tracking-wider">
+              Historia dania
+            </span>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 text-muted-foreground transition-transform duration-200',
+                storyOpen && 'rotate-180'
+              )}
+            />
           </button>
+          {storyOpen && (
+            <div className="px-4 pt-3 text-sm leading-relaxed text-muted-foreground">
+              {product.story}
+            </div>
+          )}
+        </div>
+      )}
+
+      {sortedVariants.length > 0 && (
+        <div className="mb-6">
+          <h3 className="mb-3 font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Wybierz opcję
+          </h3>
+          <div className="grid grid-cols-2 gap-3">
+            {sortedVariants.map((variant) => (
+              <button
+                key={variant.id}
+                type="button"
+                onClick={() => setSelectedVariant(variant)}
+                className={cn(
+                  'rounded-xl border p-3 text-left text-sm transition-all',
+                  selectedVariant?.id === variant.id
+                    ? 'border-primary/50 bg-primary/10 text-foreground'
+                    : 'border-border bg-secondary/30 text-foreground hover:border-primary/30'
+                )}
+              >
+                <span>{variant.name}</span>
+                {variant.price > 0 && (
+                  <span className="block text-muted-foreground">+{formatPrice(variant.price)}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {modifierGroups.map((group) => {
+        const maxSelections = Math.max(1, group.max_selections ?? 1)
+
+        return (
+          <div key={group.id} className="mb-6">
+            <h3 className="mb-3 font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {group.name} {group.required && <span className="text-destructive">*</span>}
+            </h3>
+            <div className="space-y-2">
+              {group.modifiers.map((option) => {
+                const isSelected = (selectedModifiers[group.id] || []).some(
+                  (selected) => selected.id === option.id
+                )
+
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => toggleModifier(group.id, option, maxSelections)}
+                    className={cn(
+                      'flex w-full items-center justify-between rounded-xl border p-3 text-sm transition-all',
+                      isSelected
+                        ? 'border-primary/50 bg-primary/10 text-foreground'
+                        : 'border-border bg-secondary/30 text-foreground hover:border-primary/30'
+                    )}
+                  >
+                    <span>{option.name}</span>
+                    {option.price > 0 && (
+                      <span className="text-muted-foreground">+{formatPrice(option.price)}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="fixed inset-x-0 bottom-0 z-50 bg-gradient-to-t from-background via-background/95 to-transparent px-4 pb-6 pt-3">
+        <div className="mx-auto max-w-2xl">
+          <div className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 neon-border">
+            <div className="flex items-center gap-3 rounded-xl bg-secondary px-3 py-2">
+              <button
+                type="button"
+                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
+                className="text-foreground"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="w-6 text-center font-display font-bold text-foreground">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuantity((prev) => prev + 1)}
+                className="text-foreground"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              data-testid="product-detail-add-to-cart"
+              aria-label="Dodaj produkt do koszyka"
+              onClick={handleAddToCart}
+              className="flex-1 rounded-xl bg-primary py-3 font-display text-sm font-semibold tracking-wider text-primary-foreground transition-all neon-glow hover:scale-[1.02]"
+            >
+              DODAJ • {formatPrice(calculateTotal())}
+            </button>
+          </div>
         </div>
       </div>
     </motion.div>
