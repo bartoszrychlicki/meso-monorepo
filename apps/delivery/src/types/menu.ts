@@ -81,3 +81,12 @@ export const ALLERGENS = {
 } as const
 
 export type AllergenKey = keyof typeof ALLERGENS
+
+export function getAllergenLabel(allergen: string): string {
+  const normalized = allergen?.trim().toLowerCase()
+  if (!normalized) {
+    return ''
+  }
+
+  return (ALLERGENS as Record<string, string>)[normalized] ?? allergen
+}
