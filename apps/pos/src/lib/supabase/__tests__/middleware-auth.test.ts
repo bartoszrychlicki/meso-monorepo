@@ -254,15 +254,13 @@ describe('Middleware auth guard', () => {
       expect(location.pathname).toBe('/dashboard');
     });
 
-    it('should redirect manager from /admin to /dashboard', async () => {
-      mockAuthenticatedUser({ role: 'manager' });
-      const request = createMockRequest('/admin');
+    it('should allow manager to access /admin/users', async () => {
+      const supabaseResponse = mockAuthenticatedUser({ role: 'manager' });
+      const request = createMockRequest('/admin/users');
 
       const response = await middleware(request);
 
-      expect(response.status).toBe(307);
-      const location = new URL(response.headers.get('location')!);
-      expect(location.pathname).toBe('/dashboard');
+      expect(response).toBe(supabaseResponse);
     });
 
     it('should redirect user without role metadata from /admin/users to /dashboard', async () => {

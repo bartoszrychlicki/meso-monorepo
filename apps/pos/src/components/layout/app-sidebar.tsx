@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUserStore } from '@/modules/users/store';
+import { canManageUsers } from '@/lib/auth/permissions';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -63,7 +64,7 @@ export function AppSidebar() {
   const currentUser = useUserStore((s) => s.currentUser);
 
   const filteredSecondaryNavItems = secondaryNavItems.filter(
-    (item) => !item.href.startsWith('/admin') || currentUser?.role === 'admin'
+    (item) => !item.href.startsWith('/admin') || canManageUsers(currentUser?.role)
   );
 
   const isActive = (href: string) => {
