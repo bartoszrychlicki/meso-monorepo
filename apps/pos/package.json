@@ -11,8 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:e2e:order": "npx tsx scripts/create-test-order.ts"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@meso/core": "workspace:*",

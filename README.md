@@ -103,11 +103,8 @@ Run from `apps/delivery`:
 
 ```bash
 cd apps/delivery
-pnpm test:e2e:smoke
-pnpm test:e2e:regression
+pnpm test:e2e:sandbox
 ```
-
-Smoke/regression use local `playwright.config.ts` and start both apps automatically.
 
 Sandbox cross-app flow (Delivery -> P24 sandbox -> POS KDS):
 
@@ -135,16 +132,16 @@ Optional:
 - `E2E_DELIVERY_BASE_URL` (default: `https://order.mesofood.pl`)
 - `E2E_POS_BASE_URL` (default: `https://pos.mesofood.pl`)
 - `E2E_GATE_PASSWORD` (default: `TuJestMeso2026`)
-- `E2E_P24_AUTOMATE=1` (enable heuristic auto-clicks on P24 sandbox page)
+- `E2E_P24_AUTOMATE=0` (disable heuristic auto-clicks on P24 sandbox page; default is enabled)
 - `E2E_P24_REDIRECT_TIMEOUT_MS` (max wait for redirect from P24)
 
 ## CI and Release Gates
 
 Workflows:
-- `CI PR` — required merge gate (quality + smoke E2E)
-- `CI Main` — post-merge regression (quality + regression E2E)
+- `CI PR` — required merge gate (quality + live sandbox E2E)
+- `CI Main` — post-merge confidence run (quality + live sandbox E2E)
 - `E2E Sandbox` — nightly and manual real payment sandbox flow
-- `Release Gate` — manual pre-release full validation
+- `Release Gate` — manual pre-release validation (quality + optional sandbox E2E)
 
 Detailed strategy and go/no-go checklist:
 - [`docs/testing-reliability-strategy.md`](docs/testing-reliability-strategy.md)

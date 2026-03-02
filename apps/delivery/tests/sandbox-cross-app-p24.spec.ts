@@ -2,7 +2,7 @@
  * Sandbox Cross-App E2E (Delivery -> P24 Sandbox -> POS KDS)
  *
  * This scenario is designed for deployed environments (staging/live-like):
- * 1) Creates a unique customer
+ * 1) Provisions a delivery customer account (create or reuse)
  * 2) Places an online order in Delivery
  * 3) Redirects to P24 sandbox and completes payment
  * 4) Verifies payment/order status in DB
@@ -18,31 +18,30 @@
  *   E2E_DELIVERY_BASE_URL (default: https://order.mesofood.pl)
  *   E2E_POS_BASE_URL      (default: https://pos.mesofood.pl)
  *   E2E_GATE_PASSWORD     (default: TuJestMeso2026)
- *   E2E_P24_AUTOMATE      (1/0, default: 0)
+ *   E2E_DELIVERY_EMAIL    (default: e2e-order-supabase@meso.dev)
+ *   E2E_DELIVERY_PASSWORD (default: SandboxP24-test-123!)
+ *   E2E_P24_AUTOMATE      (1/0, default: 1)
  *   E2E_P24_REDIRECT_TIMEOUT_MS (default: 300000)
  */
 import { test, expect, Page } from '@playwright/test'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 const DELIVERY_BASE_URL = (
-  process.env.E2E_DELIVERY_BASE_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  'https://order.mesofood.pl'
+  process.env.E2E_DELIVERY_BASE_URL || 'https://order.mesofood.pl'
 ).replace(/\/+$/, '')
 
 const POS_BASE_URL = (
-  process.env.E2E_POS_BASE_URL ||
-  process.env.POS_API_URL ||
-  'https://pos.mesofood.pl'
+  process.env.E2E_POS_BASE_URL || 'https://pos.mesofood.pl'
 ).replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '')
 
 const GATE_PASSWORD = process.env.E2E_GATE_PASSWORD || 'TuJestMeso2026'
-const P24_AUTOMATE = process.env.E2E_P24_AUTOMATE === '1'
+const P24_AUTOMATE = process.env.E2E_P24_AUTOMATE !== '0'
 const P24_REDIRECT_TIMEOUT_MS = Number(process.env.E2E_P24_REDIRECT_TIMEOUT_MS || 300_000)
+const SHARED_DELIVERY_EMAIL = process.env.E2E_DELIVERY_EMAIL || 'e2e-order-supabase@meso.dev'
+const SHARED_DELIVERY_PASSWORD = process.env.E2E_DELIVERY_PASSWORD || 'SandboxP24-test-123!'
 
 const UNIQUE = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-const DELIVERY_EMAIL = `e2e-sandbox-${UNIQUE}@meso.dev`
-const DELIVERY_PASSWORD = 'SandboxP24-test-123!'
+const FALLBACK_DELIVERY_EMAIL = `e2e-sandbox-${UNIQUE}@meso.dev`
 const DELIVERY_FIRST_NAME = 'E2E'
 const DELIVERY_LAST_NAME = 'Sandbox'
 const DELIVERY_PHONE = '+48500777111'
@@ -71,11 +70,137 @@ async function setGateCookie(page: Page, appUrl: string) {
   }])
 }
 
-async function loginDeliveryUser(page: Page) {
+type DeliveryAuthUser = {
+  id: string
+  email: string
+  createdForTest: boolean
+}
+
+async function findAuthUserByEmail(admin: SupabaseClient, email: string) {
+  const targetEmail = email.toLowerCase()
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) throw new Error(`Failed to list auth users: ${error.message}`)
+    const users = data?.users || []
+    const matched = users.find(user => (user.email || '').toLowerCase() === targetEmail)
+    if (matched) return matched
+    if (users.length < 200) break
+  }
+  return null
+}
+
+async function findReusableE2EUser(admin: SupabaseClient) {
+  const pattern = /^e2e-.*@meso\.dev$/i
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) throw new Error(`Failed to list auth users: ${error.message}`)
+    const users = data?.users || []
+    const matched = users.find(user => pattern.test(user.email || ''))
+    if (matched) return matched
+    if (users.length < 200) break
+  }
+  return null
+}
+
+async function ensureDeliveryAuthUser(admin: SupabaseClient): Promise<DeliveryAuthUser> {
+  // 1) Prefer shared reusable account (stable and cleanup-safe)
+  const existingPreferred = await findAuthUserByEmail(admin, SHARED_DELIVERY_EMAIL)
+  if (existingPreferred?.id && existingPreferred.email) {
+    const { error: updateError } = await admin.auth.admin.updateUserById(existingPreferred.id, {
+      password: SHARED_DELIVERY_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
+        ...(existingPreferred.user_metadata || {}),
+        app_role: 'customer',
+        first_name: DELIVERY_FIRST_NAME,
+        last_name: DELIVERY_LAST_NAME,
+      },
+    })
+    if (updateError) {
+      throw new Error(`Failed to update shared delivery user: ${updateError.message}`)
+    }
+    return { id: existingPreferred.id, email: existingPreferred.email, createdForTest: false }
+  }
+
+  // 2) Try creating fallback unique user (may fail on some live DB states)
+  const { data: createdUser, error: createError } = await admin.auth.admin.createUser({
+    email: FALLBACK_DELIVERY_EMAIL,
+    password: SHARED_DELIVERY_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      app_role: 'customer',
+      first_name: DELIVERY_FIRST_NAME,
+      last_name: DELIVERY_LAST_NAME,
+    },
+  })
+  if (!createError && createdUser.user?.id && createdUser.user.email) {
+    return { id: createdUser.user.id, email: createdUser.user.email, createdForTest: true }
+  }
+
+  // 3) Final fallback: reuse any existing E2E account and reset its password
+  const reusable = await findReusableE2EUser(admin)
+  if (reusable?.id && reusable.email) {
+    const { error: updateError } = await admin.auth.admin.updateUserById(reusable.id, {
+      password: SHARED_DELIVERY_PASSWORD,
+      email_confirm: true,
+      user_metadata: {
+        ...(reusable.user_metadata || {}),
+        app_role: 'customer',
+        first_name: DELIVERY_FIRST_NAME,
+        last_name: DELIVERY_LAST_NAME,
+      },
+    })
+    if (updateError) {
+      throw new Error(`Failed to update fallback E2E user: ${updateError.message}`)
+    }
+    return { id: reusable.id, email: reusable.email, createdForTest: false }
+  }
+
+  const createMessage = createError ? `createUser failed: ${createError.message}` : 'createUser returned no user'
+  throw new Error(
+    `Unable to provision delivery auth user (${createMessage}). ` +
+    'Set E2E_DELIVERY_EMAIL/E2E_DELIVERY_PASSWORD to an existing account.'
+  )
+}
+
+async function ensureCustomerProfile(admin: SupabaseClient, user: DeliveryAuthUser) {
+  const { data: existing, error: existingError } = await admin
+    .from('crm_customers')
+    .select('id')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (existingError) {
+    throw new Error(`Failed checking customer profile: ${existingError.message}`)
+  }
+  if (existing?.id) return
+
+  const { error: insertError } = await admin.from('crm_customers').insert({
+    id: user.id,
+    auth_id: user.id,
+    email: user.email,
+    first_name: DELIVERY_FIRST_NAME,
+    last_name: DELIVERY_LAST_NAME,
+    phone: DELIVERY_PHONE,
+    registration_date: new Date().toISOString().slice(0, 10),
+    source: 'delivery_app',
+    marketing_consent: false,
+    sms_consent: false,
+    loyalty_points: 0,
+    lifetime_points: 0,
+    loyalty_tier: 'bronze',
+    is_active: true,
+  })
+  if (insertError) {
+    throw new Error(`Failed creating missing customer profile: ${insertError.message}`)
+  }
+}
+
+async function loginDeliveryUser(page: Page, email: string, password: string) {
   await setGateCookie(page, DELIVERY_BASE_URL)
   await page.goto(`${DELIVERY_BASE_URL}/login`, { timeout: 60_000 })
-  await page.locator('input[type="email"]').fill(DELIVERY_EMAIL)
-  await page.locator('input[type="password"]').fill(DELIVERY_PASSWORD)
+  await page.locator('input[type="email"]').fill(email)
+  await page.locator('input[type="password"]').fill(password)
   await page.locator('button[type="submit"]').click()
   await page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 30_000 })
 }
@@ -226,6 +351,8 @@ async function completeP24SandboxPayment(page: Page) {
 test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () => {
   let admin: SupabaseClient
   let deliveryUserId = ''
+  let deliveryUserEmail = ''
+  let deliveryUserCreatedForTest = false
   let createdOrderId = ''
   let orderNumber = ''
 
@@ -240,7 +367,7 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
         await admin.from('orders_order_items').delete().eq('order_id', createdOrderId)
         await admin.from('orders_orders').delete().eq('id', createdOrderId)
       }
-      if (deliveryUserId) {
+      if (deliveryUserId && deliveryUserCreatedForTest) {
         await admin.from('crm_loyalty_transactions').delete().eq('customer_id', deliveryUserId)
         await admin.from('crm_customers').delete().eq('id', deliveryUserId)
         await admin.auth.admin.deleteUser(deliveryUserId)
@@ -253,38 +380,15 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
   test('places online order, pays in P24 sandbox, and starts preparing in POS KDS', async ({ page, browser }) => {
     test.setTimeout(10 * 60_000)
 
-    // 1) Create unique delivery user
-    const { data: createdUser, error: userError } = await admin.auth.admin.createUser({
-      email: DELIVERY_EMAIL,
-      password: DELIVERY_PASSWORD,
-      email_confirm: true,
-      user_metadata: {
-        app_role: 'customer',
-        first_name: DELIVERY_FIRST_NAME,
-        last_name: DELIVERY_LAST_NAME,
-      },
-    })
-    expect(userError).toBeNull()
-    expect(createdUser.user).toBeTruthy()
-    deliveryUserId = createdUser.user!.id
-
-    await admin.from('crm_customers').upsert({
-      id: deliveryUserId,
-      auth_id: deliveryUserId,
-      email: DELIVERY_EMAIL,
-      first_name: DELIVERY_FIRST_NAME,
-      last_name: DELIVERY_LAST_NAME,
-      phone: DELIVERY_PHONE,
-      registration_date: new Date().toISOString(),
-      source: 'web',
-      loyalty_points: 0,
-      lifetime_points: 0,
-      loyalty_tier: 'bronze',
-      is_active: true,
-    }, { onConflict: 'id' })
+    // 1) Provision delivery auth user (reuse if createUser is currently unavailable)
+    const deliveryUser = await ensureDeliveryAuthUser(admin)
+    deliveryUserId = deliveryUser.id
+    deliveryUserEmail = deliveryUser.email
+    deliveryUserCreatedForTest = deliveryUser.createdForTest
+    await ensureCustomerProfile(admin, deliveryUser)
 
     // 2) Login in delivery and add product via UI (more robust than localStorage injection on hosted env)
-    await loginDeliveryUser(page)
+    await loginDeliveryUser(page, deliveryUserEmail, SHARED_DELIVERY_PASSWORD)
 
     // Validate live menu endpoint/rendering first — prevents false green when menu is broken.
     await page.goto(`${DELIVERY_BASE_URL}/menu`, { timeout: 60_000 })
@@ -338,14 +442,13 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
 
     await page.getByLabel('Imię').fill(DELIVERY_FIRST_NAME)
     await page.getByLabel('Nazwisko').fill(DELIVERY_LAST_NAME)
-    await page.getByLabel('Email').fill(DELIVERY_EMAIL)
-    await page.getByLabel(/Numer telefonu|Telefon/i).fill('500777111')
+    await page.getByLabel('Email').fill(deliveryUserEmail)
+    await page.getByLabel(/Numer telefonu|Telefon/i).fill('+48500777111')
 
-    await page.evaluate(() => {
-      const form = document.getElementById('address-form') as HTMLFormElement | null
-      form?.requestSubmit()
-    })
-    await page.waitForTimeout(300)
+    // Force online payment path to guarantee /api/payments/p24/register call.
+    const onlinePaymentButton = page.getByRole('button', { name: /Płatność online/i }).first()
+    await expect(onlinePaymentButton).toBeVisible({ timeout: 10_000 })
+    await onlinePaymentButton.click()
 
     const termsCheckbox = page.getByTestId('terms-acceptance')
     await expect(termsCheckbox).toBeVisible()
@@ -356,20 +459,29 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
     const submitButton = page.getByTestId('checkout-submit-button')
     await expect(submitButton).toBeVisible()
 
-    const tryCaptureRegisterRequest = async () => {
-      const requestPromise = page.waitForRequest(
+    const waitForRegisterRequest = () =>
+      page.waitForRequest(
         req => req.method() === 'POST' && req.url().includes('/api/payments/p24/register'),
-        { timeout: 10_000 }
+        { timeout: 15_000 }
       ).catch(() => null)
-      await submitButton.click()
-      return requestPromise
-    }
 
-    let registerRequest = await tryCaptureRegisterRequest()
+    // First click may only submit contact form (requestSubmit), second click places order.
+    let registerRequestPromise = waitForRegisterRequest()
+    await submitButton.click()
+    let registerRequest = await registerRequestPromise
     if (!registerRequest) {
-      registerRequest = await tryCaptureRegisterRequest()
+      registerRequestPromise = waitForRegisterRequest()
+      await submitButton.click()
+      registerRequest = await registerRequestPromise
     }
-    expect(registerRequest, 'Missing /api/payments/p24/register request').toBeTruthy()
+    if (!registerRequest) {
+      const visibleErrors = await page.locator('p.text-red-400').allTextContents()
+      const activeToasts = await page.locator('[data-sonner-toast]').allTextContents().catch(() => [])
+      throw new Error(
+        `Missing /api/payments/p24/register request. URL=${page.url()} | ` +
+        `formErrors=${JSON.stringify(visibleErrors)} | toasts=${JSON.stringify(activeToasts)}`
+      )
+    }
 
     const registerPayload = registerRequest!.postDataJSON() as { orderId?: string }
     createdOrderId = String(registerPayload?.orderId || '')

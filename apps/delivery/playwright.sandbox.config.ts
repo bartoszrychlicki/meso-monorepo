@@ -5,9 +5,7 @@ import path from 'path';
 dotenv.config({ path: path.resolve(__dirname, '.env.local') });
 
 const deliveryBaseUrl = (
-  process.env.E2E_DELIVERY_BASE_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
-  'https://order.mesofood.pl'
+  process.env.E2E_DELIVERY_BASE_URL || 'https://order.mesofood.pl'
 ).replace(/\/+$/, '');
 
 export default defineConfig({

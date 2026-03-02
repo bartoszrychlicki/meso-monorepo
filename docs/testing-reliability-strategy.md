@@ -21,21 +21,11 @@ If any of the above fails, release is blocked.
 - Scope: business logic, API handlers, state transitions, shared packages.
 - Command: `pnpm test`
 
-2. Cross-app browser smoke (Playwright)
-- Scope: fastest end-to-end path through Delivery + POS/KDS.
-- Command: `cd apps/delivery && pnpm test:e2e:smoke`
-
-3. Cross-app browser regression (Playwright)
-- Scope: broader suite for checkout/order/payment mocks + status propagation.
-- Command: `cd apps/delivery && pnpm test:e2e:regression`
-
-4. Production-like sandbox (Playwright + real P24 sandbox)
+2. Production-like sandbox (Playwright + real P24 sandbox)
 - Scope: real payment redirect and confirmation + POS/KDS handling.
 - Command: `cd apps/delivery && pnpm test:e2e:sandbox`
 
-### Quarantined E2E tests
-
-`apps/delivery/tests/order-placement-e2e.spec.ts` is currently kept for manual/debug runs, but excluded from CI regression gate due intermittent `order_items` persistence timing in DB assertions. Re-enable in CI after root cause fix.
+Legacy localhost Playwright suites (`test:e2e:smoke`, `test:e2e:regression`) are kept only for ad-hoc debugging and are not part of the release gate.
 
 ## 3) GitHub Actions Workflows
 
@@ -43,15 +33,15 @@ If any of the above fails, release is blocked.
 - Trigger: pull requests to `main`.
 - Jobs:
   - `quality` (build, lint, type-check, unit/integration tests)
-  - `e2e-smoke` (cross-app smoke)
+  - `e2e-smoke` (live sandbox E2E; job id kept for branch-protection compatibility)
 - This is the merge gate.
 
 2. `CI Main` (`.github/workflows/ci-main.yml`)
 - Trigger: push to `main`.
 - Jobs:
   - `quality`
-  - `e2e-regression`
-- This is post-merge regression confidence.
+  - `e2e-regression` (live sandbox E2E; job id kept for compatibility)
+- This is post-merge confidence.
 
 3. `E2E Sandbox` (`.github/workflows/e2e-sandbox.yml`)
 - Trigger: nightly schedule + manual dispatch.
@@ -62,8 +52,7 @@ If any of the above fails, release is blocked.
 - Trigger: manual dispatch before release.
 - Jobs:
   - `quality`
-  - `e2e-smoke`
-  - optional `e2e-sandbox`
+  - optional `e2e-sandbox` (live sandbox E2E)
 
 All Playwright workflows upload `apps/delivery/test-results/` artifacts.
 
