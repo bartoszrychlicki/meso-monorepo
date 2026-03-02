@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { Order } from '@/types/order';
-import { OrderStatus, OrderChannel, OrderSource } from '@/types/enums';
+import {
+  ModifierAction,
+  OrderStatus,
+  OrderChannel,
+  OrderSource,
+  PaymentMethod,
+  PaymentStatus,
+} from '@/types/enums';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { OrderStatusBadge } from './order-status-badge';
@@ -52,6 +59,30 @@ const SOURCE_LABELS: Record<OrderSource, string> = {
   [OrderSource.DELIVERY]: 'Dostawa',
 };
 
+const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  [PaymentMethod.CASH]: 'Gotówka',
+  [PaymentMethod.CARD]: 'Karta',
+  [PaymentMethod.BLIK]: 'BLIK',
+  [PaymentMethod.ONLINE]: 'Online',
+  [PaymentMethod.VOUCHER]: 'Voucher',
+  [PaymentMethod.PAY_ON_PICKUP]: 'Przy odbiorze',
+};
+
+const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  [PaymentStatus.PENDING]: 'Oczekuje',
+  [PaymentStatus.PAID]: 'Opłacone',
+  [PaymentStatus.FAILED]: 'Nieudane',
+  [PaymentStatus.REFUNDED]: 'Zwrócone',
+  [PaymentStatus.PAY_ON_PICKUP]: 'Przy odbiorze',
+};
+
+const MODIFIER_ACTION_LABELS: Record<ModifierAction, string> = {
+  [ModifierAction.ADD]: '+',
+  [ModifierAction.REMOVE]: '-',
+  [ModifierAction.SUBSTITUTE]: '↔',
+  [ModifierAction.PREPARATION]: '•',
+};
+
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
   [OrderStatus.PENDING]: OrderStatus.CONFIRMED,
   [OrderStatus.CONFIRMED]: OrderStatus.PREPARING,
@@ -70,6 +101,29 @@ interface OrderDetailProps {
   order: Order;
   onStatusChange: (status: OrderStatus, note?: string) => Promise<void>;
   onCancel: (reason: string) => Promise<void>;
+}
+
+interface TimestampField {
+  key: keyof Order;
+  label: string;
+}
+
+const TIMESTAMP_FIELDS: TimestampField[] = [
+  { key: 'created_at', label: 'Utworzone' },
+  { key: 'paid_at', label: 'Opłacone' },
+  { key: 'confirmed_at', label: 'Potwierdzone' },
+  { key: 'preparing_at', label: 'Rozpoczęto przygotowanie' },
+  { key: 'ready_at', label: 'Gotowe' },
+  { key: 'picked_up_at', label: 'Wydane' },
+  { key: 'delivered_at', label: 'Dostarczone' },
+  { key: 'cancelled_at', label: 'Anulowane' },
+];
+
+function formatModifierLine(modifier: Order['items'][number]['modifiers'][number]) {
+  const actionLabel = MODIFIER_ACTION_LABELS[modifier.modifier_action] || '+';
+  const quantity = modifier.quantity > 1 ? ` x${modifier.quantity}` : '';
+  const lineTotal = modifier.price * modifier.quantity;
+  return `${actionLabel} ${modifier.name}${quantity} (${formatCurrency(lineTotal)})`;
 }
 
 export function OrderDetail({
@@ -185,6 +239,11 @@ export function OrderDetail({
                               ({item.variant_name})
                             </span>
                           )}
+                          {item.variant_id && (
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              ID wariantu: {item.variant_id}
+                            </p>
+                          )}
                           {(item.modifiers?.length ?? 0) > 0 && (
                             <div className="mt-0.5 space-y-0.5">
                               {item.modifiers!.map((mod) => (
@@ -192,7 +251,7 @@ export function OrderDetail({
                                   key={mod.modifier_id}
                                   className="text-xs font-semibold text-orange-700"
                                 >
-                                  + {mod.name} ({formatCurrency(mod.price)})
+                                  {formatModifierLine(mod)}
                                 </p>
                               ))}
                             </div>
@@ -235,6 +294,18 @@ export function OrderDetail({
                   <span className="text-muted-foreground">VAT</span>
                   <span>{formatCurrency(order.tax)}</span>
                 </div>
+                {typeof order.delivery_fee === 'number' && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Dostawa</span>
+                    <span>{formatCurrency(order.delivery_fee)}</span>
+                  </div>
+                )}
+                {typeof order.tip === 'number' && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Napiwek</span>
+                    <span>{formatCurrency(order.tip)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between text-base font-semibold">
                   <span>Razem</span>
@@ -314,7 +385,7 @@ export function OrderDetail({
         </div>
 
         {/* Right column - timeline */}
-        <div>
+        <div className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -324,6 +395,126 @@ export function OrderDetail({
             </CardHeader>
             <CardContent>
               <OrderTimeline history={order.status_history} />
+            </CardContent>
+          </Card>
+
+          <Card data-component="order-metadata">
+            <CardHeader>
+              <CardTitle className="text-base">Szczegóły zamówienia</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Metoda płatności</span>
+                <span className="text-right">
+                  {order.payment_method
+                    ? (PAYMENT_METHOD_LABELS[order.payment_method] || order.payment_method)
+                    : 'Brak'}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Status płatności</span>
+                <span className="text-right">
+                  {PAYMENT_STATUS_LABELS[order.payment_status] || order.payment_status}
+                </span>
+              </div>
+              {order.delivery_type && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Typ realizacji</span>
+                  <span className="text-right">
+                    {order.delivery_type === 'delivery' ? 'Dostawa' : 'Odbiór'}
+                  </span>
+                </div>
+              )}
+              {order.scheduled_time && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Zaplanowane na</span>
+                  <span className="text-right">{formatDateTime(order.scheduled_time)}</span>
+                </div>
+              )}
+              {order.promo_code && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Kod promocyjny</span>
+                  <span className="text-right">{order.promo_code}</span>
+                </div>
+              )}
+              {typeof order.promo_discount === 'number' && order.promo_discount > 0 && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Rabat promocyjny</span>
+                  <span className="text-right">{formatCurrency(order.promo_discount)}</span>
+                </div>
+              )}
+              {typeof order.tip === 'number' && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Napiwek</span>
+                  <span className="text-right">{formatCurrency(order.tip)}</span>
+                </div>
+              )}
+              {order.external_order_id && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">ID zewnętrzne</span>
+                  <span className="text-right break-all">{order.external_order_id}</span>
+                </div>
+              )}
+              {order.external_channel && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Kanał zewnętrzny</span>
+                  <span className="text-right">{order.external_channel}</span>
+                </div>
+              )}
+              {typeof order.loyalty_points_earned === 'number' && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Punkty loyalty</span>
+                  <span className="text-right">{order.loyalty_points_earned}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">ID lokalizacji</span>
+                <span className="text-right break-all">{order.location_id}</span>
+              </div>
+              {order.customer_id && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">ID klienta</span>
+                  <span className="text-right break-all">{order.customer_id}</span>
+                </div>
+              )}
+              {order.assigned_to && (
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Przypisane do</span>
+                  <span className="text-right break-all">{order.assigned_to}</span>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Znaczniki czasu
+                </p>
+                {TIMESTAMP_FIELDS.map((field) => {
+                  const value = order[field.key];
+                  if (!value || typeof value !== 'string') return null;
+                  return (
+                    <div key={field.key} className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">{field.label}</span>
+                      <span className="text-right">{formatDateTime(value)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {order.metadata && Object.keys(order.metadata).length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Metadata
+                    </p>
+                    <pre className="overflow-x-auto rounded-md bg-muted p-2 text-xs">
+                      {JSON.stringify(order.metadata, null, 2)}
+                    </pre>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>

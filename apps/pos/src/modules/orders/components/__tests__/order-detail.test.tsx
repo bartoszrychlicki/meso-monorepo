@@ -7,6 +7,7 @@ import {
   OrderStatus,
   OrderChannel,
   OrderSource,
+  PaymentMethod,
   PaymentStatus,
   ModifierAction,
 } from '@/types/enums';
@@ -79,7 +80,10 @@ const baseOrder: Order = {
   subtotal: 64.0,
   tax: 5.12,
   discount: 0,
+  delivery_fee: 0,
+  tip: 0,
   total: 69.12,
+  payment_method: PaymentMethod.CASH,
   payment_status: PaymentStatus.PENDING,
   status_history: [
     {
@@ -108,10 +112,23 @@ const orderWithModifiers: Order = {
     country: 'PL',
   },
   notes: 'Prosze dzwonic domofonem 15',
+  delivery_type: 'delivery',
   subtotal: 76.0,
   tax: 6.08,
+  delivery_fee: 5.0,
+  tip: 3.0,
   discount: 10.0,
   total: 72.08,
+  payment_method: PaymentMethod.BLIK,
+  payment_status: PaymentStatus.PAID,
+  promo_code: 'FIRST10',
+  promo_discount: 10.0,
+  external_order_id: 'ext-123',
+  external_channel: 'delivery-app',
+  metadata: { source: 'integration-test' },
+  loyalty_points_earned: 72,
+  preparing_at: '2024-06-15T12:10:00Z',
+  ready_at: '2024-06-15T12:20:00Z',
   status_history: [
     {
       status: OrderStatus.CONFIRMED,
@@ -166,7 +183,7 @@ describe('OrderDetail', () => {
 
     // Channel & source labels
     expect(screen.getByText('Online')).toBeInTheDocument();
-    expect(screen.getByText('Dostawa')).toBeInTheDocument();
+    expect(screen.getAllByText('Dostawa').length).toBeGreaterThan(0);
   });
 
   it('renders items with modifiers and their prices', () => {
@@ -263,6 +280,19 @@ describe('OrderDetail', () => {
     expect(screen.getByText('Rabat')).toBeInTheDocument();
     // "Razem" (total) label
     expect(screen.getByText('Razem')).toBeInTheDocument();
+  });
+
+  it('renders extended order metadata block', () => {
+    renderOrderDetail(orderWithModifiers);
+
+    expect(screen.getByText('Szczegóły zamówienia')).toBeInTheDocument();
+    expect(screen.getByText('BLIK')).toBeInTheDocument();
+    expect(screen.getByText('Opłacone')).toBeInTheDocument();
+    expect(screen.getByText('Kod promocyjny')).toBeInTheDocument();
+    expect(screen.getByText('FIRST10')).toBeInTheDocument();
+    expect(screen.getByText('ID zewnętrzne')).toBeInTheDocument();
+    expect(screen.getByText('ext-123')).toBeInTheDocument();
+    expect(screen.getByText('Metadata')).toBeInTheDocument();
   });
 
   it('does not render discount line when discount is 0', () => {
