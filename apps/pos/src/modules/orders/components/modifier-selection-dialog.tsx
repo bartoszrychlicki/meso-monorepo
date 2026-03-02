@@ -8,6 +8,7 @@ import { formatCurrency } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -78,9 +79,9 @@ export function ModifierSelectionDialog({
       >
         <DialogHeader>
           <DialogTitle>{product.name}</DialogTitle>
-          <p className="text-sm text-muted-foreground">
+          <DialogDescription>
             Wybierz modyfikatory:
-          </p>
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2 py-2">
