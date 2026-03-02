@@ -45,10 +45,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Trash2, Save, X, Search, DollarSign, HelpCircle, ListPlus } from 'lucide-react';
+import { Trash2, Save, X, Search, DollarSign, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { DecimalInput } from '@/components/ui/decimal-input';
-import { ProductSearchDialog } from './product-search-dialog';
 
 interface RecipeIngredientField {
   type: 'stock_item' | 'recipe';
@@ -89,7 +88,6 @@ function IngredientChecklist({
   setIsSavingIngredients,
   watchedIngredients,
 }: IngredientChecklistProps) {
-  const [productSearchOpen, setProductSearchOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'stock_items' | 'recipes'>('stock_items');
   const showRecipesTab = productCategory === ProductCategory.FINISHED_GOOD;
 
@@ -184,16 +182,6 @@ function IngredientChecklist({
             )}
           </CardTitle>
           <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setProductSearchOpen(true)}
-              data-action="add-from-list"
-            >
-              <ListPlus className="mr-1 h-4 w-4" />
-              Dodaj z listy
-            </Button>
             {onSaveIngredients && (
               <Button
                 type="button"
@@ -427,15 +415,6 @@ function IngredientChecklist({
           </div>
         )}
 
-        <ProductSearchDialog
-          open={productSearchOpen}
-          onOpenChange={setProductSearchOpen}
-          stockItems={stockItems}
-          excludeIds={Array.from(selectedStockIds)}
-          onSelect={(stockItem) => {
-            append({ type: 'stock_item', reference_id: stockItem.id, reference_name: stockItem.name, quantity: 1, unit: stockItem.unit });
-          }}
-        />
       </CardContent>
     </Card>
   );
@@ -599,6 +578,24 @@ export function RecipeForm({
 
           <FormField
             control={form.control}
+            name="description"
+            render={({ field }) => (
+              <FormItem className="flex-1">
+                <FormLabel>Opis</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Opis receptury (opcjonalny)"
+                    data-field="recipe-description"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
             name="product_category"
             render={({ field }) => (
               <FormItem>
@@ -732,24 +729,6 @@ export function RecipeForm({
             )}
           />
         </div>
-
-        {/* Row 2: Description */}
-        <FormField
-          control={form.control}
-          name="description"
-          render={({ field }) => (
-            <FormItem>
-              <FormControl>
-                <Input
-                  placeholder="Opis receptury (opcjonalny)"
-                  data-field="recipe-description"
-                  {...field}
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
 
         {/* Ingredients Checklist */}
         <IngredientChecklist
