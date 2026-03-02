@@ -232,7 +232,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               <Input
                 id="pickup_time_min"
                 type="number"
-                disabled={!isDeliveryActive}
                 {...form.register('pickup_time_min', { valueAsNumber: true })}
                 data-field="pickup_time_min"
               />
@@ -248,7 +247,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               <Input
                 id="pickup_time_max"
                 type="number"
-                disabled={!isDeliveryActive}
                 {...form.register('pickup_time_max', { valueAsNumber: true })}
                 data-field="pickup_time_max"
               />
@@ -266,7 +264,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               <Input
                 id="pickup_buffer_after_open"
                 type="number"
-                disabled={!isDeliveryActive}
                 {...form.register('pickup_buffer_after_open', { valueAsNumber: true })}
                 data-field="pickup_buffer_after_open"
               />
@@ -282,7 +279,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               <Input
                 id="pickup_buffer_before_close"
                 type="number"
-                disabled={!isDeliveryActive}
                 {...form.register('pickup_buffer_before_close', { valueAsNumber: true })}
                 data-field="pickup_buffer_before_close"
               />
@@ -309,7 +305,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               onCheckedChange={(checked) =>
                 form.setValue('pay_on_pickup_enabled', checked, { shouldValidate: true })
               }
-              disabled={!isDeliveryActive}
               data-field="pay_on_pickup_enabled"
             />
           </div>
@@ -321,7 +316,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
                 id="pay_on_pickup_fee"
                 type="number"
                 step="0.01"
-                disabled={!isDeliveryActive}
                 {...form.register('pay_on_pickup_fee', { valueAsNumber: true })}
                 data-field="pay_on_pickup_fee"
               />
@@ -338,7 +332,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
                 id="pay_on_pickup_max_order"
                 type="number"
                 step="0.01"
-                disabled={!isDeliveryActive}
                 {...form.register('pay_on_pickup_max_order', { valueAsNumber: true })}
                 data-field="pay_on_pickup_max_order"
               />
