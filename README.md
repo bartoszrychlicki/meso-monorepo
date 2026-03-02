@@ -107,3 +107,32 @@ npx playwright test tests/full-lifecycle-e2e.spec.ts --project=chromium
 ```
 
 Requires both apps running locally.
+
+Sandbox cross-app flow (Delivery -> P24 sandbox -> POS KDS):
+
+```bash
+cd apps/delivery
+npm run test:e2e:sandbox:headed
+```
+
+Recommended (explicit live targets):
+
+```bash
+cd apps/delivery
+E2E_DELIVERY_BASE_URL=https://order.mesofood.pl \
+E2E_POS_BASE_URL=https://pos.mesofood.pl \
+E2E_P24_AUTOMATE=1 \
+E2E_P24_REDIRECT_TIMEOUT_MS=120000 \
+npm run test:e2e:sandbox:headed
+```
+
+Required env variables for sandbox run:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Optional:
+- `E2E_DELIVERY_BASE_URL` (default: `https://order.mesofood.pl`)
+- `E2E_POS_BASE_URL` (default: `https://pos.mesofood.pl`)
+- `E2E_GATE_PASSWORD` (default: `TuJestMeso2026`)
+- `E2E_P24_AUTOMATE=1` (enable heuristic auto-clicks on P24 sandbox page)
+- `E2E_P24_REDIRECT_TIMEOUT_MS` (max wait for redirect from P24)

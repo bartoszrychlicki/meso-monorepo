@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:e2e": "playwright test tests/cross-app-lifecycle.spec.ts --project=chromium"
+    "test:e2e": "playwright test tests/cross-app-lifecycle.spec.ts --project=chromium",
+    "test:e2e:sandbox": "playwright test tests/sandbox-cross-app-p24.spec.ts --config=playwright.sandbox.config.ts --project=chromium",
+    "test:e2e:sandbox:headed": "playwright test tests/sandbox-cross-app-p24.spec.ts --config=playwright.sandbox.config.ts --project=chromium --headed"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
