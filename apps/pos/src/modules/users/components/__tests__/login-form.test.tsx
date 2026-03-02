@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 
 // Mock the server action
@@ -136,8 +136,11 @@ describe('LoginForm', () => {
       expect(button).toBeDisabled();
     });
 
-    // Clean up: resolve the pending promise
-    resolveSignIn!({ error: '' });
+    // Clean up: resolve the pending promise and flush state updates
+    await act(async () => {
+      resolveSignIn!({ error: '' });
+      await Promise.resolve();
+    });
   });
 
   it('passes redirectTo prop to signIn when provided', async () => {

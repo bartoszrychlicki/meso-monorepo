@@ -7,6 +7,7 @@ import { Recipe } from '@/types/recipe';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -114,6 +115,9 @@ export function ModifierFormDialog({
           <DialogTitle>
             {isEditing ? 'Edytuj modyfikator' : 'Nowy modyfikator'}
           </DialogTitle>
+          <DialogDescription>
+            Skonfiguruj nazwe, cene i typ akcji modyfikatora.
+          </DialogDescription>
         </DialogHeader>
 
         <TooltipProvider>

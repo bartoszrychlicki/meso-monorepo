@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -178,6 +179,9 @@ export default function AdminUsersPage() {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Nowy uzytkownik</DialogTitle>
+              <DialogDescription>
+                Uzupelnij dane pracownika, aby utworzyc nowe konto do systemu POS.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={form.handleSubmit(handleCreate)} className="space-y-4">
               <div className="space-y-2">
@@ -352,6 +356,9 @@ export default function AdminUsersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Ustaw nowe haslo: {resetPasswordUser?.name}</DialogTitle>
+            <DialogDescription>
+              Wprowadz nowe haslo dla wybranego uzytkownika.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
@@ -391,6 +398,9 @@ export default function AdminUsersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Usun uzytkownika</DialogTitle>
+            <DialogDescription>
+              Potwierdz usuniecie konta uzytkownika z systemu.
+            </DialogDescription>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Czy na pewno chcesz usunac uzytkownika <strong>{deleteUser?.name}</strong> ({deleteUser?.email})?

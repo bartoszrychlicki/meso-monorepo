@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware'
 
 export interface CartItemAddon {
   id: string
@@ -76,6 +76,12 @@ interface CartState {
 // Fallback defaults (used until location data is loaded from DB)
 const DEFAULT_MIN_ORDER_VALUE = 35 // zł
 const DEFAULT_DELIVERY_FEE = 7.99 // zł
+
+const noopStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
+}
 
 // Standalone helper – reused by selectors and store methods
 function computeSubtotal(items: CartItem[]) {
@@ -270,6 +276,9 @@ export const useCartStore = create<CartState>()(
     }),
     {
       name: 'meso-cart',
+      storage: createJSONStorage(() =>
+        typeof window !== 'undefined' ? window.localStorage : noopStorage
+      ),
       partialize: (state) => ({
         items: state.items,
         locationId: state.locationId,
