@@ -47,6 +47,31 @@ function getAdminClient(): SupabaseClient {
   })
 }
 
+async function waitForOrderItems(
+  admin: SupabaseClient,
+  orderId: string,
+  timeoutMs = 20_000,
+) {
+  const startedAt = Date.now()
+  let lastError: string | null = null
+
+  while (Date.now() - startedAt < timeoutMs) {
+    const { data, error } = await admin
+      .from('orders_order_items')
+      .select('*')
+      .eq('order_id', orderId)
+
+    if (!error && data && data.length > 0) {
+      return data
+    }
+
+    lastError = error?.message ?? null
+    await new Promise(resolve => setTimeout(resolve, 1_000))
+  }
+
+  throw new Error(`order_items did not appear for order ${orderId} within ${timeoutMs}ms${lastError ? ` (last error: ${lastError})` : ''}`)
+}
+
 // ──────────────────────────────────────────────────────────
 // Tests (serial — tests build on each other)
 // ──────────────────────────────────────────────────────────
@@ -225,16 +250,11 @@ test.describe.serial('Order Placement Flow', () => {
     expect(order!.order_number).toMatch(/^WEB-/)
 
     // 13. Verify order_items exist
-    const { data: items, error: itemsError } = await admin
-      .from('orders_order_items')
-      .select('*')
-      .eq('order_id', orderId!)
-
-    expect(itemsError, `Error fetching order items: ${itemsError?.message}`).toBeNull()
+    const items = await waitForOrderItems(admin, orderId!)
     expect(items, 'order_items should exist').toBeTruthy()
-    expect(items!.length, 'Must have at least 1 order item').toBeGreaterThan(0)
+    expect(items.length, 'Must have at least 1 order item').toBeGreaterThan(0)
 
-    const firstItem = items![0]
+    const firstItem = items[0]
     expect(firstItem.order_id).toBe(orderId!)
     expect(firstItem.product_id).toBeTruthy()
     expect(firstItem.quantity).toBeGreaterThan(0)
@@ -242,7 +262,7 @@ test.describe.serial('Order Placement Flow', () => {
     expect(firstItem.total_price).toBeGreaterThan(0)
 
     console.log(`Pay on pickup order #${orderId} created successfully`)
-    console.log(`  status: ${order!.status}, payment: ${order!.payment_status}, total: ${order!.total} PLN, items: ${items!.length}`)
+    console.log(`  status: ${order!.status}, payment: ${order!.payment_status}, total: ${order!.total} PLN, items: ${items.length}`)
   })
 
   // ──────────────────────────────────────────────────────

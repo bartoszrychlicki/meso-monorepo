@@ -1,0 +1,61 @@
+name: E2E Sandbox
+
+on:
+  schedule:
+    - cron: "15 1 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-sandbox-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-cross-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright (Chromium)
+        run: pnpm --filter meso-app exec playwright install chromium --with-deps
+
+      - name: Validate required sandbox env
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://gyxcdrcdnnzjdmcrwbpr.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          test -n "${NEXT_PUBLIC_SUPABASE_URL}" || (echo "Missing NEXT_PUBLIC_SUPABASE_URL" && exit 1)
+          test -n "${SUPABASE_SERVICE_ROLE_KEY}" || (echo "Missing SUPABASE_SERVICE_ROLE_KEY" && exit 1)
+
+      - name: Run sandbox end-to-end (Delivery -> P24 -> POS KDS)
+        working-directory: apps/delivery
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://gyxcdrcdnnzjdmcrwbpr.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_DELIVERY_BASE_URL: https://order.mesofood.pl
+          E2E_POS_BASE_URL: https://pos.mesofood.pl
+          E2E_GATE_PASSWORD: ${{ secrets.E2E_GATE_PASSWORD }}
+          E2E_P24_AUTOMATE: "1"
+          E2E_P24_REDIRECT_TIMEOUT_MS: "180000"
+        run: pnpm test:e2e:sandbox
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-sandbox-${{ github.run_id }}
+          path: apps/delivery/test-results/
+          retention-days: 14

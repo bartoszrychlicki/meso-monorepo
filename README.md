@@ -99,20 +99,21 @@ Both apps deploy to **Vercel** from this monorepo:
 
 ## E2E Tests
 
-Full lifecycle E2E test (Playwright) in `apps/delivery/tests/`:
+Run from `apps/delivery`:
 
 ```bash
 cd apps/delivery
-npx playwright test tests/full-lifecycle-e2e.spec.ts --project=chromium
+pnpm test:e2e:smoke
+pnpm test:e2e:regression
 ```
 
-Requires both apps running locally.
+Smoke/regression use local `playwright.config.ts` and start both apps automatically.
 
 Sandbox cross-app flow (Delivery -> P24 sandbox -> POS KDS):
 
 ```bash
 cd apps/delivery
-npm run test:e2e:sandbox:headed
+pnpm test:e2e:sandbox:headed
 ```
 
 Recommended (explicit live targets):
@@ -123,7 +124,7 @@ E2E_DELIVERY_BASE_URL=https://order.mesofood.pl \
 E2E_POS_BASE_URL=https://pos.mesofood.pl \
 E2E_P24_AUTOMATE=1 \
 E2E_P24_REDIRECT_TIMEOUT_MS=120000 \
-npm run test:e2e:sandbox:headed
+pnpm test:e2e:sandbox:headed
 ```
 
 Required env variables for sandbox run:
@@ -136,3 +137,14 @@ Optional:
 - `E2E_GATE_PASSWORD` (default: `TuJestMeso2026`)
 - `E2E_P24_AUTOMATE=1` (enable heuristic auto-clicks on P24 sandbox page)
 - `E2E_P24_REDIRECT_TIMEOUT_MS` (max wait for redirect from P24)
+
+## CI and Release Gates
+
+Workflows:
+- `CI PR` — required merge gate (quality + smoke E2E)
+- `CI Main` — post-merge regression (quality + regression E2E)
+- `E2E Sandbox` — nightly and manual real payment sandbox flow
+- `Release Gate` — manual pre-release full validation
+
+Detailed strategy and go/no-go checklist:
+- [`docs/testing-reliability-strategy.md`](docs/testing-reliability-strategy.md)
