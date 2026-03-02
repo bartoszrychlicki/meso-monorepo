@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Product, Category, MenuModifier, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
 import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
-import { Allergen, ProductType, VariantType } from '@/types/enums';
+import { Allergen, ModifierType, ProductType, VariantType } from '@/types/enums';
 import { generateSKU } from '@/modules/menu/utils/sku-generator';
 import { createDefaultPricing } from '@/modules/menu/utils/pricing';
 import { ALLERGEN_LABELS } from '@/lib/constants';
@@ -65,6 +65,63 @@ interface ProductFormProps {
   isSubmitting?: boolean;
 }
 
+type ProductModifier = Product['modifier_groups'][number]['modifiers'][number];
+type ProductModifierGroup = Product['modifier_groups'][number];
+
+function extractModifierIdsFromLegacyGroups(groups?: Product['modifier_groups']): string[] {
+  if (!groups || groups.length === 0) return [];
+
+  const ids = groups
+    .flatMap((group) => group.modifiers ?? [])
+    .map((modifier) => modifier.id)
+    .filter((id): id is string => Boolean(id));
+
+  return [...new Set(ids)];
+}
+
+function buildLegacyModifierGroups(
+  selectedModifierIds: string[],
+  allModifiers: MenuModifier[],
+  existingGroups: Product['modifier_groups']
+): Product['modifier_groups'] {
+  const resolvedModifiers: ProductModifier[] = selectedModifierIds
+    .map((modifierId, index) => {
+      const modifier = allModifiers.find((item) => item.id === modifierId);
+      if (!modifier) return null;
+
+      const now = new Date().toISOString();
+      return {
+        id: modifier.id,
+        name: modifier.name,
+        price: modifier.price,
+        is_available: modifier.is_available,
+        sort_order: index,
+        modifier_action: modifier.modifier_action,
+        created_at: modifier.created_at ?? now,
+        updated_at: modifier.updated_at ?? now,
+      } satisfies ProductModifier;
+    })
+    .filter((modifier): modifier is ProductModifier => Boolean(modifier));
+
+  if (resolvedModifiers.length === 0) return [];
+
+  const now = new Date().toISOString();
+  const firstExistingGroup = existingGroups[0];
+  const nextGroup: ProductModifierGroup = {
+    id: firstExistingGroup?.id ?? crypto.randomUUID(),
+    name: firstExistingGroup?.name ?? 'Dodatki',
+    type: firstExistingGroup?.type ?? ModifierType.MULTIPLE,
+    required: firstExistingGroup?.required ?? false,
+    min_selections: firstExistingGroup?.min_selections ?? 0,
+    max_selections: Math.max(firstExistingGroup?.max_selections ?? 1, resolvedModifiers.length),
+    modifiers: resolvedModifiers,
+    created_at: firstExistingGroup?.created_at ?? now,
+    updated_at: now,
+  };
+
+  return [nextGroup];
+}
+
 export function ProductForm({
   product,
   categories,
@@ -79,6 +136,10 @@ export function ProductForm({
 }: ProductFormProps) {
   const [step, setStep] = useState(0);
   const [productId] = useState(() => product?.id ?? crypto.randomUUID());
+  const legacyModifierIds = useMemo(
+    () => extractModifierIdsFromLegacyGroups(product?.modifier_groups),
+    [product?.modifier_groups]
+  );
 
   // Form state
   const [name, setName] = useState(product?.name ?? '');
@@ -99,15 +160,21 @@ export function ProductForm({
 
   // Modifiers
   const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>(
-    initialModifierIds ?? []
+    () => (initialModifierIds && initialModifierIds.length > 0 ? initialModifierIds : legacyModifierIds)
   );
+  const [modifierSelectionTouched, setModifierSelectionTouched] = useState(false);
 
   // Sync selectedModifierIds when initialModifierIds arrives asynchronously
   useEffect(() => {
-    if (initialModifierIds && initialModifierIds.length > 0) {
+    if (initialModifierIds === undefined || modifierSelectionTouched) return;
+
+    if (initialModifierIds.length > 0) {
       setSelectedModifierIds(initialModifierIds);
+      return;
     }
-  }, [initialModifierIds]);
+
+    setSelectedModifierIds(legacyModifierIds);
+  }, [initialModifierIds, legacyModifierIds, modifierSelectionTouched]);
 
   // Allergens
   const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>(
@@ -179,8 +246,24 @@ export function ProductForm({
     setVariants(variants.map((v) => (v.id === variantId ? { ...v, ...updates } : v)));
   };
 
+  const handleModifierIdsChange = (modifierIds: string[]) => {
+    setModifierSelectionTouched(true);
+    setSelectedModifierIds(modifierIds);
+  };
+
   const handleSubmit = () => {
     const selectedCategory = categories.find((c) => c.id === categoryId);
+    const existingModifierGroups = product?.modifier_groups ?? [];
+    const nextModifierGroups = buildLegacyModifierGroups(
+      selectedModifierIds,
+      allModifiers,
+      existingModifierGroups
+    );
+    const shouldPreserveExistingGroups =
+      !modifierSelectionTouched &&
+      nextModifierGroups.length === 0 &&
+      existingModifierGroups.length > 0;
+
     const data: Omit<Product, 'created_at' | 'updated_at'> = {
       id: productId,
       name,
@@ -196,7 +279,7 @@ export function ProductForm({
       allergens: selectedAllergens,
       nutritional_info: { calories, protein, carbs, fat },
       variants,
-      modifier_groups: [],
+      modifier_groups: shouldPreserveExistingGroups ? existingModifierGroups : nextModifierGroups,
       recipe_id: recipeId || undefined,
       ingredients,
       preparation_time_minutes: prepTime,
@@ -593,7 +676,7 @@ export function ProductForm({
               <ModifierPicker
                 allModifiers={allModifiers}
                 selectedModifierIds={selectedModifierIds}
-                onChange={setSelectedModifierIds}
+                onChange={handleModifierIdsChange}
                 recipes={recipes}
                 onCreateModifier={onCreateModifier ?? (async (data) => ({ ...data, id: crypto.randomUUID(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }))}
               />
