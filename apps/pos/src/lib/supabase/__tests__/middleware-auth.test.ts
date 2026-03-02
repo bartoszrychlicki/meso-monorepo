@@ -231,9 +231,9 @@ describe('Middleware auth guard', () => {
   });
 
   // -------------------------------------------------------------------------
-  // 6. Admin routes — role-based access
+  // 6. Admin routes — authenticated users can access
   // -------------------------------------------------------------------------
-  describe('Admin routes — role-based access', () => {
+  describe('Admin routes — authenticated users', () => {
     it('should allow admin user to access /admin/users', async () => {
       const supabaseResponse = mockAuthenticatedUser({ role: 'admin' });
       const request = createMockRequest('/admin/users');
@@ -243,15 +243,13 @@ describe('Middleware auth guard', () => {
       expect(response).toBe(supabaseResponse);
     });
 
-    it('should redirect cashier from /admin/users to /dashboard', async () => {
-      mockAuthenticatedUser({ role: 'cashier' });
+    it('should allow cashier to access /admin/users', async () => {
+      const supabaseResponse = mockAuthenticatedUser({ role: 'cashier' });
       const request = createMockRequest('/admin/users');
 
       const response = await middleware(request);
 
-      expect(response.status).toBe(307);
-      const location = new URL(response.headers.get('location')!);
-      expect(location.pathname).toBe('/dashboard');
+      expect(response).toBe(supabaseResponse);
     });
 
     it('should allow manager to access /admin/users', async () => {
@@ -263,15 +261,13 @@ describe('Middleware auth guard', () => {
       expect(response).toBe(supabaseResponse);
     });
 
-    it('should redirect user without role metadata from /admin/users to /dashboard', async () => {
-      mockAuthenticatedUser();
+    it('should allow user without role metadata to access /admin/users', async () => {
+      const supabaseResponse = mockAuthenticatedUser();
       const request = createMockRequest('/admin/users');
 
       const response = await middleware(request);
 
-      expect(response.status).toBe(307);
-      const location = new URL(response.headers.get('location')!);
-      expect(location.pathname).toBe('/dashboard');
+      expect(response).toBe(supabaseResponse);
     });
   });
 

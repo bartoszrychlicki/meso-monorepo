@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
-import { canManageUsers } from '@/lib/auth/permissions';
 
 const ALLOWED_ORIGINS = [
   process.env.DELIVERY_APP_URL || 'https://meso-delivery.vercel.app',
@@ -66,15 +65,6 @@ export async function middleware(request: NextRequest) {
   }
 
   const { user, supabaseResponse } = await updateSession(request);
-
-  // Admin route + authenticated user without user-management role → redirect
-  const isAdminRoute = pathname.startsWith('/admin');
-  if (isAdminRoute && user) {
-    const role = user.user_metadata?.role;
-    if (!canManageUsers(role)) {
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
-  }
 
   // Protected route + no user → redirect to /login
   if (isProtected && !user) {
