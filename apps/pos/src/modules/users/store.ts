@@ -51,9 +51,51 @@ export const useUserStore = create<UserStore>()((set, get) => ({
       const { data: staffUserByEmail } = await supabase
         .from('users_users')
         .select('*')
-        .eq('email', authUser.email)
+        .ilike('email', authUser.email)
         .maybeSingle();
       staffUser = (staffUserByEmail as User | null) ?? null;
+    }
+
+    // Auto-provision missing staff profile from auth metadata.
+    // This fixes legacy/migrated accounts that have auth.users entry but no users_users row.
+    if (!staffUser && authUser.email && authUser.user_metadata?.app_role === 'staff') {
+      const usernameBase = authUser.email
+        .split('@')[0]
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]/g, '') || 'staff';
+      const username = `${usernameBase}-${authUser.id.slice(0, 8)}`;
+      const roleFromMeta =
+        typeof authUser.user_metadata?.role === 'string'
+          ? authUser.user_metadata.role
+          : 'cashier';
+      const nameFromMeta =
+        typeof authUser.user_metadata?.name === 'string' && authUser.user_metadata.name.trim()
+          ? authUser.user_metadata.name.trim()
+          : usernameBase;
+
+      const { data: createdStaffUser } = await supabase
+        .from('users_users')
+        .insert({
+          id: authUser.id,
+          email: authUser.email,
+          name: nameFromMeta,
+          username,
+          role: roleFromMeta,
+          is_active: true,
+        })
+        .select('*')
+        .maybeSingle();
+
+      staffUser = (createdStaffUser as User | null) ?? null;
+
+      if (!staffUser) {
+        const { data: staffUserByEmailAfterInsert } = await supabase
+          .from('users_users')
+          .select('*')
+          .ilike('email', authUser.email)
+          .maybeSingle();
+        staffUser = (staffUserByEmailAfterInsert as User | null) ?? null;
+      }
     }
 
     let location: Location | null = null;

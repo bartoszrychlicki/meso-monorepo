@@ -79,8 +79,9 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     try {
       await saveDeliveryConfig(locationId, data);
       toast.success('Ustawienia dostawy zapisane');
-    } catch {
-      toast.error('Nie udalo sie zapisac ustawien dostawy');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nieznany blad';
+      toast.error(`Nie udalo sie zapisac ustawien dostawy: ${message}`);
     } finally {
       setIsSubmitting(false);
     }
