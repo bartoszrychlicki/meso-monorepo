@@ -12,13 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StockItem } from '@/types/inventory';
+import { StockItem, InventoryCategory } from '@/types/inventory';
 import { ProductCategory } from '@/types/enums';
 import { toast } from 'sonner';
 import { Save } from 'lucide-react';
 
 interface OptionsTabProps {
   item: StockItem;
+  inventoryCategories: InventoryCategory[];
   onSave: (id: string, data: Partial<StockItem>) => Promise<void>;
 }
 
@@ -28,8 +29,11 @@ const CATEGORY_LABELS: Record<ProductCategory, string> = {
   [ProductCategory.FINISHED_GOOD]: 'Gotowy produkt',
 };
 
-export function OptionsTab({ item, onSave }: OptionsTabProps) {
+const NONE_CATEGORY = '__none__';
+
+export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProps) {
   const [category, setCategory] = useState<ProductCategory>(item.product_category);
+  const [inventoryCategoryId, setInventoryCategoryId] = useState<string>(item.inventory_category_id ?? NONE_CATEGORY);
   const [costPerUnit, setCostPerUnit] = useState(item.cost_per_unit);
   const [shelfLifeDays, setShelfLifeDays] = useState(item.shelf_life_days);
   const [defaultMinQuantity, setDefaultMinQuantity] = useState(item.default_min_quantity);
@@ -38,6 +42,7 @@ export function OptionsTab({ item, onSave }: OptionsTabProps) {
 
   const hasChanges =
     category !== item.product_category ||
+    (inventoryCategoryId === NONE_CATEGORY ? null : inventoryCategoryId) !== (item.inventory_category_id ?? null) ||
     costPerUnit !== item.cost_per_unit ||
     shelfLifeDays !== item.shelf_life_days ||
     defaultMinQuantity !== item.default_min_quantity ||
@@ -48,6 +53,7 @@ export function OptionsTab({ item, onSave }: OptionsTabProps) {
     try {
       await onSave(item.id, {
         product_category: category,
+        inventory_category_id: inventoryCategoryId === NONE_CATEGORY ? null : inventoryCategoryId,
         cost_per_unit: costPerUnit,
         shelf_life_days: shelfLifeDays,
         default_min_quantity: defaultMinQuantity,
@@ -73,9 +79,9 @@ export function OptionsTab({ item, onSave }: OptionsTabProps) {
         )}
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div className="space-y-2">
-            <Label htmlFor="item-category">Kategoria</Label>
+            <Label htmlFor="item-category">Typ produktu</Label>
             <Select value={category} onValueChange={(v) => setCategory(v as ProductCategory)}>
               <SelectTrigger id="item-category" data-field="category">
                 <SelectValue />
@@ -84,6 +90,22 @@ export function OptionsTab({ item, onSave }: OptionsTabProps) {
                 {Object.values(ProductCategory).map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {CATEGORY_LABELS[cat]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="item-inventory-category">Kategoria magazynowa</Label>
+            <Select value={inventoryCategoryId} onValueChange={setInventoryCategoryId}>
+              <SelectTrigger id="item-inventory-category" data-field="inventory-category">
+                <SelectValue placeholder="Bez kategorii" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_CATEGORY}>Bez kategorii</SelectItem>
+                {inventoryCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
                   </SelectItem>
                 ))}
               </SelectContent>

@@ -1,4 +1,4 @@
-import { StockItem, StockItemComponent, Warehouse, WarehouseStock } from '@/types/inventory';
+import { InventoryCategory, StockItem, StockItemComponent, Warehouse, WarehouseStock } from '@/types/inventory';
 import { ProductCategory, Allergen, VatRate, ConsumptionType } from '@/types/enums';
 import { LOCATION_IDS } from './locations';
 
@@ -29,6 +29,12 @@ export const WAREHOUSE_IDS = {
   MAIN: '99999999-9999-9999-9999-999999990001',
   DRY: '99999999-9999-9999-9999-999999990002',
   CHEMISTRY: '99999999-9999-9999-9999-999999990003',
+} as const;
+
+export const INVENTORY_CATEGORY_IDS = {
+  RAW: '66666666-6666-6666-6666-666666666001',
+  SEMI: '66666666-6666-6666-6666-666666666002',
+  FINISHED: '66666666-6666-6666-6666-666666666003',
 } as const;
 
 export const STOCK_ITEM_COMPONENT_IDS = {
@@ -64,7 +70,37 @@ export const warehouses: Warehouse[] = [
   },
 ];
 
-export const stockItems: StockItem[] = [
+export const inventoryCategories: InventoryCategory[] = [
+  {
+    id: INVENTORY_CATEGORY_IDS.RAW,
+    name: 'Surowce',
+    description: 'Podstawowe surowce i skladniki',
+    sort_order: 1,
+    is_active: true,
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: INVENTORY_CATEGORY_IDS.SEMI,
+    name: 'Polprodukty',
+    description: 'Pozycje przygotowane do dalszej produkcji',
+    sort_order: 2,
+    is_active: true,
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+  },
+  {
+    id: INVENTORY_CATEGORY_IDS.FINISHED,
+    name: 'Produkty gotowe',
+    description: 'Produkty gotowe do wydania lub sprzedazy',
+    sort_order: 3,
+    is_active: true,
+    created_at: '2024-01-01T00:00:00.000Z',
+    updated_at: '2024-01-01T00:00:00.000Z',
+  },
+];
+
+const baseStockItems: StockItem[] = [
   {
     id: STOCK_ITEM_IDS.BEEF,
     name: 'Wolowina mielona',
@@ -406,6 +442,17 @@ export const stockItems: StockItem[] = [
     updated_at: '2024-01-01T00:00:00.000Z',
   },
 ];
+
+const CATEGORY_BY_PRODUCT_TYPE: Record<ProductCategory, string> = {
+  [ProductCategory.RAW_MATERIAL]: INVENTORY_CATEGORY_IDS.RAW,
+  [ProductCategory.SEMI_FINISHED]: INVENTORY_CATEGORY_IDS.SEMI,
+  [ProductCategory.FINISHED_GOOD]: INVENTORY_CATEGORY_IDS.FINISHED,
+};
+
+export const stockItems: StockItem[] = baseStockItems.map((item) => ({
+  ...item,
+  inventory_category_id: CATEGORY_BY_PRODUCT_TYPE[item.product_category],
+}));
 
 export const warehouseStock: WarehouseStock[] = [
   // Magazyn glowny - most items

@@ -42,6 +42,15 @@ vi.mock('@/modules/inventory/repository', () => ({
         is_active: true,
       },
     ]),
+    getAllInventoryCategories: vi.fn().mockResolvedValue([
+      {
+        id: 'category-1',
+        name: 'Surowce',
+        description: null,
+        sort_order: 1,
+        is_active: true,
+      },
+    ]),
   },
 }));
 
