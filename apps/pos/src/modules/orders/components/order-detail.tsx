@@ -267,7 +267,19 @@ export function OrderDetail({
                         {item.quantity}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(item.unit_price)}
+                        <div className="flex flex-col items-end">
+                          <span>{formatCurrency(item.unit_price)}</span>
+                          {item.original_unit_price != null && item.original_unit_price > item.unit_price && (
+                            <span className="text-xs text-muted-foreground line-through">
+                              {formatCurrency(item.original_unit_price)}
+                            </span>
+                          )}
+                          {item.promotion_label && (
+                            <span className="text-[10px] font-medium text-emerald-700">
+                              {item.promotion_label}
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency(item.subtotal)}

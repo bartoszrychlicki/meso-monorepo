@@ -13,6 +13,7 @@ import { ordersRepository } from './repository';
 import { createRepository } from '@/lib/data/repository-factory';
 import { LOCATION_IDS } from '@/seed/data/locations';
 import { USER_IDS } from '@/seed/data/users';
+import { getProductPromotionPricing } from '@/modules/menu/utils/pricing';
 
 export interface CartItem {
   id: string;
@@ -22,6 +23,8 @@ export interface CartItem {
   variant_name?: string;
   quantity: number;
   unit_price: number;
+  original_unit_price?: number;
+  promotion_label?: string;
   modifiers: OrderItemModifier[];
   modifiers_price: number;
   total_price: number;
@@ -149,6 +152,8 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
       variant_name: item.variant_name,
       quantity: item.quantity,
       unit_price: item.unit_price,
+      original_unit_price: item.original_unit_price,
+      promotion_label: item.promotion_label,
       modifiers: item.modifiers,
       subtotal: item.total_price,
     }));
@@ -255,7 +260,16 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
   // Cart actions
   addToCart: (product, variant, quantity = 1, modifiers = []) => {
     const state = get();
-    const price = variant?.price ?? product.price;
+    const promotionPricing = getProductPromotionPricing(product);
+    const basePrice = promotionPricing.currentPrice;
+    const baseOriginalPrice = promotionPricing.originalPrice;
+    const price = basePrice + (variant?.price ?? 0);
+    const originalUnitPrice = baseOriginalPrice != null
+      ? baseOriginalPrice + (variant?.price ?? 0)
+      : undefined;
+    const promotionLabel = promotionPricing.isPromotionActive
+      ? promotionPricing.promoLabel
+      : undefined;
     const modifiers_price = modifiers.reduce((sum, m) => sum + m.price * m.quantity, 0);
 
     // Only merge with existing item if no modifiers
@@ -264,6 +278,9 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
         (item) =>
           item.product_id === product.id &&
           item.variant_id === (variant?.id ?? undefined) &&
+          item.unit_price === price &&
+          item.original_unit_price === originalUnitPrice &&
+          item.promotion_label === promotionLabel &&
           item.modifiers.length === 0
       );
 
@@ -286,6 +303,8 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
       variant_name: variant?.name,
       quantity,
       unit_price: price,
+      original_unit_price: originalUnitPrice,
+      promotion_label: promotionLabel,
       modifiers,
       modifiers_price,
       total_price: quantity * (price + modifiers_price),

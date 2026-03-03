@@ -17,6 +17,7 @@ interface Product {
   description?: string
   price: number
   original_price?: number
+  promo_label?: string | null
   image_url?: string
   images?: ProductImage[]
   is_spicy?: boolean
@@ -70,6 +71,8 @@ export function ProductCard({
   const addItem = useCartStore((s) => s.addItem)
   const badges = mapProductToBadges(product)
   const imageUrl = getProductImageUrl(product)
+  const hasPromotion = Boolean(product.original_price && product.original_price > product.price)
+  const promotionLabel = product.promo_label?.trim() || 'Promocja'
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault()
@@ -125,19 +128,29 @@ export function ProductCard({
               ))}
             </div>
           )}
+          {hasPromotion && (
+            <span className="absolute right-1.5 top-1.5 rounded-md border border-emerald-400/40 bg-emerald-500/90 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-50 shadow-sm">
+              {promotionLabel}
+            </span>
+          )}
         </div>
         <h3 className="mb-0.5 font-display text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
           {product.name}
         </h3>
         <div className="flex items-center justify-between">
-          <div className="flex items-baseline gap-1">
-            <span className="font-display text-sm font-bold text-foreground">
-              {formatPrice(product.price)}
-            </span>
-            {product.original_price && product.original_price > product.price && (
-              <span className="text-[10px] font-medium text-muted-foreground line-through">
-                {formatPrice(product.original_price)}
+          <div className="flex flex-col items-start">
+            <div className="flex items-baseline gap-1">
+              <span className={cn('font-display font-bold text-foreground', hasPromotion ? 'text-base' : 'text-sm')}>
+                {formatPrice(product.price)}
               </span>
+              {hasPromotion && (
+                <span className="text-[10px] font-medium text-muted-foreground line-through">
+                  {formatPrice(product.original_price as number)}
+                </span>
+              )}
+            </div>
+            {hasPromotion && (
+              <span className="text-[10px] font-semibold text-emerald-400">Cena promocyjna</span>
             )}
           </div>
           <button
@@ -192,6 +205,11 @@ export function ProductCard({
             ))}
           </div>
         )}
+        {hasPromotion && (
+          <span className="absolute right-2 top-2 rounded-md border border-emerald-400/40 bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-50 shadow-sm">
+            {promotionLabel}
+          </span>
+        )}
       </div>
 
       {/* Info */}
@@ -205,14 +223,19 @@ export function ProductCard({
       )}
 
       <div className="flex items-center justify-between">
-        <div className="flex items-baseline gap-1.5">
-          <span className="font-display text-lg font-bold text-foreground">
-            {formatPrice(product.price)}
-          </span>
-          {product.original_price && product.original_price > product.price && (
-            <span className="text-sm font-medium text-muted-foreground line-through">
-              {formatPrice(product.original_price)}
+        <div className="flex flex-col items-start">
+          <div className="flex items-baseline gap-1.5">
+            <span className={cn('font-display font-bold text-foreground', hasPromotion ? 'text-xl' : 'text-lg')}>
+              {formatPrice(product.price)}
             </span>
+            {hasPromotion && (
+              <span className="text-sm font-medium text-muted-foreground line-through">
+                {formatPrice(product.original_price as number)}
+              </span>
+            )}
+          </div>
+          {hasPromotion && (
+            <span className="text-xs font-semibold text-emerald-400">Cena promocyjna</span>
           )}
         </div>
         <button

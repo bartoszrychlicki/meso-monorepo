@@ -24,6 +24,8 @@ export interface OrderItem {
   variant_name?: string;
   quantity: number;
   unit_price: number;
+  original_unit_price?: number;
+  promotion_label?: string;
   modifiers: OrderItemModifier[];
   subtotal: number;
   notes?: string;

@@ -24,6 +24,8 @@ export async function GET() {
       slug,
       description,
       price,
+      original_price,
+      promo_label,
       image_url,
       images,
       is_vegetarian,

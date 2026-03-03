@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { Search, ShoppingCart } from 'lucide-react';
 import { formatCurrency, cn } from '@/lib/utils';
+import { getProductPromotionPricing } from '@/modules/menu/utils/pricing';
 
 const STORAGE_PREFIX = 'mesopos_';
 
@@ -198,61 +199,93 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
         {/* Products grid */}
         <ScrollArea className="flex-1">
           <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredProducts.map((product) => (
-              <Card
-                key={product.id}
-                className={cn(
-                  'group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98]',
-                  !product.is_available && 'opacity-50 pointer-events-none'
-                )}
-                onClick={() => handleProductClick(product)}
-                data-action="add-to-cart"
-                data-id={product.id}
-              >
-                {/* Color placeholder for image */}
-                <div
+            {filteredProducts.map((product) => {
+              const promotionPricing = getProductPromotionPricing(product);
+              const currentBasePrice = promotionPricing.currentPrice;
+              const minCurrentPrice = product.variants.length > 0
+                ? Math.min(
+                    currentBasePrice,
+                    ...product.variants.map((v) => currentBasePrice + v.price)
+                  )
+                : currentBasePrice;
+              const minOriginalPrice = promotionPricing.originalPrice != null
+                ? (
+                    product.variants.length > 0
+                      ? Math.min(
+                          promotionPricing.originalPrice,
+                          ...product.variants.map((v) => promotionPricing.originalPrice! + v.price)
+                        )
+                      : promotionPricing.originalPrice
+                  )
+                : null;
+
+              return (
+                <Card
+                  key={product.id}
                   className={cn(
-                    'h-24 w-full bg-gradient-to-br',
-                    product.color || getCategoryColor(
-                      categories.find((c) => c.id === product.category_id) || {
-                        color: 'from-gray-400 to-gray-600',
-                      } as Category
-                    )
+                    'group cursor-pointer overflow-hidden transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98]',
+                    !product.is_available && 'opacity-50 pointer-events-none'
                   )}
+                  onClick={() => handleProductClick(product)}
+                  data-action="add-to-cart"
+                  data-id={product.id}
                 >
-                  <div className="flex h-full items-center justify-center">
-                    <span className="text-2xl font-bold text-white/70">
-                      {product.name.charAt(0)}
-                    </span>
-                  </div>
-                </div>
-                <div className="p-2.5">
-                  <p className="text-sm font-medium leading-tight line-clamp-2">
-                    {product.name}
-                  </p>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <span className="text-sm font-bold text-primary">
-                      {product.variants.length > 0
-                        ? `od ${formatCurrency(
-                            Math.min(
-                              product.price,
-                              ...product.variants.map((v) => v.price)
-                            )
-                          )}`
-                        : formatCurrency(product.price)}
-                    </span>
-                    {product.variants.length > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] h-4 px-1"
-                      >
-                        {product.variants.length} wer.
-                      </Badge>
+                  {/* Color placeholder for image */}
+                  <div
+                    className={cn(
+                      'h-24 w-full bg-gradient-to-br',
+                      product.color || getCategoryColor(
+                        categories.find((c) => c.id === product.category_id) || {
+                          color: 'from-gray-400 to-gray-600',
+                        } as Category
+                      )
                     )}
+                  >
+                    <div className="flex h-full items-center justify-center">
+                      <span className="text-2xl font-bold text-white/70">
+                        {product.name.charAt(0)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                  <div className="p-2.5">
+                    <p className="text-sm font-medium leading-tight line-clamp-2">
+                      {product.name}
+                    </p>
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-primary">
+                          {product.variants.length > 0
+                            ? `od ${formatCurrency(minCurrentPrice)}`
+                            : formatCurrency(currentBasePrice)}
+                        </span>
+                        {minOriginalPrice != null && (
+                          <span className="text-[10px] text-muted-foreground line-through">
+                            {product.variants.length > 0
+                              ? `od ${formatCurrency(minOriginalPrice)}`
+                              : formatCurrency(minOriginalPrice)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {promotionPricing.isPromotionActive && (
+                          <Badge variant="default" className="text-[10px] h-4 px-1">
+                            {promotionPricing.promoLabel || 'Promo'}
+                          </Badge>
+                        )}
+                        {product.variants.length > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="text-[10px] h-4 px-1"
+                          >
+                            {product.variants.length} wer.
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
 
             {filteredProducts.length === 0 && (
               <div className="col-span-full flex flex-col items-center justify-center py-12">
@@ -324,9 +357,13 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
               .filter((v) => v.is_available)
               .sort((a, b) => a.sort_order - b.sort_order)
               .map((variant) => {
+                const pricing = getProductPromotionPricing(variantDialog.product!);
                 // Warianty przechowują modyfikacje ceny (+/- PLN)
-                const basePrice = variantDialog.product?.price ?? 0;
+                const basePrice = pricing.currentPrice;
                 const finalPrice = basePrice + variant.price;
+                const originalFinalPrice = pricing.originalPrice != null
+                  ? pricing.originalPrice + variant.price
+                  : null;
                 const modDisplay = variant.price === 0
                   ? formatCurrency(finalPrice)
                   : `${formatCurrency(finalPrice)} (${variant.price >= 0 ? '+' : ''}${variant.price.toFixed(2)} PLN)`;
@@ -343,8 +380,15 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
                     data-id={variant.id}
                   >
                     <span className="font-medium">{variant.name}</span>
-                    <span className="font-bold text-primary">
-                      {modDisplay}
+                    <span className="flex items-center gap-2">
+                      {originalFinalPrice != null && (
+                        <span className="text-xs text-muted-foreground line-through">
+                          {formatCurrency(originalFinalPrice)}
+                        </span>
+                      )}
+                      <span className="font-bold text-primary">
+                        {modDisplay}
+                      </span>
                     </span>
                   </Button>
                 );
@@ -370,8 +414,22 @@ export function OrderForm({ onOrderCreated }: OrderFormProps) {
               data-action="select-base"
             >
               <span>Bez wariantu</span>
-              <span className="font-bold">
-                {formatCurrency(variantDialog.product?.price ?? 0)}
+              <span className="flex items-center gap-2">
+                {(() => {
+                  const pricing = getProductPromotionPricing(variantDialog.product!);
+                  return (
+                    <>
+                      {pricing.originalPrice != null && (
+                        <span className="text-xs text-muted-foreground line-through">
+                          {formatCurrency(pricing.originalPrice)}
+                        </span>
+                      )}
+                      <span className="font-bold">
+                        {formatCurrency(pricing.currentPrice)}
+                      </span>
+                    </>
+                  );
+                })()}
               </span>
             </Button>
           </div>
