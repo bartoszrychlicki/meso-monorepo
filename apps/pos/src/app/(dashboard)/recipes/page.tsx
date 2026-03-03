@@ -158,25 +158,26 @@ export default function RecipesPage() {
               </Select>
             </div>
             <div className="flex items-center justify-end gap-2">
-              <span className="text-sm text-muted-foreground">Widok:</span>
               <div className="inline-flex rounded-md border p-1">
                 <Button
-                  size="sm"
+                  size="icon"
                   variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                   onClick={() => setViewMode('table')}
+                  title="Widok tabeli"
+                  aria-label="Widok tabeli"
                   data-action="view-table"
                 >
                   <Rows3 className="h-4 w-4" />
-                  Tabela
                 </Button>
                 <Button
-                  size="sm"
+                  size="icon"
                   variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
                   onClick={() => setViewMode('cards')}
+                  title="Widok kafelków"
+                  aria-label="Widok kafelków"
                   data-action="view-cards"
                 >
                   <LayoutGrid className="h-4 w-4" />
-                  Kafelki
                 </Button>
               </div>
             </div>
