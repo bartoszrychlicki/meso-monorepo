@@ -1,4 +1,6 @@
-import type { OrderStatus as CoreOrderStatus } from '@meso/core'
+import { OrderStatus as CoreOrderStatusEnum } from '@meso/core'
+
+export type CoreOrderStatus = `${CoreOrderStatusEnum}`
 
 export type LegacyOrderStatus =
   | 'pending_payment'

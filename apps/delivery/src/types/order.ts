@@ -1,6 +1,6 @@
-import type { OrderStatus as CoreOrderStatus } from '@meso/core'
 import type { Product } from './menu'
 import {
+  type CoreOrderStatus,
   normalizeOrderStatus,
   toDisplayOrderStatus,
   type DisplayOrderStatus,
