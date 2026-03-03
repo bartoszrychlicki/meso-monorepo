@@ -8,16 +8,15 @@ import {
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
 import { productsRepository } from '@/modules/menu/repository';
-import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { createServiceClient } from '@/lib/supabase/server';
 import { CreateOrderSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
 import { Product } from '@/types/menu';
 import { Order } from '@/types/order';
-import { KitchenTicket, KitchenItem } from '@/types/kitchen';
+import { KitchenItem } from '@/types/kitchen';
 
 type PersistedOrderItem = {
   id: string;
-  order_id: string;
   product_id: string;
   quantity: number;
   unit_price: number;
@@ -33,6 +32,36 @@ type PersistedOrderItem = {
   }>;
   notes?: string;
 };
+
+type RpcErrorLike = {
+  code?: string;
+  message?: string;
+  details?: string | null;
+  hint?: string | null;
+};
+
+function asRpcError(value: unknown): RpcErrorLike {
+  return (value ?? {}) as RpcErrorLike;
+}
+
+function isExternalIdUniqueViolation(error: unknown): boolean {
+  const rpcError = asRpcError(error);
+  if (rpcError.code !== '23505') return false;
+  const context = [rpcError.message, rpcError.details, rpcError.hint]
+    .filter((part): part is string => Boolean(part))
+    .join(' ')
+    .toLowerCase();
+  return context.includes('external_order_id');
+}
+
+async function findExistingByExternalOrderId(
+  externalOrderId: string
+): Promise<Order | null> {
+  const existing = await ordersRepository.findMany(
+    (order) => order.external_order_id === externalOrderId
+  );
+  return existing[0] ?? null;
+}
 
 /**
  * GET /api/v1/orders
@@ -126,14 +155,13 @@ export async function POST(request: NextRequest) {
 
   const input = validation.data;
   const now = new Date().toISOString();
+  const serviceClient = createServiceClient();
 
-  // Idempotency check: if external_order_id provided, check for duplicate
+  // Fast path for idempotency key.
   if (input.external_order_id) {
-    const existing = await ordersRepository.findMany(
-      (o) => o.external_order_id === input.external_order_id
-    );
-    if (existing.length > 0) {
-      return apiSuccess(existing[0]);
+    const existing = await findExistingByExternalOrderId(input.external_order_id);
+    if (existing) {
+      return apiSuccess(existing);
     }
   }
 
@@ -186,7 +214,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const orderNumber = await ordersRepository.generateOrderNumber(input.channel);
+  const { data: nextNumber, error: numberError } = await serviceClient.rpc(
+    'next_order_number',
+    { p_channel: input.channel }
+  );
+  if (numberError || typeof nextNumber !== 'string' || nextNumber.length === 0) {
+    return apiError(
+      'ORDER_NUMBER_GENERATION_FAILED',
+      'Nie udało się wygenerować numeru zamówienia',
+      500,
+      numberError ? [numberError] : undefined
+    );
+  }
+  const orderNumber = nextNumber;
 
   // Calculate totals from items
   const items = input.items.map((item) => {
@@ -225,9 +265,7 @@ export async function POST(request: NextRequest) {
     ? 'Zamówienie z delivery app (potwierdzone)'
     : 'Zamówienie utworzone przez API';
 
-  // Use server repository (service role) for writes — API routes bypass RLS
-  const serverOrdersRepo = createServerRepository<Order>('orders');
-  const order = await serverOrdersRepo.create({
+  const orderPayload = {
     order_number: orderNumber,
     status: initialStatus,
     channel: input.channel,
@@ -262,12 +300,11 @@ export async function POST(request: NextRequest) {
     scheduled_time: input.scheduled_time,
     confirmed_at: isDeliveryConfirmed ? now : undefined,
     paid_at: input.payment_status === PaymentStatus.PAID ? now : undefined,
-  });
+  };
 
-  // Keep relational order_items table in sync with JSONB order.items
-  const persistedItems: PersistedOrderItem[] = (order.items || []).map((item) => ({
+  // Relational rows are inserted transactionally inside RPC.
+  const persistedItems: PersistedOrderItem[] = items.map((item) => ({
     id: item.id,
-    order_id: order.id,
     product_id: item.product_id,
     quantity: item.quantity,
     unit_price: item.unit_price,
@@ -284,38 +321,66 @@ export async function POST(request: NextRequest) {
     notes: item.notes,
   }));
 
-  if (persistedItems.length > 0) {
-    const orderItemsRepo = createServerRepository<any>('orders_order_items');
-    await orderItemsRepo.bulkCreate?.(persistedItems);
-  }
+  const kitchenItems: KitchenItem[] = items.map((item) => ({
+    id: crypto.randomUUID(),
+    order_item_id: item.id,
+    product_name: item.product_name,
+    variant_name: item.variant_name,
+    quantity: item.quantity,
+    modifiers: (item.modifiers || []).map((m) => m.name),
+    notes: item.notes,
+    is_done: false,
+  }));
+  const kitchenTicketPayload = {
+    order_number: orderNumber,
+    location_id: input.location_id,
+    status: OrderStatus.PENDING,
+    items: kitchenItems,
+    priority: 0,
+    estimated_minutes: Math.max(5, kitchenItems.length * 4),
+    notes: input.notes,
+  };
 
-  // Auto-create kitchen ticket for the new order
   try {
-    const kitchenItems: KitchenItem[] = (order.items || []).map((item) => ({
-      id: crypto.randomUUID(),
-      order_item_id: item.id,
-      product_name: item.product_name,
-      variant_name: item.variant_name,
-      quantity: item.quantity,
-      modifiers: (item.modifiers || []).map((m) => m.name),
-      notes: item.notes,
-      is_done: false,
-    }));
+    const { data: createdOrderData, error: createError } = await serviceClient.rpc(
+      'create_order_with_items',
+      {
+        p_order: orderPayload,
+        p_order_items: persistedItems,
+        p_kitchen_ticket: kitchenTicketPayload,
+      }
+    );
 
-    const kitchenRepo = createServerRepository<KitchenTicket>('kitchen_tickets');
-    await kitchenRepo.create({
-      order_id: order.id,
-      order_number: order.order_number,
-      location_id: order.location_id,
-      status: OrderStatus.PENDING,
-      items: kitchenItems,
-      priority: 0,
-      estimated_minutes: Math.max(5, kitchenItems.length * 4),
-      notes: order.notes,
-    });
-  } catch {
-    // Kitchen ticket failure should not block order creation
+    if (createError) {
+      throw createError;
+    }
+
+    const order = (Array.isArray(createdOrderData)
+      ? createdOrderData[0]
+      : createdOrderData) as Order | null;
+
+    if (!order) {
+      return apiError(
+        'ORDER_CREATE_FAILED',
+        'Nie udało się utworzyć zamówienia',
+        500
+      );
+    }
+
+    return apiCreated(order);
+  } catch (error) {
+    if (input.external_order_id && isExternalIdUniqueViolation(error)) {
+      const existing = await findExistingByExternalOrderId(input.external_order_id);
+      if (existing) {
+        return apiSuccess(existing);
+      }
+    }
+
+    return apiError(
+      'ORDER_CREATE_FAILED',
+      'Nie udało się utworzyć zamówienia',
+      500,
+      [asRpcError(error)]
+    );
   }
-
-  return apiCreated(order);
 }

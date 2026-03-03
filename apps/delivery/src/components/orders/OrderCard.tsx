@@ -41,7 +41,12 @@ export function OrderCard({ order, className }: OrderCardProps) {
                     </div>
 
                     {/* Status badge */}
-                    <OrderStatusBadge status={order.status} size="sm" className="mb-2" />
+                    <OrderStatusBadge
+                        status={order.status}
+                        paymentStatus={order.payment_status}
+                        size="sm"
+                        className="mb-2"
+                    />
 
                     {/* Items summary */}
                     <p className="text-sm text-zinc-400 truncate">

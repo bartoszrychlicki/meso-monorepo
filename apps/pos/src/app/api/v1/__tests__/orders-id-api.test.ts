@@ -22,6 +22,13 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
   createServerRepository: () => mockServerRepo,
 }));
 
+const mockRpc = vi.fn();
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: () => ({
+    rpc: mockRpc,
+  }),
+}));
+
 vi.mock('@/schemas/order', () => ({
   CreateOrderSchema: {
     partial: () => ({
@@ -124,6 +131,58 @@ describe('PUT /api/v1/orders/:id', () => {
 
     expect(res.status).toBe(200);
     expect(body.data.notes).toBe('Bez cebuli');
+  });
+
+  it('uses transactional replace_order_items RPC when items are provided', async () => {
+    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockOrder);
+    mockRpc.mockResolvedValue({
+      data: {
+        ...mockOrder,
+        items: [
+          {
+            id: 'new-item-id',
+            product_id: 'prod-1',
+            product_name: 'Ramen',
+            quantity: 2,
+            unit_price: 30,
+            subtotal: 60,
+            modifiers: [],
+          },
+        ],
+        subtotal: 60,
+        tax: 4.8,
+        total: 64.8,
+      },
+      error: null,
+    });
+
+    const req = makeRequest('http://localhost:3000/api/v1/orders/order-1', {
+      method: 'PUT',
+      body: JSON.stringify({
+        items: [
+          {
+            product_id: 'prod-1',
+            product_name: 'Ramen',
+            quantity: 2,
+            unit_price: 30,
+            modifiers: [],
+          },
+        ],
+      }),
+    });
+    const res = await PUT(req, makeParams('order-1'));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.data.subtotal).toBe(60);
+    expect(mockRpc).toHaveBeenCalledWith(
+      'replace_order_items',
+      expect.objectContaining({
+        p_order_id: 'order-1',
+        p_items: expect.any(Array),
+        p_order_items: expect.any(Array),
+      })
+    );
   });
 
   it('returns 404 when updating non-existent order', async () => {

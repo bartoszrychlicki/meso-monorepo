@@ -8,6 +8,7 @@ import {
 } from '@/lib/api/response';
 import { ordersRepository } from '@/modules/orders/repository';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { createServiceClient } from '@/lib/supabase/server';
 import { CreateOrderSchema } from '@/schemas/order';
 import type { Order } from '@/types/order';
 
@@ -66,7 +67,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   // Use server repository (service role) for writes — API routes bypass RLS
   const serverOrdersRepo = createServerRepository<Order>('orders');
 
-  // If items are being updated, recalculate totals
+  // If items are being updated, sync JSON + relational rows transactionally via RPC.
   if (updateData.items) {
     const items = updateData.items.map((item) => {
       const modifiersTotal = item.modifiers.reduce(
@@ -77,19 +78,68 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return { ...item, id: crypto.randomUUID(), subtotal };
     });
 
-    const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    const tax = Math.round(subtotal * 0.08 * 100) / 100;
-    const discount = updateData.discount ?? existing.discount;
-    const total = Math.round((subtotal + tax - discount) * 100) / 100;
+    const persistedItems = items.map((item) => ({
+      id: item.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.subtotal,
+      spice_level: null,
+      variant_name: item.variant_name,
+      addons: (item.modifiers || []).map((modifier) => ({
+        id: modifier.modifier_id,
+        name: modifier.name,
+        price: modifier.price,
+        quantity: modifier.quantity,
+        modifier_action: modifier.modifier_action,
+      })),
+      notes: item.notes,
+    }));
 
-    const updated = await serverOrdersRepo.update(id, {
-      ...updateData,
-      items,
-      subtotal,
-      tax,
-      discount,
-      total,
-    } as Partial<Order>);
+    const serviceClient = createServiceClient();
+    const { data, error } = await serviceClient.rpc('replace_order_items', {
+      p_order_id: id,
+      p_items: items,
+      p_order_items: persistedItems,
+      p_discount: updateData.discount ?? null,
+      p_delivery_fee: updateData.delivery_fee ?? null,
+      p_tip: updateData.tip ?? null,
+    });
+
+    if (error) {
+      return apiError(
+        'ORDER_UPDATE_FAILED',
+        'Nie udało się zaktualizować pozycji zamówienia',
+        500,
+        [error]
+      );
+    }
+
+    const updated = (Array.isArray(data) ? data[0] : data) as Order | null;
+    if (!updated) {
+      return apiError(
+        'ORDER_UPDATE_FAILED',
+        'Nie udało się zaktualizować pozycji zamówienia',
+        500
+      );
+    }
+
+    const {
+      items: _items,
+      discount: _discount,
+      delivery_fee: _deliveryFee,
+      tip: _tip,
+      ...additionalFields
+    } = updateData;
+
+    if (Object.keys(additionalFields).length > 0) {
+      const patched = await serverOrdersRepo.update(
+        id,
+        additionalFields as Partial<Order>
+      );
+      return apiSuccess(patched);
+    }
+
     return apiSuccess(updated);
   }
 

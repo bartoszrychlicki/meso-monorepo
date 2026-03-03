@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import type { OrderWithItems, OrderStatus } from '@/types/order'
+import { getOrderStatusMessage, type OrderWithItems } from '@/types/order'
+import { toDisplayOrderStatus } from '@/lib/order-status'
 
 interface UseOrderDetailsReturn {
     order: OrderWithItems | null
@@ -86,19 +87,16 @@ export function useOrderDetails(orderId: number | string): UseOrderDetailsReturn
                     })
 
                     // Show toast notification for status changes
-                    const newStatus = (payload.new as { status?: OrderStatus }).status
+                    const newStatus = (payload.new as { status?: string }).status
+                    const newPaymentStatus = (payload.new as { payment_status?: string }).payment_status
                     if (newStatus) {
-                        const statusMessages: Record<OrderStatus, string> = {
-                            pending_payment: 'Oczekujemy na płatność',
-                            confirmed: 'Zamówienie przyjęte!',
-                            preparing: 'Przygotowujemy Twój posiłek 🍜',
-                            ready: 'Zamówienie gotowe!',
-                            awaiting_courier: 'Szukamy kuriera',
-                            in_delivery: 'Kurier w drodze! 🛵',
-                            delivered: 'Smacznego! 🎉',
-                            cancelled: 'Zamówienie anulowane',
+                        const displayStatus = toDisplayOrderStatus(newStatus, newPaymentStatus)
+                        if (displayStatus === 'unknown') {
+                            toast.info('Status zamówienia został zaktualizowany')
+                        } else {
+                            const message = getOrderStatusMessage(newStatus, newPaymentStatus)
+                            toast.info(message.title)
                         }
-                        toast.info(statusMessages[newStatus] || 'Status zamówienia się zmienił')
                     }
                 }
             )

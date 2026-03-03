@@ -251,4 +251,31 @@ describe('POST /api/payments/p24/status (webhook)', () => {
       expect.objectContaining({ status: 'confirmed' })
     )
   })
+
+  it('returns 200 for duplicate callback notifications (idempotent behavior)', async () => {
+    mockVerifyTransaction.mockResolvedValue(true)
+    mockUpdateStatus.mockResolvedValue({
+      success: true,
+      data: { id: ORDER_ID, status: 'confirmed', payment_status: 'paid' },
+    })
+    mockFrom.mockImplementation(() =>
+      chain({
+        data: {
+          id: ORDER_ID,
+          delivery_address: {},
+          order_items: [],
+          location: null,
+        },
+        error: null,
+      })
+    )
+
+    const notification = makeP24Notification({ sessionId: `${ORDER_ID}-1234567890` })
+    const firstRes = await POST(makeRequest(notification))
+    const secondRes = await POST(makeRequest(notification))
+
+    expect(firstRes.status).toBe(200)
+    expect(secondRes.status).toBe(200)
+    expect(mockUpdateStatus).toHaveBeenCalledTimes(2)
+  })
 })

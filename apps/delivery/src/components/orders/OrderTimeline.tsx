@@ -2,17 +2,20 @@
 
 import { Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ORDER_TIMELINE_STEPS, getTimelineStepIndex, type OrderStatus } from '@/types/order'
+import { ORDER_TIMELINE_STEPS, getTimelineStepIndex } from '@/types/order'
+import { toDisplayOrderStatus, type RawOrderStatus } from '@/lib/order-status'
 
 interface OrderTimelineProps {
-    status: OrderStatus
+    status: RawOrderStatus
+    paymentStatus?: string
     className?: string
 }
 
-export function OrderTimeline({ status, className }: OrderTimelineProps) {
-    const currentStepIndex = getTimelineStepIndex(status)
-    const isCancelled = status === 'cancelled'
-    const isPendingPayment = status === 'pending_payment'
+export function OrderTimeline({ status, paymentStatus, className }: OrderTimelineProps) {
+    const currentStepIndex = getTimelineStepIndex(status, paymentStatus)
+    const displayStatus = toDisplayOrderStatus(status, paymentStatus)
+    const isCancelled = displayStatus === 'cancelled'
+    const isPendingPayment = displayStatus === 'pending_payment'
 
     if (isCancelled || isPendingPayment) {
         return (

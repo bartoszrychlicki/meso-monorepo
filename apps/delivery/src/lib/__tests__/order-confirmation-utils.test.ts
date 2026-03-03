@@ -8,11 +8,15 @@ import {
 
 describe('getPickupStepIndex', () => {
   // Step 0: order placed, payment not confirmed
-  it('returns 0 for pending_payment + pending', () => {
+  it('returns 0 for pending + pending', () => {
+    expect(getPickupStepIndex('pending', 'pending')).toBe(0)
+  })
+
+  it('returns 0 for legacy pending_payment + pending', () => {
     expect(getPickupStepIndex('pending_payment', 'pending')).toBe(0)
   })
 
-  it('returns 0 for confirmed + pending (edge case)', () => {
+  it('returns 0 for confirmed + pending', () => {
     expect(getPickupStepIndex('confirmed', 'pending')).toBe(0)
   })
 
@@ -23,6 +27,10 @@ describe('getPickupStepIndex', () => {
 
   it('returns 1 for pending_payment + paid (status not yet updated)', () => {
     expect(getPickupStepIndex('pending_payment', 'paid')).toBe(1)
+  })
+
+  it('returns 1 for accepted + paid', () => {
+    expect(getPickupStepIndex('accepted', 'paid')).toBe(1)
   })
 
   // Step 2: preparing
@@ -41,6 +49,10 @@ describe('getPickupStepIndex', () => {
 
   it('returns 3 for delivered + paid', () => {
     expect(getPickupStepIndex('delivered', 'paid')).toBe(3)
+  })
+
+  it('returns 3 for out_for_delivery + paid', () => {
+    expect(getPickupStepIndex('out_for_delivery', 'paid')).toBe(3)
   })
 
   // Edge cases
@@ -77,10 +89,14 @@ describe('isPaymentPending', () => {
 
 describe('isOrderActive', () => {
   const activeStatuses = [
-    'pending_payment',
+    'pending',
     'confirmed',
+    'accepted',
     'preparing',
     'ready',
+    'out_for_delivery',
+    // legacy aliases still supported at ingest level
+    'pending_payment',
     'awaiting_courier',
     'in_delivery',
   ]

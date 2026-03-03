@@ -1,23 +1,22 @@
 import type { Product } from './menu'
+import {
+  type CoreOrderStatus,
+  normalizeOrderStatus,
+  toDisplayOrderStatus,
+  type DisplayOrderStatus,
+  type RawOrderStatus,
+} from '@/lib/order-status'
 
-export type OrderStatus =
-  | 'pending_payment'
-  | 'confirmed'
-  | 'preparing'
-  | 'ready'
-  | 'awaiting_courier'
-  | 'in_delivery'
-  | 'delivered'
-  | 'cancelled'
-
+export type OrderStatus = CoreOrderStatus
 export type DeliveryType = 'delivery' | 'pickup'
-
 export type PaymentMethod = 'blik' | 'card' | 'cash' | 'pay_on_pickup'
 
 export interface DeliveryAddress {
   street: string
-  building_number: string
+  building_number?: string
+  houseNumber?: string
   apartment_number?: string
+  apartmentNumber?: string
   city: string
   postal_code: string
   notes?: string
@@ -53,7 +52,6 @@ export interface Order {
   delivered_at?: string
   cancelled_at?: string
   created_at: string
-  // Relations
   items?: OrderItem[]
 }
 
@@ -69,7 +67,6 @@ export interface OrderItem {
   notes?: string
   total_price: number
   created_at: string
-  // Relations
   product?: Product
 }
 
@@ -79,15 +76,28 @@ export interface OrderItemAddon {
   price: number
 }
 
-export const ORDER_STATUS_MESSAGES: Record<OrderStatus, { title: string; subtitle: string; emoji: string }> = {
+export const ORDER_STATUS_MESSAGES: Record<
+  DisplayOrderStatus,
+  { title: string; subtitle: string; emoji: string }
+> = {
   pending_payment: {
     title: 'Oczekujemy na płatność',
     subtitle: 'Dokończ płatność, aby złożyć zamówienie',
     emoji: '💳',
   },
+  pending: {
+    title: 'Zamówienie oczekuje',
+    subtitle: 'Zaraz potwierdzimy Twoje zamówienie',
+    emoji: '⏳',
+  },
   confirmed: {
+    title: 'Zamówienie potwierdzone',
+    subtitle: 'Przekazaliśmy je do realizacji',
+    emoji: '✅',
+  },
+  accepted: {
     title: 'Zamówienie przyjęte!',
-    subtitle: 'Zaraz zabieramy się do roboty',
+    subtitle: 'Kuchnia zaraz zacznie przygotowanie',
     emoji: '✅',
   },
   preparing: {
@@ -97,17 +107,12 @@ export const ORDER_STATUS_MESSAGES: Record<OrderStatus, { title: string; subtitl
   },
   ready: {
     title: 'Gotowe!',
-    subtitle: 'Zamówienie czeka na kuriera',
+    subtitle: 'Zamówienie czeka na kuriera lub odbiór',
     emoji: '📦',
   },
-  awaiting_courier: {
-    title: 'Szukamy kuriera',
-    subtitle: 'Za chwilę wyruszy w Twoją stronę',
-    emoji: '🔍',
-  },
-  in_delivery: {
+  out_for_delivery: {
     title: 'Kurier w drodze! 🛵',
-    subtitle: 'Śledź go na mapie',
+    subtitle: 'Śledź postęp dostawy',
     emoji: '🛵',
   },
   delivered: {
@@ -117,12 +122,16 @@ export const ORDER_STATUS_MESSAGES: Record<OrderStatus, { title: string; subtitl
   },
   cancelled: {
     title: 'Zamówienie anulowane',
-    subtitle: 'Jeśli zapłaciłeś, zwrot w ciągu 3 dni',
+    subtitle: 'Jeśli zapłaciłeś, zwrot otrzymasz automatycznie',
     emoji: '❌',
+  },
+  unknown: {
+    title: 'Aktualizujemy status',
+    subtitle: 'Odśwież stronę za chwilę',
+    emoji: 'ℹ️',
   },
 }
 
-// Extended order type for order tracking
 export interface OrderWithItems extends Omit<Order, 'items'> {
   items: OrderItemWithProduct[]
   location?: {
@@ -141,37 +150,58 @@ export interface OrderItemWithProduct extends Omit<OrderItem, 'product'> {
   variant_name?: string | null
 }
 
-// Status colors and icons for UI
-export const ORDER_STATUS_STYLES: Record<OrderStatus, { color: string; bgColor: string; icon: string }> = {
+export const ORDER_STATUS_STYLES: Record<
+  DisplayOrderStatus,
+  { color: string; bgColor: string; icon: string }
+> = {
   pending_payment: { color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', icon: 'Clock' },
+  pending: { color: 'text-amber-500', bgColor: 'bg-amber-500/10', icon: 'Clock' },
   confirmed: { color: 'text-blue-500', bgColor: 'bg-blue-500/10', icon: 'CheckCircle' },
+  accepted: { color: 'text-blue-500', bgColor: 'bg-blue-500/10', icon: 'CheckCircle' },
   preparing: { color: 'text-orange-500', bgColor: 'bg-orange-500/10', icon: 'ChefHat' },
   ready: { color: 'text-green-500', bgColor: 'bg-green-500/10', icon: 'Package' },
-  awaiting_courier: { color: 'text-purple-500', bgColor: 'bg-purple-500/10', icon: 'Search' },
-  in_delivery: { color: 'text-purple-500', bgColor: 'bg-purple-500/10', icon: 'Truck' },
+  out_for_delivery: { color: 'text-purple-500', bgColor: 'bg-purple-500/10', icon: 'Truck' },
   delivered: { color: 'text-green-600', bgColor: 'bg-green-600/10', icon: 'CheckCircle2' },
   cancelled: { color: 'text-red-500', bgColor: 'bg-red-500/10', icon: 'XCircle' },
+  unknown: { color: 'text-zinc-400', bgColor: 'bg-zinc-500/10', icon: 'Clock' },
 }
 
-// Timeline steps for order tracking
 export const ORDER_TIMELINE_STEPS = [
-  { status: 'confirmed' as OrderStatus, label: 'Zamówione', shortLabel: 'Zamówione' },
-  { status: 'preparing' as OrderStatus, label: 'Przygotowywane', shortLabel: 'Gotujemy' },
-  { status: 'ready' as OrderStatus, label: 'Gotowe', shortLabel: 'Gotowe' },
-  { status: 'in_delivery' as OrderStatus, label: 'W drodze', shortLabel: 'W drodze' },
-  { status: 'delivered' as OrderStatus, label: 'Dostarczone', shortLabel: 'Dostarczone' },
+  { status: 'accepted' as CoreOrderStatus, label: 'Przyjęte', shortLabel: 'Przyjęte' },
+  { status: 'preparing' as CoreOrderStatus, label: 'Przygotowywane', shortLabel: 'Gotujemy' },
+  { status: 'ready' as CoreOrderStatus, label: 'Gotowe', shortLabel: 'Gotowe' },
+  { status: 'out_for_delivery' as CoreOrderStatus, label: 'W drodze', shortLabel: 'W drodze' },
+  { status: 'delivered' as CoreOrderStatus, label: 'Dostarczone', shortLabel: 'Dostarczone' },
 ]
 
-// Get current step index for timeline
-export function getTimelineStepIndex(status: OrderStatus): number {
-  const index = ORDER_TIMELINE_STEPS.findIndex(step => step.status === status)
-  if (status === 'pending_payment') return -1
-  if (status === 'cancelled') return -1
-  if (status === 'awaiting_courier') return 2 // same as 'ready'
-  return index
+export function getTimelineStepIndex(
+  status: RawOrderStatus,
+  paymentStatus?: string
+): number {
+  const display = toDisplayOrderStatus(status, paymentStatus)
+  if (display === 'pending_payment' || display === 'cancelled' || display === 'unknown') {
+    return -1
+  }
+
+  const normalized = normalizeOrderStatus(status)
+  if (normalized === 'pending' || normalized === 'confirmed') return 0
+  return ORDER_TIMELINE_STEPS.findIndex((step) => step.status === normalized)
 }
 
-// Format order date
+export function getOrderStatusMessage(
+  status: RawOrderStatus,
+  paymentStatus?: string
+) {
+  return ORDER_STATUS_MESSAGES[toDisplayOrderStatus(status, paymentStatus)]
+}
+
+export function getOrderStatusStyle(
+  status: RawOrderStatus,
+  paymentStatus?: string
+) {
+  return ORDER_STATUS_STYLES[toDisplayOrderStatus(status, paymentStatus)]
+}
+
 export function formatOrderDate(dateString: string): string {
   const date = new Date(dateString)
   return new Intl.DateTimeFormat('pl-PL', {
@@ -183,7 +213,6 @@ export function formatOrderDate(dateString: string): string {
   }).format(date)
 }
 
-// Format short date for list view
 export function formatOrderDateShort(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
@@ -200,4 +229,3 @@ export function formatOrderDateShort(dateString: string): string {
     minute: '2-digit',
   }).format(date)
 }
-
