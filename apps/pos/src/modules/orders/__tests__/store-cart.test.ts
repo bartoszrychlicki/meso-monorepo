@@ -157,4 +157,44 @@ describe('Orders Store - addToCart with modifiers', () => {
     // Two separate items because both have modifiers
     expect(cart).toHaveLength(2);
   });
+
+  it('stores promotion snapshot when promotion is active', () => {
+    const store = useOrdersStore.getState();
+    const productWithPromo: Product = {
+      ...mockProduct,
+      price: 19.99,
+      original_price: 24.99,
+      promo_label: 'Lunch',
+      promo_starts_at: null,
+      promo_ends_at: null,
+    };
+
+    store.addToCart(productWithPromo, undefined, 1);
+
+    const cart = useOrdersStore.getState().cart;
+    expect(cart).toHaveLength(1);
+    expect(cart[0].unit_price).toBe(19.99);
+    expect(cart[0].original_unit_price).toBe(24.99);
+    expect(cart[0].promotion_label).toBe('Lunch');
+  });
+
+  it('uses regular price when promotion window is not active', () => {
+    const store = useOrdersStore.getState();
+    const productWithFuturePromo: Product = {
+      ...mockProduct,
+      price: 19.99,
+      original_price: 24.99,
+      promo_label: 'Lunch',
+      promo_starts_at: '2099-01-01T10:00:00.000Z',
+      promo_ends_at: '2099-01-01T18:00:00.000Z',
+    };
+
+    store.addToCart(productWithFuturePromo, undefined, 1);
+
+    const cart = useOrdersStore.getState().cart;
+    expect(cart).toHaveLength(1);
+    expect(cart[0].unit_price).toBe(24.99);
+    expect(cart[0].original_unit_price).toBeUndefined();
+    expect(cart[0].promotion_label).toBeUndefined();
+  });
 });

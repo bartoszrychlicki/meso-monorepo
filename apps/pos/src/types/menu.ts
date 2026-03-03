@@ -86,6 +86,10 @@ export interface Product extends BaseEntity {
   category_id: string;
   type: ProductType;
   price: number; // Cena bazowa (backward compatibility)
+  original_price?: number | null; // Cena regularna przed promocją
+  promo_label?: string | null; // Etykieta promocji (np. "Happy Hour")
+  promo_starts_at?: string | null; // ISO datetime
+  promo_ends_at?: string | null; // ISO datetime
   image_url?: string; // @deprecated - use images[]
   images: ProductImage[];
   is_available: boolean; // Czy dostępny do zamówienia (tymczasowo niedostępny)

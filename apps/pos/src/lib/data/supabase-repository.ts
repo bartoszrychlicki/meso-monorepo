@@ -32,7 +32,7 @@ const TABLE_MAP: Record<string, string> = {
 
 // Fields that Postgres returns as strings (NUMERIC type) but TS expects as numbers
 const NUMERIC_FIELDS = new Set([
-  'price', 'subtotal', 'tax', 'discount', 'total',
+  'price', 'original_price', 'subtotal', 'tax', 'discount', 'total',
   'quantity', 'min_quantity', 'cost_per_unit',
   'hourly_rate', 'overtime_rate',
   'yield_quantity', 'total_cost', 'food_cost_percentage',

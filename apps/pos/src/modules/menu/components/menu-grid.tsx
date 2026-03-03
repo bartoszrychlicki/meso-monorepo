@@ -10,6 +10,7 @@ import { ProductCard } from './product-card';
 import { EmptyState } from '@/components/shared/empty-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { calculateFoodCost, FoodCostResult } from '../utils/food-cost';
+import { getProductPromotionPricing } from '../utils/pricing';
 
 interface MenuGridProps {
   products: Product[];
@@ -44,12 +45,13 @@ export function MenuGrid({
   const foodCostMap = useMemo(() => {
     const map = new Map<string, FoodCostResult>();
     for (const product of products) {
+      const effectivePrice = getProductPromotionPricing(product).currentPrice;
       // Prefer recipe-based cost
       if (product.recipe_id) {
         const recipe = recipeMap.get(product.recipe_id);
         if (recipe) {
-          const costPercentage = product.price > 0
-            ? (recipe.cost_per_unit / product.price) * 100
+          const costPercentage = effectivePrice > 0
+            ? (recipe.cost_per_unit / effectivePrice) * 100
             : 0;
           map.set(product.id, {
             totalCost: recipe.cost_per_unit,
@@ -65,7 +67,7 @@ export function MenuGrid({
       // Fallback to inline ingredients
       const ingredients = product.ingredients ?? [];
       if (ingredients.length > 0 && stockItems.length > 0) {
-        map.set(product.id, calculateFoodCost(ingredients, stockItems, product.price));
+        map.set(product.id, calculateFoodCost(ingredients, stockItems, effectivePrice));
       }
     }
     return map;

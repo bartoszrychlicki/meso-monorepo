@@ -23,6 +23,8 @@ export const CreateOrderItemSchema = z.object({
   variant_name: z.string().optional(),
   quantity: z.number().int().min(1, 'Minimalna ilość to 1'),
   unit_price: z.number().min(0),
+  original_unit_price: z.number().min(0).optional(),
+  promotion_label: z.string().min(1).max(64).optional(),
   modifiers: z.array(OrderItemModifierSchema).default([]),
   notes: z.string().optional(),
 });

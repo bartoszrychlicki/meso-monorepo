@@ -85,13 +85,17 @@ const ProductPricingSchema = z.object({
   price: z.number().positive('Cena musi być większa niż 0'),
 });
 
-export const CreateProductSchema = z.object({
+const ProductBaseSchema = z.object({
   name: z.string().min(1, 'Nazwa produktu jest wymagana'),
   slug: z.string().min(1, 'Slug jest wymagany'),
   description: z.string().optional(),
   category_id: z.string().min(1, 'Kategoria jest wymagana'),
   type: z.nativeEnum(ProductType).default(ProductType.SINGLE),
   price: z.number().min(0, 'Cena nie może być ujemna'),
+  original_price: z.number().min(0, 'Cena regularna nie może być ujemna').nullable().optional(),
+  promo_label: z.string().trim().min(1, 'Label promocji nie może być pusty').max(64, 'Label promocji może mieć maksymalnie 64 znaki').nullable().optional(),
+  promo_starts_at: z.string().datetime({ offset: true }).nullable().optional(),
+  promo_ends_at: z.string().datetime({ offset: true }).nullable().optional(),
   image_url: z.string().optional(), // @deprecated - use images[]
   images: z.array(ProductImageSchema).max(3, 'Maksymalnie 3 zdjęcia').default([]),
   is_available: z.boolean().default(true),
@@ -114,7 +118,53 @@ export const CreateProductSchema = z.object({
   active_promotions: z.array(z.string().uuid()).optional(),
 });
 
-export const UpdateProductSchema = CreateProductSchema.partial();
+export const CreateProductSchema = ProductBaseSchema.superRefine((product, ctx) => {
+  if (product.original_price != null && product.original_price < product.price) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['original_price'],
+      message: 'Cena regularna musi być większa lub równa cenie sprzedaży',
+    });
+  }
+
+  if (product.promo_starts_at && product.promo_ends_at) {
+    const start = new Date(product.promo_starts_at);
+    const end = new Date(product.promo_ends_at);
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start > end) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['promo_ends_at'],
+        message: 'Data zakończenia promocji musi być późniejsza niż data startu',
+      });
+    }
+  }
+});
+
+export const UpdateProductSchema = ProductBaseSchema.partial().superRefine((product, ctx) => {
+  if (
+    product.original_price != null &&
+    product.price != null &&
+    product.original_price < product.price
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['original_price'],
+      message: 'Cena regularna musi być większa lub równa cenie sprzedaży',
+    });
+  }
+
+  if (product.promo_starts_at && product.promo_ends_at) {
+    const start = new Date(product.promo_starts_at);
+    const end = new Date(product.promo_ends_at);
+    if (!Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start > end) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['promo_ends_at'],
+        message: 'Data zakończenia promocji musi być późniejsza niż data startu',
+      });
+    }
+  }
+});
 
 export const CreateCategorySchema = z.object({
   name: z.string().min(1, 'Nazwa kategorii jest wymagana'),

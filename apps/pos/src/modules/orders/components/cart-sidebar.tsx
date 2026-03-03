@@ -144,6 +144,16 @@ export function CartSidebar({ onOrderCreated }: CartSidebarProps) {
                     <p className="mt-1 text-sm font-semibold">
                       {formatCurrency(item.total_price)}
                     </p>
+                    {item.original_unit_price != null && item.original_unit_price > item.unit_price && (
+                      <p className="text-[10px] text-muted-foreground line-through">
+                        {formatCurrency(item.original_unit_price)} / szt.
+                      </p>
+                    )}
+                    {item.promotion_label && (
+                      <p className="text-[10px] font-medium text-emerald-700">
+                        {item.promotion_label}
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex flex-col items-end gap-1">

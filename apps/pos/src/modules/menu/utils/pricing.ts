@@ -6,6 +6,13 @@
 import { Product, ProductPricing } from '@/types/menu';
 import { SalesChannel } from '@/types/enums';
 
+export interface ProductPromotionPricing {
+  currentPrice: number;
+  originalPrice?: number;
+  isPromotionActive: boolean;
+  promoLabel?: string;
+}
+
 /**
  * Pobiera cenę dla konkretnego kanału sprzedaży
  * @param product - Produkt
@@ -101,4 +108,60 @@ export function getChannelLabel(channel: SalesChannel): string {
     [SalesChannel.EAT_IN]: 'Na miejscu',
   };
   return labels[channel];
+}
+
+export function isProductPromotionActive(
+  product: Product | null | undefined,
+  now: Date = new Date()
+): boolean {
+  if (!product) return false;
+  if (product.original_price == null) return false;
+  if (product.original_price <= product.price) return false;
+
+  if (product.promo_starts_at) {
+    const start = new Date(product.promo_starts_at);
+    if (!Number.isNaN(start.getTime()) && now < start) return false;
+  }
+
+  if (product.promo_ends_at) {
+    const end = new Date(product.promo_ends_at);
+    if (!Number.isNaN(end.getTime()) && now > end) return false;
+  }
+
+  return true;
+}
+
+export function getProductPromotionPricing(
+  product: Product | null | undefined,
+  now: Date = new Date()
+): ProductPromotionPricing {
+  if (!product) {
+    return {
+      currentPrice: 0,
+      isPromotionActive: false,
+    };
+  }
+
+  const hasDiscountPrice = product.original_price != null && product.original_price > product.price;
+  if (!hasDiscountPrice) {
+    return {
+      currentPrice: product.price,
+      isPromotionActive: false,
+    };
+  }
+
+  const isPromotionActive = isProductPromotionActive(product, now);
+  if (!isPromotionActive) {
+    return {
+      currentPrice: product.original_price as number,
+      isPromotionActive: false,
+    };
+  }
+
+  return {
+    currentPrice: product.price,
+    originalPrice: product.original_price ?? undefined,
+    isPromotionActive: true,
+    promoLabel: product.promo_label?.trim() || undefined,
+  };
 }

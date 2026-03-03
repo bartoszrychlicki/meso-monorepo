@@ -8,6 +8,7 @@ import { Clock, Star, Eye, EyeOff, ImageIcon } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AllergenBadges } from './allergen-badges';
+import { getProductPromotionPricing } from '@/modules/menu/utils/pricing';
 
 const PRODUCT_PLACEHOLDER_IMAGE = '/images/product-placeholder.svg';
 
@@ -28,6 +29,9 @@ export function ProductCard({
 }: ProductCardProps) {
   const hasVariants = product.variants.length > 0;
   const [imgError, setImgError] = useState(false);
+  const promotionPricing = getProductPromotionPricing(product);
+  const basePrice = promotionPricing.currentPrice;
+  const baseOriginalPrice = promotionPricing.originalPrice;
 
   const mainImage = product.images?.length > 0 ? product.images[0] : null;
   const hasRealImage = mainImage && !imgError;
@@ -41,13 +45,13 @@ export function ProductCard({
         const maxMod = Math.max(...modifiers);
 
         if (minMod === maxMod && minMod === 0) {
-          return formatCurrency(product.price);
+          return formatCurrency(basePrice);
         }
 
         const formatMod = (mod: number) => (mod >= 0 ? `+${mod.toFixed(2)}` : mod.toFixed(2));
-        return `${formatCurrency(product.price)} (${formatMod(minMod)} do ${formatMod(maxMod)} PLN)`;
+        return `${formatCurrency(basePrice)} (${formatMod(minMod)} do ${formatMod(maxMod)} PLN)`;
       })()
-    : formatCurrency(product.price);
+    : formatCurrency(basePrice);
 
   return (
     <div
@@ -101,6 +105,11 @@ export function ProductCard({
           {product.type === 'combo' && (
             <Badge className="bg-violet-500/90 text-white shadow-sm hover:bg-violet-500/90">
               Zestaw
+            </Badge>
+          )}
+          {promotionPricing.isPromotionActive && (
+            <Badge className="bg-emerald-600/90 text-white shadow-sm hover:bg-emerald-600/90">
+              {promotionPricing.promoLabel || 'Promocja'}
             </Badge>
           )}
         </div>
@@ -158,6 +167,11 @@ export function ProductCard({
             <span className="text-sm font-bold text-foreground" data-field="price">
               {priceDisplay}
             </span>
+            {!hasVariants && baseOriginalPrice != null && (
+              <span className="ml-2 text-xs text-muted-foreground line-through">
+                {formatCurrency(baseOriginalPrice)}
+              </span>
+            )}
             {foodCost && foodCost.totalCost > 0 && (
               <span
                 className={cn(
