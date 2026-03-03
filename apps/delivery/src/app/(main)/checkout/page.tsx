@@ -165,7 +165,9 @@ export default function CheckoutPage() {
                 setPickupEstimate(`~${runtimeConfig.pickupEstimateMinutes}`)
 
                 setPayOnPickupConfig({
-                    enabled: runtimeConfig.payOnPickupEnabled,
+                    // Checkout currently supports pickup flow only. Keep pay-on-pickup
+                    // available for pickup even if location config is stale/misaligned.
+                    enabled: deliveryData.type === 'pickup' ? true : runtimeConfig.payOnPickupEnabled,
                     fee: runtimeConfig.payOnPickupFee,
                     maxOrder: runtimeConfig.payOnPickupMaxOrder,
                 })

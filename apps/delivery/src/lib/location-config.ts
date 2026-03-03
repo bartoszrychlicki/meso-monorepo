@@ -47,6 +47,11 @@ function asNumber(value: unknown, fallback: number): number {
   return typeof parsed === 'number' && Number.isFinite(parsed) ? parsed : fallback
 }
 
+function asPositiveNumber(value: unknown, fallback: number): number {
+  const parsed = asNumber(value, fallback)
+  return parsed > 0 ? parsed : fallback
+}
+
 function asTime(value: unknown, fallback: string): string {
   if (typeof value !== 'string' || value.length < 4) return fallback
   return value
@@ -67,7 +72,12 @@ export function resolveCheckoutConfig(config: DeliveryConfigRecord | null | unde
       ? config.pay_on_pickup_enabled
       : DEFAULTS.payOnPickupEnabled,
     payOnPickupFee: asNumber(config?.pay_on_pickup_fee, DEFAULTS.payOnPickupFee),
-    payOnPickupMaxOrder: asNumber(config?.pay_on_pickup_max_order, DEFAULTS.payOnPickupMaxOrder),
+    // Some legacy rows store max order as 0, which effectively disables this payment method.
+    // Treat non-positive values as missing and fall back to safe default.
+    payOnPickupMaxOrder: asPositiveNumber(
+      config?.pay_on_pickup_max_order,
+      DEFAULTS.payOnPickupMaxOrder
+    ),
   }
 }
 

@@ -25,6 +25,7 @@ const mockServerRepo = {
   create: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
+  bulkCreate: vi.fn(),
 };
 
 vi.mock('@/lib/data/server-repository-factory', () => ({
@@ -116,6 +117,7 @@ describe('POST /api/v1/orders — kitchen ticket auto-creation', () => {
     mockServerRepo.create.mockImplementation((data: Record<string, unknown>) =>
       Promise.resolve({ id: 'order-1', ...data })
     );
+    mockServerRepo.bulkCreate.mockResolvedValue(undefined);
   });
 
   it('creates a kitchen ticket alongside the order', async () => {
@@ -129,8 +131,41 @@ describe('POST /api/v1/orders — kitchen ticket auto-creation', () => {
     expect(res.status).toBe(201);
     // createServerRepository called for 'orders' and 'kitchen_tickets'
     expect(mockCreateServerRepo).toHaveBeenCalledWith('kitchen_tickets');
+    expect(mockCreateServerRepo).toHaveBeenCalledWith('orders_order_items');
     // create called twice: once for order, once for kitchen ticket
     expect(mockServerRepo.create).toHaveBeenCalledTimes(2);
+  });
+
+  it('persists order items into orders_order_items table', async () => {
+    const req = makeRequest('http://localhost:3000/api/v1/orders', {
+      method: 'POST',
+      body: JSON.stringify(validOrderInput),
+    });
+
+    await POST(req);
+
+    expect(mockServerRepo.bulkCreate).toHaveBeenCalledTimes(1);
+    const [payload] = mockServerRepo.bulkCreate.mock.calls[0];
+
+    expect(payload).toHaveLength(1);
+    expect(payload[0]).toMatchObject({
+      order_id: 'order-1',
+      product_id: 'prod-1',
+      quantity: 2,
+      unit_price: 35,
+      total_price: 86,
+      variant_name: undefined,
+      notes: undefined,
+    });
+    expect(payload[0].addons).toEqual([
+      {
+        id: 'mod-1',
+        name: 'Extra Chashu',
+        price: 8,
+        quantity: 1,
+        modifier_action: 'add',
+      },
+    ]);
   });
 
   it('creates kitchen ticket with correct order_id, order_number, and location_id', async () => {

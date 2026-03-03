@@ -48,6 +48,15 @@ describe('resolveCheckoutConfig', () => {
       payOnPickupMaxOrder: 100,
     })
   })
+
+  it('falls back to default pay-on-pickup max order when config value is non-positive', () => {
+    const result = resolveCheckoutConfig({
+      pay_on_pickup_enabled: true,
+      pay_on_pickup_max_order: 0,
+    })
+
+    expect(result.payOnPickupMaxOrder).toBe(100)
+  })
 })
 
 describe('resolveCartLocationConfig', () => {

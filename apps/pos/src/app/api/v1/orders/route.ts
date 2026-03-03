@@ -15,6 +15,25 @@ import { Product } from '@/types/menu';
 import { Order } from '@/types/order';
 import { KitchenTicket, KitchenItem } from '@/types/kitchen';
 
+type PersistedOrderItem = {
+  id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  spice_level: number | null;
+  variant_name?: string;
+  addons: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    modifier_action: string;
+  }>;
+  notes?: string;
+};
+
 /**
  * GET /api/v1/orders
  * List orders with optional filtering.
@@ -244,6 +263,31 @@ export async function POST(request: NextRequest) {
     confirmed_at: isDeliveryConfirmed ? now : undefined,
     paid_at: input.payment_status === PaymentStatus.PAID ? now : undefined,
   });
+
+  // Keep relational order_items table in sync with JSONB order.items
+  const persistedItems: PersistedOrderItem[] = (order.items || []).map((item) => ({
+    id: item.id,
+    order_id: order.id,
+    product_id: item.product_id,
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    total_price: item.subtotal,
+    spice_level: null,
+    variant_name: item.variant_name,
+    addons: (item.modifiers || []).map((modifier) => ({
+      id: modifier.modifier_id,
+      name: modifier.name,
+      price: modifier.price,
+      quantity: modifier.quantity,
+      modifier_action: modifier.modifier_action,
+    })),
+    notes: item.notes,
+  }));
+
+  if (persistedItems.length > 0) {
+    const orderItemsRepo = createServerRepository<any>('orders_order_items');
+    await orderItemsRepo.bulkCreate?.(persistedItems);
+  }
 
   // Auto-create kitchen ticket for the new order
   try {
