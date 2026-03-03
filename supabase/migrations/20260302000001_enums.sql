@@ -1,0 +1,10 @@
+-- Placeholder migration: remote history alignment only.
+-- Version: 20260302000001_enums.sql
+--
+-- NOTE:
+-- On 2026-03-02, migration versions 20260302000001..20260302000014
+-- were applied on remote from an unrelated project (BeautyApp).
+--
+-- This file is intentionally a no-op in MESO.
+-- Cleanup is handled by:
+--   20260303000002_remove_foreign_beautyapp_artifacts.sql

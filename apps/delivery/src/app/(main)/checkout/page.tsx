@@ -125,6 +125,8 @@ export default function CheckoutPage() {
                 .from('users_locations')
                 .select('id, name, address, phone, is_active')
                 .eq('is_active', true)
+                .order('updated_at', { ascending: false })
+                .order('id', { ascending: true })
                 .limit(1)
                 .single()
 

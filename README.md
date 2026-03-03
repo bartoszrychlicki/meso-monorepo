@@ -36,6 +36,20 @@ meso-monorepo/
 - Node.js 24.x
 - pnpm 9.x
 
+### Supabase Migrations (Remote Only)
+
+- This project does not use a local Supabase instance.
+- Run migrations only against the remote project.
+- Use:
+
+```bash
+npx supabase link --project-ref gyxcdrcdnnzjdmcrwbpr
+npx supabase migration list
+npx supabase db push
+```
+
+- Avoid local Docker-based commands like `supabase start`, `supabase status`, and `supabase db reset`.
+
 ### Install
 
 ```bash

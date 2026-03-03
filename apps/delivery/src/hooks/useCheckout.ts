@@ -81,6 +81,8 @@ export function useCheckout() {
                 .from('users_locations')
                 .select('id')
                 .eq('is_active', true)
+                .order('updated_at', { ascending: false })
+                .order('id', { ascending: true })
                 .limit(1)
                 .single()
 
