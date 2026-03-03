@@ -29,7 +29,7 @@ interface StockItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   warehouses: Warehouse[];
-  inventoryCategories: InventoryCategory[];
+  inventoryCategories?: InventoryCategory[];
   onSubmit: (
     data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>,
     warehouseId: string,
@@ -50,7 +50,7 @@ export function StockItemForm({
   open,
   onOpenChange,
   warehouses,
-  inventoryCategories,
+  inventoryCategories = [],
   onSubmit,
 }: StockItemFormProps) {
   const [name, setName] = useState('');
