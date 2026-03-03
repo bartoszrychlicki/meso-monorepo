@@ -54,6 +54,17 @@ function isExternalIdUniqueViolation(error: unknown): boolean {
   return context.includes('external_order_id');
 }
 
+const VAT_RATE = 0.08;
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function calculateIncludedTaxFromGross(grossAmount: number, rate: number): number {
+  if (grossAmount <= 0) return 0;
+  return roundCurrency(grossAmount - grossAmount / (1 + rate));
+}
+
 async function findExistingByExternalOrderId(
   externalOrderId: string
 ): Promise<Order | null> {
@@ -243,11 +254,12 @@ export async function POST(request: NextRequest) {
   });
 
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-  const tax = Math.round(subtotal * 0.08 * 100) / 100; // 8% VAT
+  // Menu prices are gross. VAT is informational only and already included in subtotal.
+  const tax = calculateIncludedTaxFromGross(subtotal, VAT_RATE);
   const discount = input.discount ?? 0;
   const deliveryFee = input.delivery_fee ?? 0;
   const tip = input.tip ?? 0;
-  const total = Math.round((subtotal + tax - discount + deliveryFee + tip) * 100) / 100;
+  const total = roundCurrency(subtotal - discount + deliveryFee + tip);
 
   // Delivery app orders with pre-paid or pay-on-pickup status start as CONFIRMED
   const isDeliveryConfirmed =

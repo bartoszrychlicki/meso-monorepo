@@ -47,6 +47,19 @@ function getAdminClient(): SupabaseClient {
   })
 }
 
+function readNumber(value: unknown): number {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function computeExpectedGrossTotal(order: Record<string, unknown>): number {
+  const subtotal = readNumber(order.subtotal)
+  const discount = readNumber(order.discount ?? order.promo_discount)
+  const deliveryFee = readNumber(order.delivery_fee)
+  const tip = readNumber(order.tip)
+  return Number((subtotal - discount + deliveryFee + tip).toFixed(2))
+}
+
 async function waitForOrderItems(
   admin: SupabaseClient,
   orderId: string,
@@ -245,6 +258,8 @@ test.describe.serial('Order Placement Flow', () => {
     expect(order!.customer_id).toBe(testUserId)
     expect(order!.total).toBeGreaterThan(0)
     expect(order!.subtotal).toBeGreaterThan(0)
+    const expectedTotal = computeExpectedGrossTotal(order as unknown as Record<string, unknown>)
+    expect(Math.abs(Number(order!.total) - expectedTotal)).toBeLessThan(0.01)
     expect(order!.confirmed_at).toBeTruthy()
     // Order number should have WEB- prefix for delivery app orders
     expect(order!.order_number).toMatch(/^WEB-/)
@@ -346,6 +361,8 @@ test.describe.serial('Order Placement Flow', () => {
     expect(order!.payment_method).toBe('online')
     expect(order!.customer_id).toBe(testUserId)
     expect(order!.total).toBeGreaterThan(0)
+    const expectedTotal = computeExpectedGrossTotal(order as unknown as Record<string, unknown>)
+    expect(Math.abs(Number(order!.total) - expectedTotal)).toBeLessThan(0.01)
 
     // Verify order_items exist
     const { data: items } = await admin

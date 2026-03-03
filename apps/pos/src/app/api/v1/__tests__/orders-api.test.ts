@@ -278,7 +278,7 @@ describe('POST /api/v1/orders', () => {
     expect(body.error.details[0].message).toContain('nie jest dostępny')
   })
 
-  it('calculates totals and forwards them to transactional RPC payload', async () => {
+  it('calculates gross totals and forwards them to transactional RPC payload', async () => {
     const orderWithModifiers = {
       ...validOrderBody,
       items: [
@@ -312,7 +312,8 @@ describe('POST /api/v1/orders', () => {
     const payload = createCall?.[1]?.p_order
 
     expect(payload.subtotal).toBe(67.8)
-    expect(payload.tax).toBe(5.42)
-    expect(payload.total).toBe(68.22)
+    // Gross prices: VAT is included in subtotal and must not be added to total.
+    expect(payload.tax).toBe(5.02)
+    expect(payload.total).toBe(62.8)
   })
 })

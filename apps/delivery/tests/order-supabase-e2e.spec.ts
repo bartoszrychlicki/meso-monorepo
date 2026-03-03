@@ -33,6 +33,19 @@ function getAdminClient(): SupabaseClient {
   })
 }
 
+function readNumber(value: unknown): number {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function computeExpectedGrossTotal(order: Record<string, unknown>): number {
+  const subtotal = readNumber(order.subtotal)
+  const discount = readNumber(order.discount ?? order.promo_discount)
+  const deliveryFee = readNumber(order.delivery_fee)
+  const tip = readNumber(order.tip)
+  return Number((subtotal - discount + deliveryFee + tip).toFixed(2))
+}
+
 const TEST_EMAIL = 'e2e-order-supabase@meso.dev'
 const TEST_PASSWORD = 'e2e-supabase-test-123!'
 
@@ -241,6 +254,9 @@ test.describe('Order → Supabase', () => {
     const itemsTotalSum = items!.reduce((sum: number, i: any) => sum + Number(i.total_price), 0)
     // subtotal powinien być bliski sumie pozycji (różnica max 0.01 ze względu na float)
     expect(Math.abs(Number(order!.subtotal) - itemsTotalSum)).toBeLessThan(1)
+    // Total should match gross-price formula (VAT included in menu prices, not added on top)
+    const expectedTotal = computeExpectedGrossTotal(order as unknown as Record<string, unknown>)
+    expect(Math.abs(Number(order!.total) - expectedTotal)).toBeLessThan(0.01)
 
     console.log(`✅ Zamówienie #${orderId} poprawnie zapisane w Supabase`)
     console.log(`   - status: ${order!.status}, payment: ${order!.payment_status}`)
