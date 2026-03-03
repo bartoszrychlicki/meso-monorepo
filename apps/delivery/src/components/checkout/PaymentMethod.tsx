@@ -8,6 +8,7 @@ type PaymentType = 'online' | 'pay_on_pickup'
 interface PaymentMethodProps {
     selected: PaymentType
     onChange: (type: PaymentType) => void
+    payOnPickupEnabled: boolean
     payOnPickupFee: number
     payOnPickupMaxOrder: number
     orderSubtotal: number
@@ -16,11 +17,13 @@ interface PaymentMethodProps {
 export function PaymentMethod({
     selected,
     onChange,
+    payOnPickupEnabled,
     payOnPickupFee,
     payOnPickupMaxOrder,
     orderSubtotal,
 }: PaymentMethodProps) {
     const exceedsLimit = orderSubtotal > payOnPickupMaxOrder
+    const payOnPickupDisabled = !payOnPickupEnabled || exceedsLimit
 
     return (
         <div className="space-y-3">
@@ -78,11 +81,11 @@ export function PaymentMethod({
             {/* Option 2: Pay on pickup */}
             <button
                 type="button"
-                onClick={() => !exceedsLimit && onChange('pay_on_pickup')}
-                disabled={exceedsLimit}
+                onClick={() => !payOnPickupDisabled && onChange('pay_on_pickup')}
+                disabled={payOnPickupDisabled}
                 className={cn(
                     'w-full rounded-xl border p-4 text-left transition-all',
-                    exceedsLimit && 'opacity-50 cursor-not-allowed',
+                    payOnPickupDisabled && 'opacity-50 cursor-not-allowed',
                     selected === 'pay_on_pickup'
                         ? 'border-primary bg-primary/5 neon-border'
                         : 'border-border bg-card hover:border-primary/30'
@@ -115,7 +118,14 @@ export function PaymentMethod({
             </button>
 
             {/* Limit warning */}
-            {exceedsLimit && (
+            {!payOnPickupEnabled && (
+                <p className="flex items-center gap-2 text-xs text-amber-400">
+                    <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                    Płatność przy odbiorze jest obecnie niedostępna dla tej lokalizacji.
+                </p>
+            )}
+
+            {payOnPickupEnabled && exceedsLimit && (
                 <p className="flex items-center gap-2 text-xs text-amber-400">
                     <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
                     Płatność przy odbiorze dostępna do {payOnPickupMaxOrder} zł. Twoje zamówienie: {orderSubtotal.toFixed(0)} zł.

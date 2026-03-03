@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import type { OrderConfirmation } from '@/stores/orderConfirmationStore'
 import { PAYMENT_TIMEOUT_MS, getPickupStepIndex, isPaymentPending } from '@/lib/order-confirmation-utils'
 import { mapConfirmationItems } from '@/lib/order-confirmation-mapper'
+import { resolveCheckoutConfig } from '@/lib/location-config'
 
 // Step definitions for pickup orders
 const pickupSteps = [
@@ -87,31 +88,39 @@ function OrderConfirmationContent() {
 
                 const supabase = createClient()
 
-                const [orderRes, configRes] = await Promise.all([
-                    supabase
-                        .from('orders_orders')
-                        .select(`
+                const orderRes = await supabase
+                    .from('orders_orders')
+                    .select(`
+                        *,
+                        location:users_locations(name, address, phone),
+                        order_items:orders_order_items(
                             *,
-                            location:users_locations(name, address, phone),
-                            order_items:orders_order_items(
-                                *,
-                                product:menu_products(*)
-                            )
-                        `)
-                        .eq('id', orderId)
-                        .single(),
-                    supabase
-                        .from('app_config')
-                        .select('key, value')
-                        .eq('key', 'estimated_wait_time')
-                        .maybeSingle(),
-                ])
+                            product:menu_products(*)
+                        )
+                    `)
+                    .eq('id', orderId)
+                    .single()
 
                 if (orderRes.error || !orderRes.data) {
                     throw new Error('Nie znaleziono zamówienia')
                 }
 
-                const waitMinutes = configRes.data ? parseInt(configRes.data.value as string) || 20 : 20
+                let deliveryConfig: { pickup_time_min?: number | null; estimated_delivery_minutes?: number | null } | null = null
+                if (orderRes.data.location_id) {
+                    const configRes = await supabase
+                        .from('orders_delivery_config')
+                        .select('pickup_time_min, estimated_delivery_minutes')
+                        .eq('location_id', orderRes.data.location_id)
+                        .maybeSingle()
+                    deliveryConfig = configRes.data
+                }
+
+                const checkoutConfig = resolveCheckoutConfig(deliveryConfig)
+                const estimatedDelivery = Number(deliveryConfig?.estimated_delivery_minutes)
+                const waitMinutes = orderRes.data.delivery_type === 'delivery' && Number.isFinite(estimatedDelivery)
+                    ? estimatedDelivery
+                    : checkoutConfig.pickupEstimateMinutes
+
                 setConfirmation(buildConfirmation(orderRes.data, waitMinutes))
             } catch (err) {
                 console.error('Error fetching order:', err)

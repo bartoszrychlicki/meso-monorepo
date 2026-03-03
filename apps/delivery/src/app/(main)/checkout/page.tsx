@@ -11,6 +11,7 @@ import { useCartStore } from '@/stores/cartStore'
 import { useAuth } from '@/hooks/useAuth'
 import { useCheckout } from '@/hooks/useCheckout'
 import { formatPriceExact } from '@/lib/formatters'
+import { resolveCheckoutConfig } from '@/lib/location-config'
 
 // Components
 import { DeliveryForm } from '@/components/checkout/DeliveryForm'
@@ -55,6 +56,7 @@ export default function CheckoutPage() {
 
     // Payment on pickup config
     const [payOnPickupConfig, setPayOnPickupConfig] = useState({
+        enabled: true,
         fee: 2,
         maxOrder: 100,
     })
@@ -119,73 +121,65 @@ export default function CheckoutPage() {
     useEffect(() => {
         const fetchLocationConfig = async () => {
             const supabase = createClient()
+            const { data: locationData } = await supabase
+                .from('users_locations')
+                .select('id, name, address, phone, is_active')
+                .eq('is_active', true)
+                .limit(1)
+                .single()
 
-            const [locationRes, configRes] = await Promise.all([
-                supabase
-                    .from('users_locations')
-                    .select('name, address, phone, is_active')
-                    .eq('is_active', true)
-                    .limit(1)
-                    .single(),
-                supabase
-                    .from('app_config')
-                    .select('key, value')
-                    .in('key', [
-                        'pickup_buffer_after_open',
-                        'pickup_buffer_before_close',
-                        'estimated_wait_time',
-                        'pay_on_pickup_fee',
-                        'pay_on_pickup_max_order',
-                    ]),
-            ])
+            if (locationData) {
+                const { data: deliveryConfig } = await supabase
+                    .from('orders_delivery_config')
+                    .select(
+                        'opening_time, closing_time, pickup_time_min, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order'
+                    )
+                    .eq('location_id', locationData.id)
+                    .maybeSingle()
 
-            if (locationRes.data) {
+                const runtimeConfig = resolveCheckoutConfig(deliveryConfig)
+
                 // POS stores address as JSONB; extract city/street from it
-                const addr = typeof locationRes.data.address === 'object' && locationRes.data.address
-                    ? (locationRes.data.address as Record<string, string>)
+                const addr = typeof locationData.address === 'object' && locationData.address
+                    ? (locationData.address as Record<string, string>)
                     : null
+
                 setLocationHours({
-                    open_time: (locationRes.data as Record<string, unknown>).open_time as string || '11:00',
-                    close_time: (locationRes.data as Record<string, unknown>).close_time as string || '22:00',
+                    open_time: runtimeConfig.openTime,
+                    close_time: runtimeConfig.closeTime,
                 })
+
                 setPickupLocation({
-                    name: locationRes.data.name,
-                    address: addr?.street || String(locationRes.data.address || ''),
+                    name: locationData.name,
+                    address: addr?.street || String(locationData.address || ''),
                     city: addr?.city || '',
                 })
-            }
-
-            if (configRes.data) {
-                const configMap: Record<string, string> = {}
-                for (const row of configRes.data) {
-                    configMap[row.key] = typeof row.value === 'string' ? row.value : String(row.value)
-                }
 
                 setPickupBuffers({
-                    after_open: configMap.pickup_buffer_after_open
-                        ? Number(configMap.pickup_buffer_after_open)
-                        : 30,
-                    before_close: configMap.pickup_buffer_before_close
-                        ? Number(configMap.pickup_buffer_before_close)
-                        : 30,
+                    after_open: runtimeConfig.pickupBufferAfterOpen,
+                    before_close: runtimeConfig.pickupBufferBeforeClose,
                 })
 
-                const waitTime = configMap.estimated_wait_time
-                if (waitTime) {
-                    setPickupEstimate(`~${waitTime}`)
-                }
+                setPickupEstimate(`~${runtimeConfig.pickupEstimateMinutes}`)
 
-                // Payment on pickup config
-                const fee = configMap.pay_on_pickup_fee ? Number(configMap.pay_on_pickup_fee) : 2
-                const maxOrder = configMap.pay_on_pickup_max_order ? Number(configMap.pay_on_pickup_max_order) : 100
-                setPayOnPickupConfig({ fee, maxOrder })
-                setPayOnPickupFee(fee)
+                setPayOnPickupConfig({
+                    enabled: runtimeConfig.payOnPickupEnabled,
+                    fee: runtimeConfig.payOnPickupFee,
+                    maxOrder: runtimeConfig.payOnPickupMaxOrder,
+                })
+                setPayOnPickupFee(runtimeConfig.payOnPickupFee)
             }
         }
 
         fetchLocationConfig()
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    useEffect(() => {
+        if (!payOnPickupConfig.enabled && paymentType === 'pay_on_pickup') {
+            setPaymentType('online')
+        }
+    }, [payOnPickupConfig.enabled, paymentType, setPaymentType])
 
     // Redirect if not logged in (anonymous users cannot checkout)
     useEffect(() => {
@@ -434,6 +428,7 @@ export default function CheckoutPage() {
                 <PaymentMethod
                     selected={paymentType}
                     onChange={setPaymentType}
+                    payOnPickupEnabled={payOnPickupConfig.enabled}
                     payOnPickupFee={payOnPickupConfig.fee}
                     payOnPickupMaxOrder={payOnPickupConfig.maxOrder}
                     orderSubtotal={subtotal}

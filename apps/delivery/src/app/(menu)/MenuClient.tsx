@@ -10,6 +10,7 @@ import { CartSidebar } from '@/components/cart/CartSidebar'
 import { MobileStickyHeader } from '@/components/layout/MobileStickyHeader'
 import { useAuth } from '@/hooks/useAuth'
 import { useCartStore } from '@/stores/cartStore'
+import { resolveCartLocationConfig } from '@/lib/location-config'
 
 interface Category {
   id: string
@@ -49,7 +50,8 @@ interface Location {
   name: string
   delivery_time_min: number
   delivery_time_max: number
-  min_order_value: number
+  min_order_value?: number
+  min_order_amount?: number
   delivery_fee: number
 }
 
@@ -75,7 +77,8 @@ export function MenuClient({ categories, products, location, banners }: MenuClie
   // Sync location config (min order, delivery fee) to cart store
   useEffect(() => {
     if (location) {
-      setLocationConfig(location.min_order_value, location.delivery_fee)
+      const resolved = resolveCartLocationConfig(location)
+      setLocationConfig(resolved.minOrderAmount, resolved.deliveryFee)
     }
   }, [location, setLocationConfig])
 

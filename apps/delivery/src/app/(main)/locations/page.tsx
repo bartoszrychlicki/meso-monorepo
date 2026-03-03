@@ -51,29 +51,39 @@ export default function LocationsPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from('users_locations')
-      .select('id, name, address, phone, type, is_active')
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data, error }) => {
-        if (!error && data) {
-          // POS stores address as JSONB; normalize for display
-          setLocations(data.map((loc) => {
-            const addr = typeof loc.address === 'object' && loc.address
-              ? (loc.address as Record<string, string>)
-              : null
-            return {
-              ...loc,
-              address: addr?.street || String(loc.address || ''),
-              city: addr?.city || '',
-              open_time: '11:00:00',
-              close_time: '22:00:00',
-            } as LocationData
-          }))
-        }
-        setIsLoading(false)
-      })
+    Promise.all([
+      supabase
+        .from('users_locations')
+        .select('id, name, address, phone, type, is_active')
+        .eq('is_active', true)
+        .order('name'),
+      supabase
+        .from('orders_delivery_config')
+        .select('location_id, opening_time, closing_time'),
+    ]).then(([locationsRes, configRes]) => {
+      if (!locationsRes.error && locationsRes.data) {
+        const configMap = new Map(
+          (configRes.data || []).map((cfg) => [cfg.location_id, cfg])
+        )
+
+        // POS stores address as JSONB; normalize for display
+        setLocations(locationsRes.data.map((loc) => {
+          const addr = typeof loc.address === 'object' && loc.address
+            ? (loc.address as Record<string, string>)
+            : null
+          const cfg = configMap.get(loc.id)
+
+          return {
+            ...loc,
+            address: addr?.street || String(loc.address || ''),
+            city: addr?.city || '',
+            open_time: cfg?.opening_time || '11:00:00',
+            close_time: cfg?.closing_time || '22:00:00',
+          } as LocationData
+        }))
+      }
+      setIsLoading(false)
+    })
   }, [])
 
   return (

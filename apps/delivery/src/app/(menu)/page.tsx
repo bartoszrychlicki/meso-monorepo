@@ -53,10 +53,28 @@ async function getMenuData() {
       .order('sort_order'),
   ])
 
+  let locationWithConfig = locationResult.data
+  if (locationResult.data?.id) {
+    const { data: deliveryConfig } = await supabase
+      .from('orders_delivery_config')
+      .select('*')
+      .eq('location_id', locationResult.data.id)
+      .maybeSingle()
+
+    if (deliveryConfig) {
+      locationWithConfig = {
+        ...locationResult.data,
+        ...deliveryConfig,
+        // Backward compatibility for components still using old key name.
+        min_order_value: deliveryConfig.min_order_amount,
+      }
+    }
+  }
+
   return {
     categories: categoriesResult.data || [],
     products: productsResult.data || [],
-    location: locationResult.data,
+    location: locationWithConfig,
     banners: bannersResult.data || [],
   }
 }

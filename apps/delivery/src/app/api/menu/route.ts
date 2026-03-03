@@ -77,6 +77,7 @@ export async function GET() {
       postal_code: typeof location.address === 'object' ? (location.address as Record<string, string>).postal_code : undefined,
       // Merge delivery config into location for backward compatibility
       ...(deliveryConfig || {}),
+      min_order_value: deliveryConfig?.min_order_amount,
     },
     meta: {
       totalProducts: products.length,
