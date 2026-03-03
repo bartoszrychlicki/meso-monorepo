@@ -42,6 +42,7 @@ import {
 import { ImageUploader } from './image-uploader';
 import { ModifierPicker } from './modifier-picker';
 import { formatCurrency } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const STEPS = [
   { label: 'Podstawowe', icon: Info },
@@ -122,6 +123,28 @@ function buildLegacyModifierGroups(
   return [nextGroup];
 }
 
+function toDatetimeLocal(iso?: string | null): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function fromDatetimeLocal(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+function getSuggestedPromoPrice(regularPrice: number): number {
+  if (regularPrice <= 0) return 0;
+
+  const suggested = regularPrice > 1 ? regularPrice - 1 : regularPrice * 0.9;
+  return Number(Math.max(0.01, suggested).toFixed(2));
+}
+
 export function ProductForm({
   product,
   categories,
@@ -140,13 +163,28 @@ export function ProductForm({
     () => extractModifierIdsFromLegacyGroups(product?.modifier_groups),
     [product?.modifier_groups]
   );
+  const hasExistingPromotion =
+    product?.original_price != null &&
+    typeof product.original_price === 'number' &&
+    product.original_price > product.price;
+  const initialRegularPrice = hasExistingPromotion
+    ? Number(product.original_price)
+    : (product?.price ?? 0);
+  const initialPromoPrice = hasExistingPromotion
+    ? product!.price
+    : getSuggestedPromoPrice(initialRegularPrice);
 
   // Form state
   const [name, setName] = useState(product?.name ?? '');
   const [slug, setSlug] = useState(product?.slug ?? '');
   const [description, setDescription] = useState(product?.description ?? '');
   const [categoryId, setCategoryId] = useState(product?.category_id ?? '');
-  const [price, setPrice] = useState(product?.price ?? 0);
+  const [price, setPrice] = useState(initialRegularPrice);
+  const [isPromotionEnabled, setIsPromotionEnabled] = useState(hasExistingPromotion);
+  const [promoPrice, setPromoPrice] = useState(initialPromoPrice);
+  const [promoLabel, setPromoLabel] = useState(product?.promo_label ?? '');
+  const [promoStartsAt, setPromoStartsAt] = useState(toDatetimeLocal(product?.promo_starts_at));
+  const [promoEndsAt, setPromoEndsAt] = useState(toDatetimeLocal(product?.promo_ends_at));
   const [prepTime, setPrepTime] = useState(product?.preparation_time_minutes ?? 0);
   const [productType, setProductType] = useState<ProductType>(product?.type ?? ProductType.SINGLE);
   const [isFeatured, setIsFeatured] = useState(product?.is_featured ?? false);
@@ -251,7 +289,24 @@ export function ProductForm({
     setSelectedModifierIds(modifierIds);
   };
 
+  const isPromotionPriceInvalid = isPromotionEnabled && (promoPrice <= 0 || promoPrice >= price);
+  const isPromotionWindowInvalid =
+    isPromotionEnabled &&
+    Boolean(promoStartsAt && promoEndsAt) &&
+    new Date(promoStartsAt) > new Date(promoEndsAt);
+  const promotionDiscount = isPromotionEnabled ? Math.max(0, price - promoPrice) : 0;
+
   const handleSubmit = () => {
+    if (isPromotionPriceInvalid) {
+      toast.error('Cena promocyjna musi byc nizsza od regularnej');
+      return;
+    }
+
+    if (isPromotionWindowInvalid) {
+      toast.error('Data zakonczenia promocji musi byc pozniejsza od daty startu');
+      return;
+    }
+
     const selectedCategory = categories.find((c) => c.id === categoryId);
     const existingModifierGroups = product?.modifier_groups ?? [];
     const nextModifierGroups = buildLegacyModifierGroups(
@@ -263,6 +318,8 @@ export function ProductForm({
       !modifierSelectionTouched &&
       nextModifierGroups.length === 0 &&
       existingModifierGroups.length > 0;
+    const regularPrice = price;
+    const effectivePrice = isPromotionEnabled ? promoPrice : regularPrice;
 
     const data: Omit<Product, 'created_at' | 'updated_at'> = {
       id: productId,
@@ -271,7 +328,11 @@ export function ProductForm({
       description,
       category_id: categoryId,
       type: variants.length > 0 ? ProductType.WITH_VARIANTS : productType,
-      price,
+      price: effectivePrice,
+      original_price: isPromotionEnabled ? regularPrice : null,
+      promo_label: isPromotionEnabled ? (promoLabel.trim() || null) : null,
+      promo_starts_at: isPromotionEnabled ? fromDatetimeLocal(promoStartsAt) : null,
+      promo_ends_at: isPromotionEnabled ? fromDatetimeLocal(promoEndsAt) : null,
       image_url: images.length > 0 ? images[0].url : undefined,
       images,
       is_available: isAvailable,
@@ -290,7 +351,7 @@ export function ProductForm({
       tax_rate: product?.tax_rate ?? 8,
       is_active: product?.is_active ?? true,
       point_ids: product?.point_ids ?? [],
-      pricing: product?.pricing ?? createDefaultPricing(price, 2),
+      pricing: product?.pricing ?? createDefaultPricing(effectivePrice, 2),
     };
     onSubmit(data, selectedModifierIds);
   };
@@ -383,7 +444,7 @@ export function ProductForm({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="price">Cena (PLN) *</Label>
+                  <Label htmlFor="price">Cena regularna (PLN) *</Label>
                   <Input
                     id="price"
                     type="number"
@@ -405,6 +466,110 @@ export function ProductForm({
                     data-field="product-prep-time"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-3 rounded-lg border p-4" data-component="promotion-settings">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="promotion-enabled"
+                    checked={isPromotionEnabled}
+                    onCheckedChange={(checked) => {
+                      const enabled = checked === true;
+                      setIsPromotionEnabled(enabled);
+                      if (enabled && (promoPrice <= 0 || promoPrice >= price)) {
+                        setPromoPrice(getSuggestedPromoPrice(price));
+                      }
+                      if (!enabled) {
+                        setPromoLabel('');
+                        setPromoStartsAt('');
+                        setPromoEndsAt('');
+                      }
+                    }}
+                    data-field="promotion-enabled"
+                  />
+                  <div>
+                    <Label htmlFor="promotion-enabled" className="text-sm font-medium">
+                      Promocja cenowa
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Cena produktu (pole wyzej) pozostaje regularna. Podaj cene promocyjna ponizej.
+                    </p>
+                  </div>
+                </div>
+
+                {isPromotionEnabled && (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="promo-price">Cena promocyjna (PLN)</Label>
+                      <Input
+                        id="promo-price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={promoPrice}
+                        onChange={(e) => setPromoPrice(parseFloat(e.target.value) || 0)}
+                        data-field="product-promo-price"
+                      />
+                      {isPromotionPriceInvalid && (
+                        <p className="text-xs text-destructive">
+                          Cena promocyjna musi byc nizsza od regularnej.
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="promo-label">Label promocji</Label>
+                      <Input
+                        id="promo-label"
+                        value={promoLabel}
+                        onChange={(e) => setPromoLabel(e.target.value)}
+                        placeholder="np. -20% Happy Hour"
+                        maxLength={64}
+                        data-field="product-promo-label"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="promo-starts-at">Start promocji</Label>
+                      <Input
+                        id="promo-starts-at"
+                        type="datetime-local"
+                        value={promoStartsAt}
+                        onChange={(e) => setPromoStartsAt(e.target.value)}
+                        data-field="product-promo-starts-at"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="promo-ends-at">Koniec promocji</Label>
+                      <Input
+                        id="promo-ends-at"
+                        type="datetime-local"
+                        value={promoEndsAt}
+                        onChange={(e) => setPromoEndsAt(e.target.value)}
+                        data-field="product-promo-ends-at"
+                      />
+                      {isPromotionWindowInvalid && (
+                        <p className="text-xs text-destructive">
+                          Koniec promocji musi byc pozniejszy niz start.
+                        </p>
+                      )}
+                    </div>
+                    <div className="md:col-span-2 rounded-md bg-muted/60 px-3 py-2 text-sm">
+                      <span className="text-muted-foreground">Podglad: </span>
+                      <span className="line-through text-muted-foreground">
+                        {formatCurrency(price)}
+                      </span>
+                      <span className="mx-1">→</span>
+                      <span className="font-semibold text-foreground">{formatCurrency(promoPrice)}</span>
+                      {promotionDiscount > 0 && (
+                        <span className="ml-2 text-emerald-600">
+                          oszczednosc {formatCurrency(promotionDiscount)}
+                        </span>
+                      )}
+                      {promoLabel.trim() && (
+                        <Badge className="ml-2">{promoLabel.trim()}</Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -775,9 +940,23 @@ export function ProductForm({
                       <dd className="font-medium">{name || '-'}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Cena:</dt>
+                      <dt className="text-muted-foreground">Cena regularna:</dt>
                       <dd className="font-medium">{price > 0 ? `${price.toFixed(2)} PLN` : '-'}</dd>
                     </div>
+                    {isPromotionEnabled && (
+                      <>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Cena promocyjna:</dt>
+                          <dd className="font-medium">
+                            {promoPrice > 0 ? `${promoPrice.toFixed(2)} PLN` : '-'}
+                          </dd>
+                        </div>
+                        <div className="flex justify-between">
+                          <dt className="text-muted-foreground">Label promo:</dt>
+                          <dd className="font-medium">{promoLabel.trim() || '-'}</dd>
+                        </div>
+                      </>
+                    )}
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">Zdjecia:</dt>
                       <dd className="font-medium">{images.length}</dd>
@@ -841,7 +1020,14 @@ export function ProductForm({
         <div className="flex items-center gap-2">
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting || !name || !categoryId || price <= 0}
+            disabled={
+              isSubmitting ||
+              !name ||
+              !categoryId ||
+              price <= 0 ||
+              isPromotionPriceInvalid ||
+              isPromotionWindowInvalid
+            }
             variant={step < STEPS.length - 1 ? 'outline' : 'default'}
             data-action="submit-product"
           >
