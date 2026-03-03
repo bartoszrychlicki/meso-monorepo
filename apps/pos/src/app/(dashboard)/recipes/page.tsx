@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Plus, Search, ChefHat } from 'lucide-react';
-import { ProductCategory } from '@/types/enums';
+import { RECIPE_PRODUCT_CATEGORIES, RecipeProductCategory } from '@/types/recipe';
 import { getCategoryDisplayName } from '@/modules/recipes/utils/recipe-calculator';
 
 export default function RecipesPage() {
@@ -75,7 +75,7 @@ export default function RecipesPage() {
           </CardContent>
         </Card>
 
-        {Object.values(ProductCategory).map((category) => (
+        {RECIPE_PRODUCT_CATEGORIES.map((category) => (
           <Card key={category}>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm">
@@ -111,7 +111,7 @@ export default function RecipesPage() {
             <Select
               value={categoryFilter}
               onValueChange={(value) =>
-                setCategoryFilter(value as ProductCategory | 'all')
+                setCategoryFilter(value as RecipeProductCategory | 'all')
               }
             >
               <SelectTrigger
@@ -122,7 +122,7 @@ export default function RecipesPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Wszystkie kategorie</SelectItem>
-                {Object.values(ProductCategory).map((category) => (
+                {RECIPE_PRODUCT_CATEGORIES.map((category) => (
                   <SelectItem key={category} value={category}>
                     {getCategoryDisplayName(category)}
                   </SelectItem>

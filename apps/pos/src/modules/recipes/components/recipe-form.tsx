@@ -12,7 +12,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { CreateRecipeSchema, CreateRecipeInput } from '@/schemas/recipe';
 import { ProductCategory } from '@/types/enums';
-import { Recipe } from '@/types/recipe';
+import { Recipe, RecipeProductCategory, RECIPE_PRODUCT_CATEGORIES } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
 import { inventoryRepository } from '@/modules/inventory/repository';
 import { recipesRepository } from '../repository';
@@ -60,7 +60,7 @@ interface RecipeIngredientField {
 interface IngredientChecklistProps {
   stockItems: StockItem[];
   semiFinishedRecipes: Recipe[];
-  productCategory: ProductCategory;
+  productCategory: RecipeProductCategory;
   form: { setValue: (name: string, value: unknown) => void };
   append: (value: RecipeIngredientField) => void;
   remove: (index: number) => void;
@@ -533,7 +533,7 @@ export function RecipeForm({
 
   // Calculate estimated cost
   const watchedIngredients = form.watch('ingredients');
-  const watchedCategory = form.watch('product_category') as ProductCategory;
+  const watchedCategory = form.watch('product_category') as RecipeProductCategory;
   const estimatedCost = (watchedIngredients || []).reduce(
     (sum: number, ing: RecipeIngredientField) => {
       if (ing.type === 'recipe') {
@@ -620,7 +620,7 @@ export function RecipeForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {Object.values(ProductCategory).map((category) => (
+                    {RECIPE_PRODUCT_CATEGORIES.map((category) => (
                       <SelectItem key={category} value={category}>
                         {getCategoryDisplayName(category)}
                       </SelectItem>

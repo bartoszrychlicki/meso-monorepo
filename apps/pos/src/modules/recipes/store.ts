@@ -5,8 +5,14 @@
  */
 
 import { create } from 'zustand';
-import { Recipe, RecipeCostBreakdown, AllergenSource } from '@/types/recipe';
-import { ProductCategory, Allergen } from '@/types/enums';
+import {
+  Recipe,
+  RecipeCostBreakdown,
+  AllergenSource,
+  RecipeProductCategory,
+  RECIPE_PRODUCT_CATEGORIES,
+} from '@/types/recipe';
+import { Allergen } from '@/types/enums';
 import { recipesRepository } from './repository';
 import { CreateRecipeInput, UpdateRecipeInput } from '@/schemas/recipe';
 
@@ -15,7 +21,7 @@ interface RecipesStore {
   recipes: Recipe[];
   selectedRecipeId: string | null;
   searchQuery: string;
-  categoryFilter: ProductCategory | 'all';
+  categoryFilter: RecipeProductCategory | 'all';
   allergenFilter: Allergen[];
   isLoading: boolean;
   error: string | null;
@@ -36,7 +42,7 @@ interface RecipesStore {
   deleteRecipe: (id: string) => Promise<void>;
   setSelectedRecipeId: (id: string | null) => void;
   setSearchQuery: (query: string) => void;
-  setCategoryFilter: (category: ProductCategory | 'all') => void;
+  setCategoryFilter: (category: RecipeProductCategory | 'all') => void;
   setAllergenFilter: (allergens: Allergen[]) => void;
   clearError: () => void;
 
@@ -46,7 +52,7 @@ interface RecipesStore {
 
   // Computed
   getFilteredRecipes: () => Recipe[];
-  getRecipesByCategory: () => Map<ProductCategory, Recipe[]>;
+  getRecipesByCategory: () => Map<RecipeProductCategory, Recipe[]>;
   getSelectedRecipe: () => Recipe | null;
   getRecipeStats: () => {
     total: number;
@@ -314,9 +320,9 @@ export const useRecipesStore = create<RecipesStore>((set, get) => ({
    */
   getRecipesByCategory: () => {
     const recipes = get().recipes;
-    const byCategory = new Map<ProductCategory, Recipe[]>();
+    const byCategory = new Map<RecipeProductCategory, Recipe[]>();
 
-    Object.values(ProductCategory).forEach((category) => {
+    RECIPE_PRODUCT_CATEGORIES.forEach((category) => {
       byCategory.set(
         category,
         recipes.filter((r) => r.product_category === category)
@@ -346,7 +352,7 @@ export const useRecipesStore = create<RecipesStore>((set, get) => ({
     const recipes = get().recipes;
 
     const byCategory: Record<string, number> = {};
-    Object.values(ProductCategory).forEach((category) => {
+    RECIPE_PRODUCT_CATEGORIES.forEach((category) => {
       byCategory[category] = recipes.filter(
         (r) => r.product_category === category
       ).length;

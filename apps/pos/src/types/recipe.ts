@@ -8,6 +8,14 @@
 import { ProductCategory, Allergen } from './enums';
 import { BaseEntity } from './common';
 
+export const RECIPE_PRODUCT_CATEGORIES = [
+  ProductCategory.SEMI_FINISHED,
+  ProductCategory.FINISHED_GOOD,
+] as const;
+
+export type RecipeProductCategory =
+  (typeof RECIPE_PRODUCT_CATEGORIES)[number];
+
 /**
  * Recipe Ingredient
  * Represents a single ingredient in a recipe with quantity and unit
@@ -28,8 +36,7 @@ export interface RecipeIngredient {
  * Defines how to make a product from ingredients
  *
  * Supports nested recipes:
- * - RAW_MATERIAL: Base ingredients (flour, milk, meat)
- * - SEMI_FINISHED: Made from raw materials (buns, sauces, patties)
+ * - SEMI_FINISHED: Intermediate products (buns, sauces, patties)
  * - FINISHED_GOOD: Final products made from semi-finished (burgers, meals)
  */
 export interface Recipe extends BaseEntity {
@@ -37,7 +44,7 @@ export interface Recipe extends BaseEntity {
   product_id: string; // Which product this recipe makes
   name: string; // Recipe name (e.g., "Cheeseburger Classic")
   description: string | null;
-  product_category: ProductCategory; // RAW_MATERIAL, SEMI_FINISHED, FINISHED_GOOD
+  product_category: RecipeProductCategory; // SEMI_FINISHED, FINISHED_GOOD
 
   // Ingredients (BOM)
   ingredients: RecipeIngredient[];

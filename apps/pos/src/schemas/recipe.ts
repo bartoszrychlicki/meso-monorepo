@@ -5,7 +5,8 @@
  */
 
 import { z } from 'zod';
-import { ProductCategory, Allergen } from '@/types/enums';
+import { Allergen } from '@/types/enums';
+import { RECIPE_PRODUCT_CATEGORIES } from '@/types/recipe';
 
 /**
  * Recipe Ingredient Schema (discriminated union: stock_item | recipe)
@@ -64,8 +65,8 @@ export const CreateRecipeSchema = z.object({
     .optional()
     .describe('Opcjonalny opis receptury'),
   product_category: z
-    .nativeEnum(ProductCategory)
-    .describe('Kategoria produktu (surowiec/półprodukt/gotowe)'),
+    .enum(RECIPE_PRODUCT_CATEGORIES)
+    .describe('Kategoria produktu (półprodukt/produkt finalny)'),
   ingredients: z
     .array(RecipeIngredientSchema)
     .min(1, 'Receptura musi zawierać przynajmniej jeden składnik')
