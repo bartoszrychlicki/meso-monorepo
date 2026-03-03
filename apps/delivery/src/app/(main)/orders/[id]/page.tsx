@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, MapPin, Phone, Clock, CreditCard, Store, Radio } from 'lucide-react'
 import { useOrderDetails } from '@/hooks/useOrderDetails'
 import { OrderTimeline, OrderStatusBadge, OrderItemsList } from '@/components/orders'
-import { ORDER_STATUS_MESSAGES, formatOrderDate } from '@/types/order'
+import { formatOrderDate, getOrderStatusMessage } from '@/types/order'
 import { formatPrice } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
 import { isOrderActive } from '@/lib/order-confirmation-utils'
@@ -54,7 +54,7 @@ export default function OrderDetailsPage() {
         )
     }
 
-    const statusMessage = ORDER_STATUS_MESSAGES[order.status]
+    const statusMessage = getOrderStatusMessage(order.status, order.payment_status)
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-6 pb-24 space-y-6">
@@ -78,7 +78,11 @@ export default function OrderDetailsPage() {
                 <h2 className="text-xl font-bold text-foreground mb-1">{statusMessage.title}</h2>
                 <p className="text-muted-foreground text-sm">{statusMessage.subtitle}</p>
                 <div className="mt-4">
-                    <OrderStatusBadge status={order.status} size="lg" />
+                    <OrderStatusBadge
+                        status={order.status}
+                        paymentStatus={order.payment_status}
+                        size="lg"
+                    />
                 </div>
                 {isOrderActive(order.status) && (
                     <Link
@@ -94,7 +98,7 @@ export default function OrderDetailsPage() {
             {/* Timeline */}
             <section className="rounded-xl border border-border bg-card p-4">
                 <h3 className="text-sm font-medium text-muted-foreground mb-4">Status zamówienia</h3>
-                <OrderTimeline status={order.status} />
+                <OrderTimeline status={order.status} paymentStatus={order.payment_status} />
             </section>
 
             {/* Delivery info */}

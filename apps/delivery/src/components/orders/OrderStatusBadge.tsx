@@ -2,10 +2,12 @@
 
 import { Clock, CheckCircle, Package, Truck, CheckCircle2, XCircle, ChefHat, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { ORDER_STATUS_STYLES, ORDER_STATUS_MESSAGES, type OrderStatus } from '@/types/order'
+import { getOrderStatusMessage, getOrderStatusStyle } from '@/types/order'
+import type { RawOrderStatus } from '@/lib/order-status'
 
 interface OrderStatusBadgeProps {
-    status: OrderStatus
+    status: RawOrderStatus
+    paymentStatus?: string
     showIcon?: boolean
     size?: 'sm' | 'md' | 'lg'
     className?: string
@@ -24,12 +26,13 @@ const iconMap = {
 
 export function OrderStatusBadge({
     status,
+    paymentStatus,
     showIcon = true,
     size = 'md',
     className
 }: OrderStatusBadgeProps) {
-    const style = ORDER_STATUS_STYLES[status]
-    const message = ORDER_STATUS_MESSAGES[status]
+    const style = getOrderStatusStyle(status, paymentStatus)
+    const message = getOrderStatusMessage(status, paymentStatus)
     const IconComponent = iconMap[style.icon as keyof typeof iconMap] || Clock
 
     const sizeClasses = {
@@ -55,7 +58,7 @@ export function OrderStatusBadge({
             )}
         >
             {showIcon && <IconComponent className={iconSizes[size]} />}
-            <span>{message.title.replace(/[🍜🛵💳✅👨‍🍳📦🔍🎉❌]/g, '').trim()}</span>
+            <span>{message.title.replace(/[🍜🛵💳✅👨‍🍳📦🔍🎉❌⏳ℹ️]/g, '').trim()}</span>
         </span>
     )
 }
