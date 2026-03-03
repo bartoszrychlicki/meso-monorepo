@@ -36,6 +36,7 @@ export default function InventoryPage() {
     loadAll,
     adjustStock,
     createStockItem,
+    deleteStockItem,
     assignToWarehouse,
     transferStock,
     createWarehouse,
@@ -238,6 +239,7 @@ export default function InventoryPage() {
             onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
               await adjustStock(warehouseId, stockItemId, quantity, reason);
             }}
+            onDeleteStockItem={deleteStockItem}
           />
         </TabsContent>
         {warehouses.map((w) => (
@@ -247,6 +249,7 @@ export default function InventoryPage() {
               onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
                 await adjustStock(warehouseId, stockItemId, quantity, reason);
               }}
+              onDeleteStockItem={deleteStockItem}
             />
           </TabsContent>
         ))}

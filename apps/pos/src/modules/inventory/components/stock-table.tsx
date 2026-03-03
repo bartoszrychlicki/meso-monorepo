@@ -23,15 +23,17 @@ import {
 import { WarehouseStockItem } from '@/types/inventory';
 import { AllergenBadges } from '@/modules/menu/components/allergen-badges';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Minus, Package, Pencil } from 'lucide-react';
+import { Plus, Minus, Package, Pencil, Trash2 } from 'lucide-react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 
 interface StockTableProps {
   items: WarehouseStockItem[];
   showWarehouseColumn?: boolean;
   onAdjustStock?: (warehouseId: string, stockItemId: string, quantity: number, reason: string) => Promise<void>;
+  onDeleteStockItem?: (stockItemId: string) => Promise<void>;
 }
 
 function getStockStatus(item: WarehouseStockItem): { label: string; color: string } {
@@ -48,11 +50,13 @@ function getQuantityColor(item: WarehouseStockItem): string {
   return 'text-green-700';
 }
 
-export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockTableProps) {
+export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDeleteStockItem }: StockTableProps) {
   const [adjustDialog, setAdjustDialog] = useState<WarehouseStockItem | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<WarehouseStockItem | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleAdjust = async () => {
     if (!adjustDialog || adjustQty === 0 || !onAdjustStock) return;
@@ -67,6 +71,21 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockT
       toast.error('Nie udalo sie zaktualizowac stanu');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteDialog || !onDeleteStockItem) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteStockItem(deleteDialog.id);
+      toast.success(`Usunieto pozycje: ${deleteDialog.name}`);
+      setDeleteDialog(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nie udalo sie usunac pozycji';
+      toast.error(message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -193,6 +212,19 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockT
                           </Button>
                         </>
                       )}
+                      {onDeleteStockItem && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => setDeleteDialog(item)}
+                          data-action="delete-stock-item"
+                          data-id={item.id}
+                          title="Usun pozycje"
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -292,6 +324,22 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock }: StockT
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteDialog(null);
+          }
+        }}
+        title="Usun pozycje magazynowa?"
+        description={`Ta operacja usunie pozycje "${deleteDialog?.name ?? ''}" oraz jej stany we wszystkich magazynach. Tej operacji nie mozna cofnac.`}
+        confirmLabel={isDeleting ? 'Usuwanie...' : 'Usun pozycje'}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+        variant="destructive"
+      />
     </>
   );
 }

@@ -9,7 +9,7 @@ const mockGetAllWarehouses = vi.fn();
 const mockGetAllWarehouseStockItems = vi.fn();
 const mockStockItemsCreate = vi.fn();
 const mockStockItemsUpdate = vi.fn();
-const mockStockItemsDelete = vi.fn();
+const mockDeleteStockItem = vi.fn();
 const mockAdjustStock = vi.fn();
 const mockTransferStock = vi.fn();
 const mockAssignToWarehouse = vi.fn();
@@ -32,6 +32,7 @@ vi.mock('../repository', () => ({
     getAllInventoryCategories: (...args: unknown[]) => mockGetAllInventoryCategories(...args),
     getAllWarehouses: (...args: unknown[]) => mockGetAllWarehouses(...args),
     getAllWarehouseStockItems: (...args: unknown[]) => mockGetAllWarehouseStockItems(...args),
+    deleteStockItem: (...args: unknown[]) => mockDeleteStockItem(...args),
     adjustStock: (...args: unknown[]) => mockAdjustStock(...args),
     transferStock: (...args: unknown[]) => mockTransferStock(...args),
     assignToWarehouse: (...args: unknown[]) => mockAssignToWarehouse(...args),
@@ -50,7 +51,6 @@ vi.mock('../repository', () => ({
     stockItems: {
       create: (...args: unknown[]) => mockStockItemsCreate(...args),
       update: (...args: unknown[]) => mockStockItemsUpdate(...args),
-      delete: (...args: unknown[]) => mockStockItemsDelete(...args),
     },
   },
 }));
@@ -262,14 +262,21 @@ describe('useInventoryStore', () => {
   describe('deleteStockItem', () => {
     it('removes item from store', async () => {
       const items = [makeStockItem({ id: '1' }), makeStockItem({ id: '2' })];
-      useInventoryStore.setState({ stockItems: items });
+      const whItems = [
+        makeWarehouseStockItem({ id: '1', warehouse_stock_id: 'ws-1' }),
+        makeWarehouseStockItem({ id: '2', warehouse_stock_id: 'ws-2' }),
+      ];
+      useInventoryStore.setState({ stockItems: items, warehouseStockItems: whItems });
 
-      mockStockItemsDelete.mockResolvedValue(undefined);
+      mockDeleteStockItem.mockResolvedValue(undefined);
 
       await useInventoryStore.getState().deleteStockItem('1');
 
+      expect(mockDeleteStockItem).toHaveBeenCalledWith('1');
       expect(useInventoryStore.getState().stockItems).toHaveLength(1);
       expect(useInventoryStore.getState().stockItems[0].id).toBe('2');
+      expect(useInventoryStore.getState().warehouseStockItems).toHaveLength(1);
+      expect(useInventoryStore.getState().warehouseStockItems[0].id).toBe('2');
     });
   });
 

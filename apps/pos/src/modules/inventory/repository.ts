@@ -8,6 +8,7 @@ import {
   StockItemUsage,
   InventoryCategory,
 } from '@/types/inventory';
+import { Recipe, RecipeIngredient } from '@/types/recipe';
 import { createRepository } from '@/lib/data/repository-factory';
 
 const stockItemRepo = createRepository<StockItem>('stock_items');
@@ -15,6 +16,32 @@ const warehouseRepo = createRepository<Warehouse>('warehouses');
 const warehouseStockRepo = createRepository<WarehouseStock>('warehouse_stock');
 const stockItemComponentRepo = createRepository<StockItemComponent>('stock_item_components');
 const inventoryCategoryRepo = createRepository<InventoryCategory>('inventory_categories');
+const recipesRepo = createRepository<Recipe>('recipes');
+
+function recipeUsesStockItem(ingredients: RecipeIngredient[], stockItemId: string): boolean {
+  return ingredients.some((ingredient) => {
+    if (ingredient.type === 'stock_item' && ingredient.reference_id === stockItemId) {
+      return true;
+    }
+    // Backward compatibility with legacy ingredient shape (stock_item_id)
+    const legacyIngredient = ingredient as unknown as { stock_item_id?: string };
+    return legacyIngredient.stock_item_id === stockItemId;
+  });
+}
+
+function formatRecipeNames(recipes: Recipe[]): string {
+  const uniqueNames = Array.from(
+    new Set(
+      recipes
+        .map((recipe) => recipe.name.trim())
+        .filter((name) => name.length > 0)
+    )
+  );
+  if (uniqueNames.length <= 5) {
+    return uniqueNames.join(', ');
+  }
+  return `${uniqueNames.slice(0, 5).join(', ')} (+${uniqueNames.length - 5} wiecej)`;
+}
 
 // Join warehouse_stock rows with stock items and warehouses in JS
 async function queryWarehouseStockItems(warehouseId?: string): Promise<WarehouseStockItem[]> {
@@ -206,6 +233,38 @@ export const inventoryRepository = {
       quantity,
       min_quantity: minQuantity,
     } as Omit<WarehouseStock, 'id' | 'created_at' | 'updated_at'>);
+  },
+
+  async deleteStockItem(id: string): Promise<void> {
+    const blockingRecipes = await recipesRepo.findMany(
+      (recipe) => recipe.is_active && recipeUsesStockItem(recipe.ingredients, id)
+    );
+
+    if (blockingRecipes.length > 0) {
+      const recipeNames = formatRecipeNames(blockingRecipes);
+      throw new Error(
+        `Nie mozna usunac pozycji, bo jest uzywana w recepturach: ${recipeNames}. Aby usunac pozycje, najpierw zmodyfikuj te receptury.`
+      );
+    }
+
+    const [warehouseRows, parentComponents, componentRows] = await Promise.all([
+      warehouseStockRepo.findMany({ stock_item_id: id } as Partial<WarehouseStock>),
+      stockItemComponentRepo.findMany({ parent_stock_item_id: id } as Partial<StockItemComponent>),
+      stockItemComponentRepo.findMany({ component_stock_item_id: id } as Partial<StockItemComponent>),
+    ]);
+
+    const componentIdsToDelete = new Set([
+      ...parentComponents.map((component) => component.id),
+      ...componentRows.map((component) => component.id),
+    ]);
+
+    await Promise.all([
+      ...warehouseRows.map((row) => warehouseStockRepo.delete(row.id)),
+      ...Array.from(componentIdsToDelete).map((componentId) => stockItemComponentRepo.delete(componentId)),
+    ]);
+
+    // Soft-delete to preserve historical references (e.g. deliveries, usage logs).
+    await stockItemRepo.update(id, { is_active: false } as Partial<StockItem>);
   },
 
   // --- Stock Item Detail methods ---

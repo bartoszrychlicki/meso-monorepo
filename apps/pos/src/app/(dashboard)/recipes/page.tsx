@@ -24,6 +24,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Table,
   TableBody,
   TableCell,
@@ -31,7 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Search, ChefHat, LayoutGrid, Rows3 } from 'lucide-react';
+import { Plus, Search, ChefHat, LayoutGrid, Rows3, CircleHelp } from 'lucide-react';
 import { RECIPE_PRODUCT_CATEGORIES, RecipeProductCategory } from '@/types/recipe';
 import {
   formatFoodCostPercentage,
@@ -70,8 +76,12 @@ export default function RecipesPage() {
     red: 'text-red-600',
   };
 
+  const foodCostTooltip =
+    'FC (Food Cost) = (koszt jednostkowy receptury / cena sprzedazy produktu) x 100. N/A oznacza brak dostepnej ceny sprzedazy do wyliczenia.';
+
   return (
-    <div className="space-y-6" data-page="recipes">
+    <TooltipProvider>
+      <div className="space-y-6" data-page="recipes">
       <PageHeader
         title="Receptury (BOM)"
         description="Zarządzanie recepturami i kalkulacja kosztów produkcji"
@@ -198,7 +208,19 @@ export default function RecipesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Nazwa</TableHead>
-                    <TableHead>FC</TableHead>
+                    <TableHead>
+                      <div className="inline-flex items-center gap-1.5">
+                        <span>FC</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <CircleHelp className="h-3.5 w-3.5 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            {foodCostTooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TableHead>
                     <TableHead>Koszt jednostkowy</TableHead>
                     <TableHead>Kategoria</TableHead>
                     <TableHead className="text-right">Ilość składników</TableHead>
@@ -278,6 +300,7 @@ export default function RecipesPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }

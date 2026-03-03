@@ -46,6 +46,38 @@ const CATEGORY_LABELS: Record<ProductCategory, string> = {
 
 const NONE_CATEGORY = '__none__';
 
+function generateAutoSku(name: string): string {
+  const prefix = name
+    .toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 6);
+  const timePart = Date.now().toString(36).toUpperCase();
+  const randomPart = Math.floor(Math.random() * 1296).toString(36).toUpperCase().padStart(2, '0');
+  return `${prefix || 'ITEM'}-${timePart}-${randomPart}`;
+}
+
+function getCreateStockItemErrorMessage(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return 'Nie udalo sie dodac pozycji';
+  }
+
+  const message = error.message.toLowerCase();
+  if (
+    message.includes('inventory_stock_items_sku_key') ||
+    message.includes('duplicate key value violates unique constraint')
+  ) {
+    return 'SKU jest juz zajete. Podaj inny kod lub zostaw pole puste (wygenerujemy automatycznie).';
+  }
+
+  if (message.includes('inventory_warehouse_stock')) {
+    return 'Pozycja zostala utworzona, ale nie udalo sie przypisac jej do magazynu.';
+  }
+
+  return 'Nie udalo sie dodac pozycji';
+}
+
 export function StockItemForm({
   open,
   onOpenChange,
@@ -108,12 +140,15 @@ export function StockItemForm({
       return;
     }
 
+    const trimmedName = name.trim();
+    const normalizedSku = sku.trim() || generateAutoSku(trimmedName);
+
     setIsSubmitting(true);
     try {
       await onSubmit(
         {
-          name: name.trim(),
-          sku: sku.trim(),
+          name: trimmedName,
+          sku: normalizedSku,
           product_category: category,
           inventory_category_id: inventoryCategoryId === NONE_CATEGORY ? null : inventoryCategoryId,
           unit,
@@ -133,8 +168,8 @@ export function StockItemForm({
       toast.success(`Dodano pozycje: ${name}`);
       resetForm();
       onOpenChange(false);
-    } catch {
-      toast.error('Nie udalo sie dodac pozycji');
+    } catch (error) {
+      toast.error(getCreateStockItemErrorMessage(error));
     } finally {
       setIsSubmitting(false);
     }
@@ -168,7 +203,7 @@ export function StockItemForm({
               <Label htmlFor="stock-sku">SKU</Label>
               <Input
                 id="stock-sku"
-                placeholder="np. WOL-001"
+                placeholder="np. WOL-001 (opcjonalnie)"
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
                 data-field="sku"

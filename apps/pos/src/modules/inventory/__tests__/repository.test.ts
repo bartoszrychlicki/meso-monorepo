@@ -247,4 +247,48 @@ describe('inventoryRepository', () => {
       ).rejects.toThrow('Nie mozna usunac kategorii z przypisanymi pozycjami');
     });
   });
+
+  describe('deleteStockItem', () => {
+    it('blocks deletion when stock item is used in recipes', async () => {
+      mockFindMany.mockResolvedValueOnce([
+        {
+          id: 'recipe-1',
+          name: 'Burger Classic',
+          is_active: true,
+          ingredients: [
+            { type: 'stock_item', reference_id: 'si-001', quantity: 1, unit: 'szt' },
+          ],
+        },
+      ]);
+
+      await expect(inventoryRepository.deleteStockItem('si-001')).rejects.toThrow(
+        'Nie mozna usunac pozycji, bo jest uzywana w recepturach: Burger Classic. Aby usunac pozycje, najpierw zmodyfikuj te receptury.'
+      );
+    });
+
+    it('removes warehouse state and soft-deletes stock item when not used in recipes', async () => {
+      mockFindMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          { id: 'ws-1', stock_item_id: 'si-001' },
+          { id: 'ws-2', stock_item_id: 'si-001' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 'comp-1', parent_stock_item_id: 'si-001', component_stock_item_id: 'si-002' },
+        ])
+        .mockResolvedValueOnce([
+          { id: 'comp-2', parent_stock_item_id: 'si-003', component_stock_item_id: 'si-001' },
+        ]);
+      mockDelete.mockResolvedValue(undefined);
+      mockUpdate.mockResolvedValue({});
+
+      await inventoryRepository.deleteStockItem('si-001');
+
+      expect(mockDelete).toHaveBeenCalledWith('ws-1');
+      expect(mockDelete).toHaveBeenCalledWith('ws-2');
+      expect(mockDelete).toHaveBeenCalledWith('comp-1');
+      expect(mockDelete).toHaveBeenCalledWith('comp-2');
+      expect(mockUpdate).toHaveBeenCalledWith('si-001', { is_active: false });
+    });
+  });
 });

@@ -125,8 +125,18 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   },
 
   deleteStockItem: async (id) => {
-    await inventoryRepository.stockItems.delete(id);
-    set({ stockItems: get().stockItems.filter((item) => item.id !== id) });
+    await inventoryRepository.deleteStockItem(id);
+    const wasCurrentItemDeleted = get().currentStockItem?.id === id;
+
+    set({
+      stockItems: get().stockItems.filter((item) => item.id !== id),
+      warehouseStockItems: get().warehouseStockItems.filter((item) => item.id !== id),
+      currentStockItem: wasCurrentItemDeleted ? null : get().currentStockItem,
+      currentComponents: get().currentComponents.filter(
+        (component) => component.parent_stock_item_id !== id && component.component_stock_item_id !== id
+      ),
+      currentUsage: wasCurrentItemDeleted ? null : get().currentUsage,
+    });
   },
 
   adjustStock: async (warehouseId: string, stockItemId: string, quantity: number, reason: string) => {
