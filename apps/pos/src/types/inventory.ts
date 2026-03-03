@@ -5,6 +5,7 @@ export interface StockItem extends BaseEntity {
   name: string;
   sku: string;
   product_category: ProductCategory;
+  inventory_category_id?: string | null;
   unit: string;
   cost_per_unit: number;
   allergens: Allergen[];
@@ -14,6 +15,13 @@ export interface StockItem extends BaseEntity {
   shelf_life_days: number;
   default_min_quantity: number;
   storage_location: string | null;
+}
+
+export interface InventoryCategory extends BaseEntity {
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
 }
 
 export interface StockItemComponent extends BaseEntity {

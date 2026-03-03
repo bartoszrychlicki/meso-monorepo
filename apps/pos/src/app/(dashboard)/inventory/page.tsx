@@ -7,16 +7,29 @@ import { StockTable } from '@/modules/inventory/components/stock-table';
 import { StockItemForm } from '@/modules/inventory/components/stock-item-form';
 import { TransferDialog } from '@/modules/inventory/components/transfer-dialog';
 import { WarehouseManager } from '@/modules/inventory/components/warehouse-manager';
+import { InventoryCategoryManager } from '@/modules/inventory/components/inventory-category-manager';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
-import { Package, AlertTriangle, DollarSign, Plus, ArrowLeftRight, Settings, Search } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Package, AlertTriangle, DollarSign, Plus, ArrowLeftRight, Settings, Search, Tags } from 'lucide-react';
+
+const ALL_CATEGORIES = '__all__';
+const UNCATEGORIZED = '__uncategorized__';
 
 export default function InventoryPage() {
   const {
+    stockItems,
+    inventoryCategories,
     warehouses,
     warehouseStockItems,
     isLoading,
@@ -28,6 +41,9 @@ export default function InventoryPage() {
     createWarehouse,
     updateWarehouse,
     deleteWarehouse,
+    createInventoryCategory,
+    updateInventoryCategory,
+    deleteInventoryCategory,
     selectedWarehouseId,
     setSelectedWarehouse,
   } = useInventoryStore();
@@ -35,7 +51,9 @@ export default function InventoryPage() {
   const [showNewItemForm, setShowNewItemForm] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showWarehouseManager, setShowWarehouseManager] = useState(false);
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
 
   useEffect(() => {
     loadAll();
@@ -47,14 +65,23 @@ export default function InventoryPage() {
   }, [warehouseStockItems, selectedWarehouseId]);
 
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return currentItems;
+    let filtered = currentItems;
+
+    if (categoryFilter !== ALL_CATEGORIES) {
+      filtered = filtered.filter((item) => {
+        if (categoryFilter === UNCATEGORIZED) return !item.inventory_category_id;
+        return item.inventory_category_id === categoryFilter;
+      });
+    }
+
+    if (!searchQuery.trim()) return filtered;
     const q = searchQuery.toLowerCase();
-    return currentItems.filter(
+    return filtered.filter(
       (item) =>
         item.name.toLowerCase().includes(q) ||
         item.sku.toLowerCase().includes(q)
     );
-  }, [currentItems, searchQuery]);
+  }, [currentItems, searchQuery, categoryFilter]);
 
   const lowStockItems = useMemo(() => {
     return currentItems.filter((item) => item.is_active && item.quantity < item.min_quantity);
@@ -71,6 +98,16 @@ export default function InventoryPage() {
     }
     return counts;
   }, [warehouseStockItems]);
+
+  const categoryItemCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of stockItems) {
+      const categoryId = item.inventory_category_id;
+      if (!categoryId) continue;
+      counts[categoryId] = (counts[categoryId] ?? 0) + 1;
+    }
+    return counts;
+  }, [stockItems]);
 
   const handleTabChange = (value: string) => {
     setSelectedWarehouse(value === 'all' ? null : value);
@@ -99,6 +136,14 @@ export default function InventoryPage() {
             >
               <Settings className="mr-2 h-4 w-4" />
               Zarzadzaj magazynami
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowCategoryManager(true)}
+              data-action="manage-inventory-categories"
+            >
+              <Tags className="mr-2 h-4 w-4" />
+              Zarzadzaj kategoriami
             </Button>
             <Button
               variant="outline"
@@ -143,15 +188,31 @@ export default function InventoryPage() {
         />
       </div>
 
-      <div className="relative" data-component="stock-search">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Szukaj produktu po nazwie lub SKU..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9"
-          data-field="stock-search"
-        />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_280px]">
+        <div className="relative" data-component="stock-search">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Szukaj produktu po nazwie lub SKU..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+            data-field="stock-search"
+          />
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger data-field="stock-category-filter">
+            <SelectValue placeholder="Wszystkie kategorie" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_CATEGORIES}>Wszystkie kategorie</SelectItem>
+            <SelectItem value={UNCATEGORIZED}>Bez kategorii</SelectItem>
+            {inventoryCategories.map((category) => (
+              <SelectItem key={category.id} value={category.id}>
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Tabs
@@ -195,6 +256,7 @@ export default function InventoryPage() {
         open={showNewItemForm}
         onOpenChange={setShowNewItemForm}
         warehouses={warehouses}
+        inventoryCategories={inventoryCategories}
         onSubmit={async (data, warehouseId, quantity, minQuantity) => {
           const newItem = await createStockItem(data);
           await assignToWarehouse(warehouseId, newItem.id, quantity, minQuantity);
@@ -217,6 +279,16 @@ export default function InventoryPage() {
         onCreateWarehouse={createWarehouse}
         onUpdateWarehouse={updateWarehouse}
         onDeleteWarehouse={deleteWarehouse}
+      />
+
+      <InventoryCategoryManager
+        open={showCategoryManager}
+        onOpenChange={setShowCategoryManager}
+        categories={inventoryCategories}
+        stockItemCountsByCategory={categoryItemCounts}
+        onCreateCategory={createInventoryCategory}
+        onUpdateCategory={updateInventoryCategory}
+        onDeleteCategory={deleteInventoryCategory}
       />
     </div>
   );

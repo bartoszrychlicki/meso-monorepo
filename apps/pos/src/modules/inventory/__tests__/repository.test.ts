@@ -96,6 +96,23 @@ describe('inventoryRepository', () => {
     });
   });
 
+  describe('getAllInventoryCategories', () => {
+    it('returns active categories sorted by sort_order and name', async () => {
+      const categories = [
+        { id: '2', name: 'Mieso', sort_order: 2, is_active: true },
+        { id: '1', name: 'Warzywa', sort_order: 1, is_active: true },
+        { id: '3', name: 'Napoje', sort_order: 2, is_active: true },
+      ];
+
+      mockFindMany.mockImplementation((filter: (item: Record<string, unknown>) => boolean) => {
+        return Promise.resolve(categories.filter(filter));
+      });
+
+      const result = await inventoryRepository.getAllInventoryCategories();
+      expect(result.map((c) => c.id)).toEqual(['1', '2', '3']);
+    });
+  });
+
   describe('adjustStock', () => {
     it('finds junction row and updates quantity', async () => {
       const warehouseStockRow = {
@@ -207,6 +224,27 @@ describe('inventoryRepository', () => {
       await expect(
         inventoryRepository.deleteWarehouse('wh-001')
       ).rejects.toThrow('Nie mozna usunac magazynu z przypisanymi pozycjami');
+    });
+  });
+
+  describe('deleteInventoryCategory', () => {
+    it('soft-deletes category when no stock items are assigned', async () => {
+      mockFindMany.mockResolvedValue([]);
+      mockUpdate.mockResolvedValue({});
+
+      await inventoryRepository.deleteInventoryCategory('cat-001');
+
+      expect(mockUpdate).toHaveBeenCalledWith('cat-001', { is_active: false });
+    });
+
+    it('throws when category has assigned stock items', async () => {
+      mockFindMany.mockResolvedValue([
+        makeStockItem({ id: 'si-1', inventory_category_id: 'cat-001' }),
+      ]);
+
+      await expect(
+        inventoryRepository.deleteInventoryCategory('cat-001')
+      ).rejects.toThrow('Nie mozna usunac kategorii z przypisanymi pozycjami');
     });
   });
 });

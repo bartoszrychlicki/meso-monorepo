@@ -10,13 +10,17 @@ CREATE TABLE IF NOT EXISTS public.inventory_categories (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
 CREATE INDEX IF NOT EXISTS idx_inventory_categories_is_active
   ON public.inventory_categories(is_active);
+
 CREATE INDEX IF NOT EXISTS idx_inventory_categories_sort_order
   ON public.inventory_categories(sort_order);
+
 -- 2) Add optional FK from stock items to inventory categories
 ALTER TABLE public.inventory_stock_items
   ADD COLUMN IF NOT EXISTS inventory_category_id UUID REFERENCES public.inventory_categories(id) ON DELETE SET NULL;
+
 CREATE INDEX IF NOT EXISTS idx_inventory_stock_items_inventory_category_id
   ON public.inventory_stock_items(inventory_category_id);
 -- 3) Seed default categories
@@ -36,6 +40,7 @@ WHERE si.inventory_category_id IS NULL
     (si.product_category = 'semi_finished' AND c.name = 'Polprodukty') OR
     (si.product_category = 'finished_good' AND c.name = 'Produkty gotowe')
   );
+
 -- 5) RLS and trigger
 ALTER TABLE public.inventory_categories ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all access to inventory_categories"

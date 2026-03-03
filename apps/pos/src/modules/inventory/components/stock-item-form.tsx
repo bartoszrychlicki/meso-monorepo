@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { StockItem, Warehouse } from '@/types/inventory';
+import { StockItem, Warehouse, InventoryCategory } from '@/types/inventory';
 import { ProductCategory, Allergen, VatRate, ConsumptionType } from '@/types/enums';
 import { ALLERGEN_LABELS } from '@/lib/constants';
 import { UNIT_OPTIONS, VAT_RATE_LABELS, CONSUMPTION_TYPE_LABELS } from '@/lib/constants/inventory';
@@ -29,6 +29,7 @@ interface StockItemFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   warehouses: Warehouse[];
+  inventoryCategories: InventoryCategory[];
   onSubmit: (
     data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>,
     warehouseId: string,
@@ -43,11 +44,20 @@ const CATEGORY_LABELS: Record<ProductCategory, string> = {
   [ProductCategory.FINISHED_GOOD]: 'Gotowy produkt',
 };
 
-export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: StockItemFormProps) {
+const NONE_CATEGORY = '__none__';
+
+export function StockItemForm({
+  open,
+  onOpenChange,
+  warehouses,
+  inventoryCategories,
+  onSubmit,
+}: StockItemFormProps) {
   const [name, setName] = useState('');
   const [sku, setSku] = useState('');
   const [unit, setUnit] = useState('kg');
   const [category, setCategory] = useState<ProductCategory>(ProductCategory.RAW_MATERIAL);
+  const [inventoryCategoryId, setInventoryCategoryId] = useState<string>(NONE_CATEGORY);
   const [costPerUnit, setCostPerUnit] = useState(0);
   const [vatRate, setVatRate] = useState<VatRate>(VatRate.PTU_B);
   const [consumptionType, setConsumptionType] = useState<ConsumptionType>(ConsumptionType.PRODUCT);
@@ -64,6 +74,7 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
     setSku('');
     setUnit('kg');
     setCategory(ProductCategory.RAW_MATERIAL);
+    setInventoryCategoryId(NONE_CATEGORY);
     setCostPerUnit(0);
     setVatRate(VatRate.PTU_B);
     setConsumptionType(ConsumptionType.PRODUCT);
@@ -104,6 +115,7 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
           name: name.trim(),
           sku: sku.trim(),
           product_category: category,
+          inventory_category_id: inventoryCategoryId === NONE_CATEGORY ? null : inventoryCategoryId,
           unit,
           cost_per_unit: costPerUnit,
           allergens: selectedAllergens,
@@ -164,37 +176,53 @@ export function StockItemForm({ open, onOpenChange, warehouses, onSubmit }: Stoc
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="stock-category">Kategoria</Label>
-              <Select value={category} onValueChange={(v) => setCategory(v as ProductCategory)}>
-                <SelectTrigger id="stock-category" data-field="category">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(ProductCategory).map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {CATEGORY_LABELS[cat]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-unit">Jednostka</Label>
-              <Select value={unit} onValueChange={setUnit}>
-                <SelectTrigger id="stock-unit" data-field="unit">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {UNIT_OPTIONS.map((u) => (
-                    <SelectItem key={u.value} value={u.value}>
-                      {u.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="stock-category">Typ produktu</Label>
+            <Select value={category} onValueChange={(v) => setCategory(v as ProductCategory)}>
+              <SelectTrigger id="stock-category" data-field="category">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.values(ProductCategory).map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {CATEGORY_LABELS[cat]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="stock-inventory-category">Kategoria magazynowa</Label>
+            <Select value={inventoryCategoryId} onValueChange={setInventoryCategoryId}>
+              <SelectTrigger id="stock-inventory-category" data-field="inventory-category">
+                <SelectValue placeholder="Bez kategorii" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_CATEGORY}>Bez kategorii</SelectItem>
+                {inventoryCategories.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="stock-unit">Jednostka</Label>
+            <Select value={unit} onValueChange={setUnit}>
+              <SelectTrigger id="stock-unit" data-field="unit">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {UNIT_OPTIONS.map((u) => (
+                  <SelectItem key={u.value} value={u.value}>
+                    {u.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

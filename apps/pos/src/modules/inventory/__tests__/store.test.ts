@@ -4,6 +4,7 @@ import { ProductCategory, VatRate, ConsumptionType } from '@/types/enums';
 
 // Mock inventory repository
 const mockGetAllStockItems = vi.fn();
+const mockGetAllInventoryCategories = vi.fn();
 const mockGetAllWarehouses = vi.fn();
 const mockGetAllWarehouseStockItems = vi.fn();
 const mockStockItemsCreate = vi.fn();
@@ -15,6 +16,9 @@ const mockAssignToWarehouse = vi.fn();
 const mockCreateWarehouse = vi.fn();
 const mockUpdateWarehouse = vi.fn();
 const mockDeleteWarehouse = vi.fn();
+const mockCreateInventoryCategory = vi.fn();
+const mockUpdateInventoryCategory = vi.fn();
+const mockDeleteInventoryCategory = vi.fn();
 const mockGetStockItemById = vi.fn();
 const mockGetComponentsForItem = vi.fn();
 const mockGetStockItemUsage = vi.fn();
@@ -25,6 +29,7 @@ const mockRemoveComponent = vi.fn();
 vi.mock('../repository', () => ({
   inventoryRepository: {
     getAllStockItems: (...args: unknown[]) => mockGetAllStockItems(...args),
+    getAllInventoryCategories: (...args: unknown[]) => mockGetAllInventoryCategories(...args),
     getAllWarehouses: (...args: unknown[]) => mockGetAllWarehouses(...args),
     getAllWarehouseStockItems: (...args: unknown[]) => mockGetAllWarehouseStockItems(...args),
     adjustStock: (...args: unknown[]) => mockAdjustStock(...args),
@@ -33,6 +38,9 @@ vi.mock('../repository', () => ({
     createWarehouse: (...args: unknown[]) => mockCreateWarehouse(...args),
     updateWarehouse: (...args: unknown[]) => mockUpdateWarehouse(...args),
     deleteWarehouse: (...args: unknown[]) => mockDeleteWarehouse(...args),
+    createInventoryCategory: (...args: unknown[]) => mockCreateInventoryCategory(...args),
+    updateInventoryCategory: (...args: unknown[]) => mockUpdateInventoryCategory(...args),
+    deleteInventoryCategory: (...args: unknown[]) => mockDeleteInventoryCategory(...args),
     getStockItemById: (...args: unknown[]) => mockGetStockItemById(...args),
     getComponentsForItem: (...args: unknown[]) => mockGetComponentsForItem(...args),
     getStockItemUsage: (...args: unknown[]) => mockGetStockItemUsage(...args),
@@ -107,6 +115,7 @@ describe('useInventoryStore', () => {
     vi.clearAllMocks();
     useInventoryStore.setState({
       stockItems: [],
+      inventoryCategories: [],
       warehouses: [],
       warehouseStockItems: [],
       selectedWarehouseId: null,
@@ -121,16 +130,19 @@ describe('useInventoryStore', () => {
   describe('loadAll', () => {
     it('loads stock items, warehouses, and warehouse stock items', async () => {
       const items = [makeStockItem({ id: '1' })];
+      const categories = [{ id: 'cat-1', name: 'Warzywa', description: null, sort_order: 1, is_active: true }];
       const warehouses = [makeWarehouse({ id: 'wh-1' })];
       const whItems = [makeWarehouseStockItem({ id: '1', warehouse_id: 'wh-1' })];
 
       mockGetAllStockItems.mockResolvedValue(items);
+      mockGetAllInventoryCategories.mockResolvedValue(categories);
       mockGetAllWarehouses.mockResolvedValue(warehouses);
       mockGetAllWarehouseStockItems.mockResolvedValue(whItems);
 
       await useInventoryStore.getState().loadAll();
 
       expect(useInventoryStore.getState().stockItems).toEqual(items);
+      expect(useInventoryStore.getState().inventoryCategories).toEqual(categories);
       expect(useInventoryStore.getState().warehouses).toEqual(warehouses);
       expect(useInventoryStore.getState().warehouseStockItems).toEqual(whItems);
       expect(useInventoryStore.getState().isLoading).toBe(false);
@@ -141,6 +153,7 @@ describe('useInventoryStore', () => {
       mockGetAllStockItems.mockReturnValue(
         new Promise<StockItem[]>((resolve) => { resolveItems = resolve; })
       );
+      mockGetAllInventoryCategories.mockResolvedValue([]);
       mockGetAllWarehouses.mockResolvedValue([]);
       mockGetAllWarehouseStockItems.mockResolvedValue([]);
 
@@ -155,6 +168,7 @@ describe('useInventoryStore', () => {
 
     it('resets isLoading on error', async () => {
       mockGetAllStockItems.mockRejectedValue(new Error('Network error'));
+      mockGetAllInventoryCategories.mockResolvedValue([]);
       mockGetAllWarehouses.mockResolvedValue([]);
       mockGetAllWarehouseStockItems.mockResolvedValue([]);
 
@@ -256,6 +270,53 @@ describe('useInventoryStore', () => {
 
       expect(useInventoryStore.getState().stockItems).toHaveLength(1);
       expect(useInventoryStore.getState().stockItems[0].id).toBe('2');
+    });
+  });
+
+  describe('inventory categories CRUD', () => {
+    const category = {
+      id: 'cat-001',
+      name: 'Warzywa',
+      description: null,
+      sort_order: 1,
+      is_active: true,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    };
+
+    it('reloads categories after create', async () => {
+      mockCreateInventoryCategory.mockResolvedValue(category);
+      mockGetAllInventoryCategories.mockResolvedValue([category]);
+
+      await useInventoryStore.getState().createInventoryCategory({
+        name: category.name,
+        description: category.description,
+        sort_order: category.sort_order,
+        is_active: category.is_active,
+      });
+
+      expect(mockCreateInventoryCategory).toHaveBeenCalled();
+      expect(useInventoryStore.getState().inventoryCategories).toEqual([category]);
+    });
+
+    it('reloads categories after update', async () => {
+      mockUpdateInventoryCategory.mockResolvedValue(category);
+      mockGetAllInventoryCategories.mockResolvedValue([category]);
+
+      await useInventoryStore.getState().updateInventoryCategory('cat-001', { name: 'Nowa nazwa' });
+
+      expect(mockUpdateInventoryCategory).toHaveBeenCalledWith('cat-001', { name: 'Nowa nazwa' });
+      expect(useInventoryStore.getState().inventoryCategories).toEqual([category]);
+    });
+
+    it('reloads categories after delete', async () => {
+      mockDeleteInventoryCategory.mockResolvedValue(undefined);
+      mockGetAllInventoryCategories.mockResolvedValue([]);
+
+      await useInventoryStore.getState().deleteInventoryCategory('cat-001');
+
+      expect(mockDeleteInventoryCategory).toHaveBeenCalledWith('cat-001');
+      expect(useInventoryStore.getState().inventoryCategories).toEqual([]);
     });
   });
 

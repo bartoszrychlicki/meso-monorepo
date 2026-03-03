@@ -1,11 +1,19 @@
 'use client';
 
 import { create } from 'zustand';
-import { StockItem, Warehouse, WarehouseStockItem, StockItemComponentWithDetails, StockItemUsage } from '@/types/inventory';
+import {
+  StockItem,
+  Warehouse,
+  WarehouseStockItem,
+  StockItemComponentWithDetails,
+  StockItemUsage,
+  InventoryCategory,
+} from '@/types/inventory';
 import { inventoryRepository } from './repository';
 
 interface InventoryStore {
   stockItems: StockItem[];
+  inventoryCategories: InventoryCategory[];
   warehouses: Warehouse[];
   warehouseStockItems: WarehouseStockItem[];
   selectedWarehouseId: string | null;
@@ -19,6 +27,7 @@ interface InventoryStore {
 
   loadAll: () => Promise<void>;
   loadStockItems: () => Promise<void>;
+  loadInventoryCategories: () => Promise<void>;
   setSelectedWarehouse: (id: string | null) => void;
 
   createStockItem: (data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>) => Promise<StockItem>;
@@ -32,6 +41,10 @@ interface InventoryStore {
   createWarehouse: (data: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateWarehouse: (id: string, data: Partial<Warehouse>) => Promise<void>;
   deleteWarehouse: (id: string) => Promise<void>;
+
+  createInventoryCategory: (data: Omit<InventoryCategory, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateInventoryCategory: (id: string, data: Partial<InventoryCategory>) => Promise<void>;
+  deleteInventoryCategory: (id: string) => Promise<void>;
 
   getItemsForWarehouse: (warehouseId: string | null) => WarehouseStockItem[];
   getLowStockItems: () => WarehouseStockItem[];
@@ -48,6 +61,7 @@ interface InventoryStore {
 
 export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   stockItems: [],
+  inventoryCategories: [],
   warehouses: [],
   warehouseStockItems: [],
   selectedWarehouseId: null,
@@ -62,12 +76,13 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   loadAll: async () => {
     set({ isLoading: true });
     try {
-      const [stockItems, warehouses, warehouseStockItems] = await Promise.all([
+      const [stockItems, inventoryCategories, warehouses, warehouseStockItems] = await Promise.all([
         inventoryRepository.getAllStockItems(),
+        inventoryRepository.getAllInventoryCategories(),
         inventoryRepository.getAllWarehouses(),
         inventoryRepository.getAllWarehouseStockItems(),
       ]);
-      set({ stockItems, warehouses, warehouseStockItems });
+      set({ stockItems, inventoryCategories, warehouses, warehouseStockItems });
     } finally {
       set({ isLoading: false });
     }
@@ -81,6 +96,11 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  loadInventoryCategories: async () => {
+    const inventoryCategories = await inventoryRepository.getAllInventoryCategories();
+    set({ inventoryCategories });
   },
 
   setSelectedWarehouse: (id) => {
@@ -149,6 +169,24 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
     await inventoryRepository.deleteWarehouse(id);
     const warehouses = await inventoryRepository.getAllWarehouses();
     set({ warehouses });
+  },
+
+  createInventoryCategory: async (data) => {
+    await inventoryRepository.createInventoryCategory(data);
+    const inventoryCategories = await inventoryRepository.getAllInventoryCategories();
+    set({ inventoryCategories });
+  },
+
+  updateInventoryCategory: async (id, data) => {
+    await inventoryRepository.updateInventoryCategory(id, data);
+    const inventoryCategories = await inventoryRepository.getAllInventoryCategories();
+    set({ inventoryCategories });
+  },
+
+  deleteInventoryCategory: async (id) => {
+    await inventoryRepository.deleteInventoryCategory(id);
+    const inventoryCategories = await inventoryRepository.getAllInventoryCategories();
+    set({ inventoryCategories });
   },
 
   getItemsForWarehouse: (warehouseId) => {

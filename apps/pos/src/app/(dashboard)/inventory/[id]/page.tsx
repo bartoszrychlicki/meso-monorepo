@@ -24,8 +24,10 @@ export default function StockItemDetailPage() {
 
   const {
     currentStockItem,
+    inventoryCategories,
     isDetailLoading,
     loadStockItemDetail,
+    loadInventoryCategories,
     loadComponents,
     loadUsage,
     updateStockItem,
@@ -35,9 +37,10 @@ export default function StockItemDetailPage() {
 
   useEffect(() => {
     loadStockItemDetail(id);
+    loadInventoryCategories();
     loadComponents(id);
     loadUsage(id);
-  }, [id, loadStockItemDetail, loadComponents, loadUsage]);
+  }, [id, loadStockItemDetail, loadInventoryCategories, loadComponents, loadUsage]);
 
   const handleTabChange = (value: string) => {
     const url = new URL(window.location.href);
@@ -83,7 +86,11 @@ export default function StockItemDetailPage() {
           <DescriptionTab item={currentStockItem} onSave={updateStockItem} />
         </TabsContent>
         <TabsContent value="opcje">
-          <OptionsTab item={currentStockItem} onSave={updateStockItem} />
+          <OptionsTab
+            item={currentStockItem}
+            inventoryCategories={inventoryCategories}
+            onSave={updateStockItem}
+          />
         </TabsContent>
         <TabsContent value="skladowe">
           <ComponentsTab itemId={id} consumptionType={currentStockItem.consumption_type} />

@@ -1,10 +1,20 @@
-import { StockItem, Warehouse, WarehouseStock, WarehouseStockItem, StockItemComponent, StockItemComponentWithDetails, StockItemUsage } from '@/types/inventory';
+import {
+  StockItem,
+  Warehouse,
+  WarehouseStock,
+  WarehouseStockItem,
+  StockItemComponent,
+  StockItemComponentWithDetails,
+  StockItemUsage,
+  InventoryCategory,
+} from '@/types/inventory';
 import { createRepository } from '@/lib/data/repository-factory';
 
 const stockItemRepo = createRepository<StockItem>('stock_items');
 const warehouseRepo = createRepository<Warehouse>('warehouses');
 const warehouseStockRepo = createRepository<WarehouseStock>('warehouse_stock');
 const stockItemComponentRepo = createRepository<StockItemComponent>('stock_item_components');
+const inventoryCategoryRepo = createRepository<InventoryCategory>('inventory_categories');
 
 // Join warehouse_stock rows with stock items and warehouses in JS
 async function queryWarehouseStockItems(warehouseId?: string): Promise<WarehouseStockItem[]> {
@@ -41,12 +51,41 @@ async function queryWarehouseStockItems(warehouseId?: string): Promise<Warehouse
 
 export const inventoryRepository = {
   stockItems: stockItemRepo,
+  inventoryCategories: inventoryCategoryRepo,
   warehouses: warehouseRepo,
   warehouseStock: warehouseStockRepo,
   stockItemComponents: stockItemComponentRepo,
 
   async getAllStockItems(): Promise<StockItem[]> {
     return stockItemRepo.findMany((item) => item.is_active);
+  },
+
+  async getAllInventoryCategories(): Promise<InventoryCategory[]> {
+    const categories = await inventoryCategoryRepo.findMany((category) => category.is_active);
+    return categories.sort((a, b) => {
+      if (a.sort_order === b.sort_order) return a.name.localeCompare(b.name);
+      return a.sort_order - b.sort_order;
+    });
+  },
+
+  async createInventoryCategory(
+    data: Omit<InventoryCategory, 'id' | 'created_at' | 'updated_at'>
+  ): Promise<InventoryCategory> {
+    return inventoryCategoryRepo.create(data);
+  },
+
+  async updateInventoryCategory(id: string, data: Partial<InventoryCategory>): Promise<InventoryCategory> {
+    return inventoryCategoryRepo.update(id, data);
+  },
+
+  async deleteInventoryCategory(id: string): Promise<void> {
+    const assignedItems = await stockItemRepo.findMany(
+      (item) => item.is_active && item.inventory_category_id === id
+    );
+    if (assignedItems.length > 0) {
+      throw new Error('Nie mozna usunac kategorii z przypisanymi pozycjami');
+    }
+    await inventoryCategoryRepo.update(id, { is_active: false } as Partial<InventoryCategory>);
   },
 
   async getAllWarehouses(): Promise<Warehouse[]> {

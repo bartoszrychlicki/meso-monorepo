@@ -21,6 +21,7 @@ const TABLE_MAP: Record<string, string> = {
   recipe_versions: 'recipes_recipe_versions',
   ingredient_usage_logs: 'recipes_ingredient_usage_logs',
   stock_items: 'inventory_stock_items',
+  inventory_categories: 'inventory_categories',
   warehouses: 'inventory_warehouses',
   warehouse_stock: 'inventory_warehouse_stock',
   stock_item_components: 'inventory_stock_item_components',
