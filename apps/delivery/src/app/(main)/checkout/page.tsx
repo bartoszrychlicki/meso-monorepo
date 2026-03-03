@@ -29,7 +29,7 @@ export default function CheckoutPage() {
     const router = useRouter()
     const { items, getTotal, getSubtotal, getDeliveryFee, getPaymentFee, getDiscount, tip, setDeliveryType, paymentType, setPaymentType, setPayOnPickupFee, promoCode, loyaltyCoupon } = useCartStore()
     const { user, isLoading: authLoading, isPermanent } = useAuth()
-    const { submitOrder, isLoading: isSubmitting } = useCheckout()
+    const { submitOrder, isLoading: isSubmitting, error: submitError } = useCheckout()
 
     // Form States
     const [deliveryData, setDeliveryData] = useState<DeliveryFormData>({
@@ -569,6 +569,11 @@ export default function CheckoutPage() {
                     'POTWIERDŹ ZAMÓWIENIE'
                 )}
             </motion.button>
+            {submitError && (
+                <p data-testid="checkout-submit-error" className="mt-3 text-sm text-red-400">
+                    {submitError}
+                </p>
+            )}
         </div>
     )
 }
