@@ -13,7 +13,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CreateRecipeSchema, CreateRecipeInput } from '@/schemas/recipe';
 import { ProductCategory } from '@/types/enums';
 import { Recipe, RecipeProductCategory, RECIPE_PRODUCT_CATEGORIES } from '@/types/recipe';
-import { StockItem, Warehouse, InventoryCategory } from '@/types/inventory';
+import { StockItem, Warehouse } from '@/types/inventory';
 import { inventoryRepository } from '@/modules/inventory/repository';
 import { StockItemForm } from '@/modules/inventory/components/stock-item-form';
 import { recipesRepository } from '../repository';
@@ -461,7 +461,6 @@ export function RecipeForm({
 }: RecipeFormProps) {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
   const [semiFinishedRecipes, setSemiFinishedRecipes] = useState<Recipe[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [isSavingIngredients, setIsSavingIngredients] = useState(false);
@@ -484,19 +483,13 @@ export function RecipeForm({
     setWarehouses(warehouseList);
   }, []);
 
-  const loadInventoryCategories = useCallback(async () => {
-    const categories = await inventoryRepository.getAllInventoryCategories();
-    setInventoryCategories(categories);
-  }, []);
-
   useEffect(() => {
     void Promise.all([
       loadStockItems(),
       loadSemiFinishedRecipes(),
       loadWarehouses(),
-      loadInventoryCategories(),
     ]);
-  }, [loadStockItems, loadSemiFinishedRecipes, loadWarehouses, loadInventoryCategories]);
+  }, [loadStockItems, loadSemiFinishedRecipes, loadWarehouses]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<Record<string, any>>({
@@ -877,7 +870,6 @@ export function RecipeForm({
       open={showStockItemForm}
       onOpenChange={setShowStockItemForm}
       warehouses={warehouses}
-      inventoryCategories={inventoryCategories}
       onSubmit={handleCreateStockItem}
     />
     </TooltipProvider>
