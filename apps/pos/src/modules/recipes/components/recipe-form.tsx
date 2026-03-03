@@ -13,8 +13,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { CreateRecipeSchema, CreateRecipeInput } from '@/schemas/recipe';
 import { ProductCategory } from '@/types/enums';
 import { Recipe, RecipeProductCategory, RECIPE_PRODUCT_CATEGORIES } from '@/types/recipe';
-import { StockItem } from '@/types/inventory';
+import { StockItem, Warehouse, InventoryCategory } from '@/types/inventory';
 import { inventoryRepository } from '@/modules/inventory/repository';
+import { StockItemForm } from '@/modules/inventory/components/stock-item-form';
 import { recipesRepository } from '../repository';
 import { getCategoryDisplayName } from '../utils/recipe-calculator';
 import { cn } from '@/lib/utils';
@@ -45,7 +46,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Trash2, Save, X, Search, DollarSign, HelpCircle } from 'lucide-react';
+import { Trash2, Save, X, Search, DollarSign, HelpCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { DecimalInput } from '@/components/ui/decimal-input';
 
@@ -61,7 +62,13 @@ interface IngredientChecklistProps {
   stockItems: StockItem[];
   semiFinishedRecipes: Recipe[];
   productCategory: RecipeProductCategory;
-  form: { setValue: (name: string, value: unknown) => void };
+  form: {
+    setValue: (
+      name: string,
+      value: unknown,
+      options?: { shouldDirty?: boolean; shouldValidate?: boolean }
+    ) => void;
+  };
   append: (value: RecipeIngredientField) => void;
   remove: (index: number) => void;
   ingredientSearch: string;
@@ -71,6 +78,8 @@ interface IngredientChecklistProps {
   isSavingIngredients: boolean;
   setIsSavingIngredients: (value: boolean) => void;
   watchedIngredients: RecipeIngredientField[];
+  onAddStockItem?: () => void;
+  canAddStockItem: boolean;
 }
 
 function IngredientChecklist({
@@ -87,6 +96,8 @@ function IngredientChecklist({
   isSavingIngredients,
   setIsSavingIngredients,
   watchedIngredients,
+  onAddStockItem,
+  canAddStockItem,
 }: IngredientChecklistProps) {
   const [activeTab, setActiveTab] = useState<'stock_items' | 'recipes'>('stock_items');
   const showRecipesTab = productCategory === ProductCategory.FINISHED_GOOD;
@@ -182,6 +193,19 @@ function IngredientChecklist({
             )}
           </CardTitle>
           <div className="flex gap-2">
+            {onAddStockItem && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onAddStockItem}
+                disabled={!canAddStockItem}
+                data-action="add-stock-item-from-recipe"
+              >
+                <Plus className="mr-1 h-4 w-4" />
+                Dodaj produkt
+              </Button>
+            )}
             {onSaveIngredients && (
               <Button
                 type="button"
@@ -436,14 +460,43 @@ export function RecipeForm({
   onSaveIngredients,
 }: RecipeFormProps) {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [inventoryCategories, setInventoryCategories] = useState<InventoryCategory[]>([]);
   const [semiFinishedRecipes, setSemiFinishedRecipes] = useState<Recipe[]>([]);
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [isSavingIngredients, setIsSavingIngredients] = useState(false);
+  const [showStockItemForm, setShowStockItemForm] = useState(false);
+
+  const loadStockItems = useCallback(async () => {
+    const items = await inventoryRepository.getAllStockItems();
+    setStockItems(items);
+  }, []);
+
+  const loadSemiFinishedRecipes = useCallback(async () => {
+    const recipes = await recipesRepository.getRecipesByCategory(
+      ProductCategory.SEMI_FINISHED
+    );
+    setSemiFinishedRecipes(recipes);
+  }, []);
+
+  const loadWarehouses = useCallback(async () => {
+    const warehouseList = await inventoryRepository.getAllWarehouses();
+    setWarehouses(warehouseList);
+  }, []);
+
+  const loadInventoryCategories = useCallback(async () => {
+    const categories = await inventoryRepository.getAllInventoryCategories();
+    setInventoryCategories(categories);
+  }, []);
 
   useEffect(() => {
-    inventoryRepository.getAllStockItems().then(setStockItems);
-    recipesRepository.getRecipesByCategory(ProductCategory.SEMI_FINISHED).then(setSemiFinishedRecipes);
-  }, []);
+    void Promise.all([
+      loadStockItems(),
+      loadSemiFinishedRecipes(),
+      loadWarehouses(),
+      loadInventoryCategories(),
+    ]);
+  }, [loadStockItems, loadSemiFinishedRecipes, loadWarehouses, loadInventoryCategories]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const form = useForm<Record<string, any>>({
@@ -527,9 +580,30 @@ export function RecipeForm({
     if (errors.name) messages.push(`Nazwa: ${errors.name.message}`);
     if (errors.ingredients) messages.push(`Skladniki: ${errors.ingredients.message || 'Dodaj co najmniej 1 skladnik'}`);
     if (errors.product_category) messages.push(`Kategoria: ${errors.product_category.message}`);
+    if (errors.product_id) messages.push(`Produkt: ${errors.product_id.message}`);
+    if (errors.created_by) messages.push(`Uzytkownik: ${errors.created_by.message}`);
     if (messages.length === 0) messages.push('Formularz zawiera bledy walidacji');
     toast.error(messages.join('. '));
   };
+
+  const handleCreateStockItem = useCallback(
+    async (
+      data: Omit<StockItem, 'id' | 'created_at' | 'updated_at'>,
+      warehouseId: string,
+      quantity: number,
+      minQuantity: number
+    ) => {
+      const createdItem = await inventoryRepository.stockItems.create(data);
+      await inventoryRepository.assignToWarehouse(
+        warehouseId,
+        createdItem.id,
+        quantity,
+        minQuantity
+      );
+      await loadStockItems();
+    },
+    [loadStockItems]
+  );
 
   // Calculate estimated cost
   const watchedIngredients = form.watch('ingredients');
@@ -745,6 +819,8 @@ export function RecipeForm({
           isSavingIngredients={isSavingIngredients}
           setIsSavingIngredients={setIsSavingIngredients}
           watchedIngredients={watchedIngredients}
+          onAddStockItem={() => setShowStockItemForm(true)}
+          canAddStockItem={warehouses.length > 0}
         />
         {form.formState.errors.ingredients && (
           <p className="text-sm text-destructive font-medium" data-status="error">
@@ -797,6 +873,13 @@ export function RecipeForm({
         </div>
       </form>
     </Form>
+    <StockItemForm
+      open={showStockItemForm}
+      onOpenChange={setShowStockItemForm}
+      warehouses={warehouses}
+      inventoryCategories={inventoryCategories}
+      onSubmit={handleCreateStockItem}
+    />
     </TooltipProvider>
   );
 }

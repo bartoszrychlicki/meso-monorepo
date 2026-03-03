@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
+import { ProductCategory } from '@/types/enums';
 
 // Polyfill for Radix components
 beforeAll(() => {
@@ -32,6 +33,13 @@ vi.mock('@/modules/inventory/repository', () => ({
         unit: 'szt',
         cost_per_unit: 1.2,
         allergens: [],
+      },
+    ]),
+    getAllWarehouses: vi.fn().mockResolvedValue([
+      {
+        id: 'warehouse-1',
+        name: 'Magazyn glowny',
+        is_active: true,
       },
     ]),
   },
@@ -136,5 +144,68 @@ describe('RecipeForm', () => {
     }, { timeout: 3000 });
 
     expect(mockSubmit).not.toHaveBeenCalled();
+  });
+
+  it('submits recipe edit with non-UUID metadata values', async () => {
+    render(
+      <RecipeForm
+        defaultValues={{
+          name: 'Azjatycki Coleslaw',
+          description: 'Surowka coleslaw z pasta miso',
+          product_id: 'product-coleslaw',
+          created_by: 'system',
+          product_category: ProductCategory.FINISHED_GOOD,
+          ingredients: [
+            {
+              type: 'stock_item',
+              reference_id: STOCK_ID_1,
+              reference_name: 'Boczek wieprzowy',
+              quantity: 1,
+              unit: 'kg',
+            },
+          ],
+          yield_quantity: 1,
+          yield_unit: 'porcja',
+          preparation_time_minutes: 10,
+        }}
+        onSubmit={mockSubmit}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Wybrane (1)')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      const saveButton = screen.getByRole('button', { name: /zapisz recepture/i });
+      fireEvent.click(saveButton);
+    });
+
+    await waitFor(() => {
+      expect(mockSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    const submittedData = mockSubmit.mock.calls[0][0];
+    expect(submittedData.product_id).toBe('product-coleslaw');
+    expect(submittedData.created_by).toBe('system');
+    expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it('opens stock item dialog from recipe ingredients section', async () => {
+    render(
+      <RecipeForm
+        onSubmit={mockSubmit}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Boczek wieprzowy')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /dodaj produkt/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Nowa pozycja magazynowa')).toBeInTheDocument();
+    });
   });
 });

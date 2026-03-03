@@ -52,7 +52,7 @@ export const RecipeIngredientSchema = z.discriminatedUnion('type', [
 export const CreateRecipeSchema = z.object({
   product_id: z
     .string()
-    .uuid('ID produktu musi być prawidłowym UUID')
+    .min(1, 'ID produktu jest wymagane')
     .describe('Produkt, który ta receptura wytwarza'),
   name: z
     .string()
@@ -92,7 +92,7 @@ export const CreateRecipeSchema = z.object({
     .describe('Instrukcje krok po kroku'),
   created_by: z
     .string()
-    .uuid('ID użytkownika musi być prawidłowym UUID')
+    .min(1, 'ID użytkownika jest wymagane')
     .describe('Użytkownik tworzący recepturę'),
 });
 
@@ -103,7 +103,7 @@ export const CreateRecipeSchema = z.object({
 export const UpdateRecipeSchema = CreateRecipeSchema.partial().extend({
   last_updated_by: z
     .string()
-    .uuid('ID użytkownika musi być prawidłowym UUID')
+    .min(1, 'ID użytkownika jest wymagane')
     .optional(),
   version: z.number().int().positive().optional(),
 });
