@@ -38,7 +38,7 @@ export function useLoyaltyHistory(): UseLoyaltyHistoryResult {
       .eq('customer_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50)
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: LoyaltyHistoryEntry[] | null; error: unknown }) => {
         if (!error && data) {
           setHistory(data as LoyaltyHistoryEntry[])
         }

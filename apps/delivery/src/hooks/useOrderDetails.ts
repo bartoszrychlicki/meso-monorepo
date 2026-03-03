@@ -79,7 +79,7 @@ export function useOrderDetails(orderId: number | string): UseOrderDetailsReturn
                     table: 'orders_orders',
                     filter: `id=eq.${orderId}`,
                 },
-                (payload) => {
+                (payload: { new: Record<string, unknown> }) => {
                     console.log('Order updated:', payload.new)
                     setOrder((prev) => {
                         if (!prev) return null

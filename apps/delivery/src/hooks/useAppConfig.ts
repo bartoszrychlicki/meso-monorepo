@@ -5,6 +5,11 @@ interface AppConfigMap {
   [key: string]: unknown
 }
 
+interface AppConfigRow {
+  key: string
+  value: unknown
+}
+
 interface UseAppConfigResult {
   config: AppConfigMap
   isLoading: boolean
@@ -24,7 +29,7 @@ export function useAppConfig(): UseAppConfigResult {
     supabase
       .from('app_config')
       .select('key, value')
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: AppConfigRow[] | null; error: unknown }) => {
         if (!error && data) {
           const map: AppConfigMap = {}
           for (const row of data) {

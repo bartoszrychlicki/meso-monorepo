@@ -35,7 +35,7 @@ export function useLoyaltyRewards(): UseLoyaltyRewardsResult {
       .select('*')
       .eq('is_active', true)
       .order('points_cost', { ascending: true })
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: LoyaltyRewardRow[] | null; error: unknown }) => {
         if (!error && data) {
           setRewards(data as LoyaltyRewardRow[])
         }

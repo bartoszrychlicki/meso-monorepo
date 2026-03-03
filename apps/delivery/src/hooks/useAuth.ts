@@ -6,6 +6,11 @@ import { useState, useEffect } from 'react'
 import { useAuth as useAuthBase } from '@/providers/AuthProvider'
 import { createClient } from '@/lib/supabase/client'
 
+interface CustomerNameRow {
+  first_name: string | null
+  last_name: string | null
+}
+
 /**
  * Hook for checking if user can access MESO Club features
  * Only authenticated (registered) users can use loyalty features
@@ -52,7 +57,7 @@ export function useUserDisplay() {
       .select('first_name, last_name')
       .eq('id', user.id)
       .single()
-      .then(({ data }) => {
+      .then(({ data }: { data: CustomerNameRow | null }) => {
         if (data) {
           const first = typeof data.first_name === 'string' ? data.first_name.trim() : ''
           const last = typeof data.last_name === 'string' ? data.last_name.trim() : ''

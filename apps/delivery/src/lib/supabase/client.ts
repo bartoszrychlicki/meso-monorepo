@@ -111,17 +111,37 @@ async function lockWithTimeout<R>(
 }
 
 export function createClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   // Support both variable names for flexibility
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-    || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
+    || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
 
-  return createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    anonKey,
-    {
-      auth: {
-        lock: lockWithTimeout,
-      },
+  if (!supabaseUrl || !anonKey) {
+    const missingVars = [
+      !supabaseUrl ? 'NEXT_PUBLIC_SUPABASE_URL' : null,
+      !anonKey
+        ? 'NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY'
+        : null,
+    ]
+      .filter(Boolean)
+      .join(', ')
+
+    // Allow Next.js server prerender/build to continue even when browser-only
+    // Supabase env vars are unavailable at compile time.
+    if (typeof window === 'undefined') {
+      return new Proxy({}, {
+        get() {
+          throw new Error(`Supabase browser client is unavailable on server: missing ${missingVars}`)
+        },
+      }) as ReturnType<typeof createBrowserClient>
     }
-  )
+
+    throw new Error(`Missing required environment variables: ${missingVars}`)
+  }
+
+  return createBrowserClient(supabaseUrl, anonKey, {
+    auth: {
+      lock: lockWithTimeout,
+    },
+  })
 }

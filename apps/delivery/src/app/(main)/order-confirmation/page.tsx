@@ -153,7 +153,7 @@ function OrderConfirmationContent() {
                     table: 'orders_orders',
                     filter: `id=eq.${orderId}`,
                 },
-                (payload) => {
+                (payload: { new: Record<string, string | undefined> }) => {
                     const updated = payload.new as Record<string, string | undefined>
                     console.log('[Realtime] Order updated:', updated.status, updated.payment_status)
 
@@ -181,7 +181,7 @@ function OrderConfirmationContent() {
                     }
                 }
             )
-            .subscribe((status) => {
+            .subscribe((status: string) => {
                 console.log('[Realtime] Channel status:', status)
             })
 

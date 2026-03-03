@@ -18,6 +18,21 @@ interface LocationData {
   is_active: boolean
 }
 
+interface DeliveryConfigRow {
+  location_id: string
+  opening_time: string | null
+  closing_time: string | null
+}
+
+interface LocationRow {
+  id: string
+  name: string
+  address: unknown
+  phone: string | null
+  type: string | null
+  is_active: boolean
+}
+
 function isLocationOpen(openTime: string, closeTime: string): boolean {
   const now = new Date()
   const hours = now.getHours()
@@ -62,12 +77,14 @@ export default function LocationsPage() {
         .select('location_id, opening_time, closing_time'),
     ]).then(([locationsRes, configRes]) => {
       if (!locationsRes.error && locationsRes.data) {
+        const configRows: DeliveryConfigRow[] = (configRes.data || []) as DeliveryConfigRow[]
+        const locationRows: LocationRow[] = locationsRes.data as LocationRow[]
         const configMap = new Map(
-          (configRes.data || []).map((cfg) => [cfg.location_id, cfg])
+          configRows.map((cfg: DeliveryConfigRow) => [cfg.location_id, cfg] as const)
         )
 
         // POS stores address as JSONB; normalize for display
-        setLocations(locationsRes.data.map((loc) => {
+        setLocations(locationRows.map((loc: LocationRow) => {
           const addr = typeof loc.address === 'object' && loc.address
             ? (loc.address as Record<string, string>)
             : null

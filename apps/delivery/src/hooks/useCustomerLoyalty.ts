@@ -11,6 +11,12 @@ interface CustomerLoyalty {
   refresh: () => void
 }
 
+interface CustomerLoyaltyRow {
+  loyalty_points: number | null
+  loyalty_tier: string | null
+  lifetime_points: number | null
+}
+
 /**
  * Hook for fetching the current user's loyalty points and tier from Supabase.
  * Replaces hardcoded MOCK_POINTS and points = 340.
@@ -39,7 +45,7 @@ export function useCustomerLoyalty(): CustomerLoyalty {
       .select('loyalty_points, loyalty_tier, lifetime_points')
       .eq('id', user.id)
       .single()
-      .then(({ data, error }) => {
+      .then(({ data, error }: { data: CustomerLoyaltyRow | null; error: unknown }) => {
         if (!error && data) {
           setPoints(data.loyalty_points ?? 0)
           setTier((data.loyalty_tier as LoyaltyTier) ?? 'bronze')
