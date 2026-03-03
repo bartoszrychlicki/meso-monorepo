@@ -58,6 +58,71 @@ interface RecipeIngredientField {
   unit: string;
 }
 
+function normalizeRecipeIngredients(rawIngredients: unknown): RecipeIngredientField[] {
+  if (!Array.isArray(rawIngredients)) return [];
+
+  const normalized: RecipeIngredientField[] = [];
+
+  for (const raw of rawIngredients) {
+    if (!raw || typeof raw !== 'object') continue;
+
+    const ingredient = raw as Record<string, unknown>;
+
+    const type =
+      ingredient.type === 'stock_item' || ingredient.type === 'recipe'
+        ? ingredient.type
+        : typeof ingredient.stock_item_id === 'string'
+          ? 'stock_item'
+          : typeof ingredient.recipe_id === 'string' ||
+              typeof ingredient.semi_finished_id === 'string'
+            ? 'recipe'
+            : null;
+
+    const referenceId =
+      typeof ingredient.reference_id === 'string'
+        ? ingredient.reference_id
+        : typeof ingredient.stock_item_id === 'string'
+          ? ingredient.stock_item_id
+          : typeof ingredient.recipe_id === 'string'
+            ? ingredient.recipe_id
+            : typeof ingredient.semi_finished_id === 'string'
+              ? ingredient.semi_finished_id
+              : '';
+
+    const parsedQuantity =
+      typeof ingredient.quantity === 'number'
+        ? ingredient.quantity
+        : Number(ingredient.quantity);
+
+    const unit =
+      typeof ingredient.unit === 'string' && ingredient.unit.trim().length > 0
+        ? ingredient.unit
+        : 'szt';
+
+    const referenceName =
+      typeof ingredient.reference_name === 'string'
+        ? ingredient.reference_name
+        : typeof ingredient.stock_item_name === 'string'
+          ? ingredient.stock_item_name
+          : typeof ingredient.recipe_name === 'string'
+            ? ingredient.recipe_name
+            : undefined;
+
+    if (!type || !referenceId) continue;
+    if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) continue;
+
+    normalized.push({
+      type,
+      reference_id: referenceId,
+      reference_name: referenceName,
+      quantity: parsedQuantity,
+      unit,
+    });
+  }
+
+  return normalized;
+}
+
 interface IngredientChecklistProps {
   stockItems: StockItem[];
   semiFinishedRecipes: Recipe[];
@@ -466,6 +531,11 @@ export function RecipeForm({
   const [isSavingIngredients, setIsSavingIngredients] = useState(false);
   const [showStockItemForm, setShowStockItemForm] = useState(false);
 
+  const normalizedDefaultIngredients = useMemo(
+    () => normalizeRecipeIngredients(defaultValues?.ingredients),
+    [defaultValues?.ingredients]
+  );
+
   const loadStockItems = useCallback(async () => {
     const items = await inventoryRepository.getAllStockItems();
     setStockItems(items);
@@ -501,7 +571,7 @@ export function RecipeForm({
       product_id: defaultValues?.product_id || crypto.randomUUID(),
       product_category:
         defaultValues?.product_category || ProductCategory.FINISHED_GOOD,
-      ingredients: defaultValues?.ingredients || [],
+      ingredients: normalizedDefaultIngredients,
       yield_quantity: defaultValues?.yield_quantity || 1,
       yield_unit: defaultValues?.yield_unit || 'szt',
       preparation_time_minutes:
@@ -528,8 +598,12 @@ export function RecipeForm({
     try {
       const saved = sessionStorage.getItem(DRAFT_KEY);
       if (saved) {
-        const draft = JSON.parse(saved);
-        form.reset({ ...form.getValues(), ...draft });
+        const draft = JSON.parse(saved) as Record<string, unknown>;
+        form.reset({
+          ...form.getValues(),
+          ...draft,
+          ingredients: normalizeRecipeIngredients(draft.ingredients),
+        });
       }
     } catch {
       // ignore parse errors
@@ -571,7 +645,14 @@ export function RecipeForm({
   const handleInvalid = (errors: Record<string, { message?: string } | undefined>) => {
     const messages: string[] = [];
     if (errors.name) messages.push(`Nazwa: ${errors.name.message}`);
-    if (errors.ingredients) messages.push(`Skladniki: ${errors.ingredients.message || 'Dodaj co najmniej 1 skladnik'}`);
+    if (errors.ingredients) {
+      const ingredientsError = errors.ingredients as Record<string, unknown>;
+      const message =
+        typeof ingredientsError.message === 'string'
+          ? ingredientsError.message
+          : 'Co najmniej jeden skladnik ma niepoprawny format. Usun go i dodaj ponownie.';
+      messages.push(`Skladniki: ${message}`);
+    }
     if (errors.product_category) messages.push(`Kategoria: ${errors.product_category.message}`);
     if (errors.product_id) messages.push(`Produkt: ${errors.product_id.message}`);
     if (errors.created_by) messages.push(`Uzytkownik: ${errors.created_by.message}`);
@@ -817,7 +898,10 @@ export function RecipeForm({
         />
         {form.formState.errors.ingredients && (
           <p className="text-sm text-destructive font-medium" data-status="error">
-            {String((form.formState.errors.ingredients as Record<string, unknown>)?.message ?? 'Dodaj co najmniej 1 skladnik')}
+            {String(
+              (form.formState.errors.ingredients as Record<string, unknown>)?.message ??
+                'Co najmniej jeden skladnik ma niepoprawny format. Usun go i dodaj ponownie.'
+            )}
           </p>
         )}
 
