@@ -8,6 +8,8 @@ import {
   modifierGroupsRepository,
   modifiersRepository,
   toggleAvailability,
+  createProductWithFoodCost,
+  updateProductWithFoodCost,
 } from './repository';
 import { deleteAllProductImages } from '@/lib/supabase/storage';
 
@@ -74,13 +76,13 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
   },
 
   createProduct: async (data) => {
-    const product = await productsRepository.create(data);
+    const product = await createProductWithFoodCost(data);
     set((state) => ({ products: [...state.products, product] }));
     return product;
   },
 
   updateProduct: async (id, data) => {
-    const updated = await productsRepository.update(id, data);
+    const updated = await updateProductWithFoodCost(id, data);
     set((state) => ({
       products: state.products.map((p) => (p.id === id ? updated : p)),
     }));

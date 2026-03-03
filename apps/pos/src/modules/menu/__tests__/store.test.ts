@@ -10,6 +10,8 @@ const mockModifiersFindAll = vi.fn();
 const mockModifiersCreate = vi.fn();
 const mockModifiersUpdate = vi.fn();
 const mockModifiersDelete = vi.fn();
+const mockCreateProductWithFoodCost = vi.fn();
+const mockUpdateProductWithFoodCost = vi.fn();
 
 // Mock the repository module
 vi.mock('../repository', () => ({
@@ -34,6 +36,8 @@ vi.mock('../repository', () => ({
     update: (...args: unknown[]) => mockModifiersUpdate(...args),
     delete: (...args: unknown[]) => mockModifiersDelete(...args),
   },
+  createProductWithFoodCost: (...args: unknown[]) => mockCreateProductWithFoodCost(...args),
+  updateProductWithFoodCost: (...args: unknown[]) => mockUpdateProductWithFoodCost(...args),
   toggleAvailability: vi.fn(),
 }));
 

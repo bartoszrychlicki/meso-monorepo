@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { Product } from '@/types/menu';
 
 // Mock the supabase client before importing the repository
 const mockFrom = vi.fn();
@@ -8,9 +9,13 @@ vi.mock('@/lib/supabase/client', () => ({
   },
 }));
 
-// Mock the repository factory so modifiersRepository doesn't interfere
-vi.mock('@/lib/data/repository-factory', () => ({
-  createRepository: vi.fn(() => ({
+const mockProductsCreate = vi.fn();
+const mockProductsUpdate = vi.fn();
+const mockProductsFindById = vi.fn();
+const mockRecipesFindById = vi.fn();
+
+function createBaseRepositoryMock() {
+  return {
     findAll: vi.fn(),
     findById: vi.fn(),
     findMany: vi.fn(),
@@ -18,15 +23,151 @@ vi.mock('@/lib/data/repository-factory', () => ({
     update: vi.fn(),
     delete: vi.fn(),
     count: vi.fn(),
-  })),
+  };
+}
+
+// Mock the repository factory (products/recipes are used by food cost persistence)
+vi.mock('@/lib/data/repository-factory', () => ({
+  createRepository: vi.fn((collectionName: string) => {
+    if (collectionName === 'products') {
+      return {
+        ...createBaseRepositoryMock(),
+        findById: (...args: unknown[]) => mockProductsFindById(...args),
+        create: (...args: unknown[]) => mockProductsCreate(...args),
+        update: (...args: unknown[]) => mockProductsUpdate(...args),
+      };
+    }
+
+    if (collectionName === 'recipes') {
+      return {
+        ...createBaseRepositoryMock(),
+        findById: (...args: unknown[]) => mockRecipesFindById(...args),
+      };
+    }
+
+    return createBaseRepositoryMock();
+  }),
 }));
 
 import {
+  createProductWithFoodCost,
+  updateProductWithFoodCost,
   getProductModifierIds,
   setProductModifiers,
   getProductModifiers,
   countProductsUsingModifier,
 } from '../repository';
+
+type ProductInput = Omit<Product, 'created_at' | 'updated_at'>;
+
+function makeProductData(
+  overrides: Partial<ProductInput> = {}
+): ProductInput {
+  return {
+    id: 'product-1',
+    name: 'Burger Klasyczny',
+    slug: 'burger-klasyczny',
+    description: 'Testowy produkt',
+    category_id: 'cat-1',
+    type: 'single' as Product['type'],
+    price: 20,
+    original_price: null,
+    images: [],
+    is_available: true,
+    is_featured: false,
+    allergens: [],
+    variants: [],
+    modifier_groups: [],
+    ingredients: [],
+    preparation_time_minutes: 10,
+    sort_order: 1,
+    sku: 'BUR-001',
+    tax_rate: 8,
+    is_active: true,
+    point_ids: [],
+    pricing: [],
+    ...overrides,
+  };
+}
+
+function makePersistedProduct(
+  overrides: Partial<Product> = {}
+): Product {
+  return {
+    ...makeProductData(overrides),
+    created_at: '2026-03-03T00:00:00.000Z',
+    updated_at: '2026-03-03T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('food cost persistence in menu products', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calculates and persists food cost on product create', async () => {
+    mockRecipesFindById.mockResolvedValueOnce({ cost_per_unit: 8 });
+    mockProductsCreate.mockResolvedValueOnce({
+      ...makePersistedProduct({ recipe_id: 'recipe-1', food_cost_percentage: 40 }),
+    });
+
+    await createProductWithFoodCost(
+      makeProductData({ recipe_id: 'recipe-1', price: 20 })
+    );
+
+    expect(mockRecipesFindById).toHaveBeenCalledWith('recipe-1');
+    expect(mockProductsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipe_id: 'recipe-1',
+        price: 20,
+        food_cost_percentage: 40,
+      })
+    );
+  });
+
+  it('recalculates food cost on price update', async () => {
+    mockProductsFindById.mockResolvedValueOnce(
+      makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 20, food_cost_percentage: 40 })
+    );
+    mockRecipesFindById.mockResolvedValueOnce({ cost_per_unit: 8 });
+    mockProductsUpdate.mockResolvedValueOnce(
+      makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 40, food_cost_percentage: 20 })
+    );
+
+    await updateProductWithFoodCost('product-1', { price: 40 });
+
+    expect(mockProductsFindById).toHaveBeenCalledWith('product-1');
+    expect(mockRecipesFindById).toHaveBeenCalledWith('recipe-1');
+    expect(mockProductsUpdate).toHaveBeenCalledWith(
+      'product-1',
+      expect.objectContaining({
+        price: 40,
+        food_cost_percentage: 20,
+      })
+    );
+  });
+
+  it('stores null food cost when product has no recipe', async () => {
+    mockProductsFindById.mockResolvedValueOnce(
+      makePersistedProduct({ id: 'product-1', recipe_id: undefined, price: 20, food_cost_percentage: null })
+    );
+    mockProductsUpdate.mockResolvedValueOnce(
+      makePersistedProduct({ id: 'product-1', recipe_id: undefined, price: 25, food_cost_percentage: null })
+    );
+
+    await updateProductWithFoodCost('product-1', { price: 25 });
+
+    expect(mockRecipesFindById).not.toHaveBeenCalled();
+    expect(mockProductsUpdate).toHaveBeenCalledWith(
+      'product-1',
+      expect.objectContaining({
+        price: 25,
+        food_cost_percentage: null,
+      })
+    );
+  });
+});
 
 function createMockChain() {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};

@@ -1,4 +1,5 @@
 import { Product, Category, ModifierGroup, MenuModifier } from '@/types/menu';
+import { Recipe } from '@/types/recipe';
 import { createRepository } from '@/lib/data/repository-factory';
 import { supabase } from '@/lib/supabase/client';
 
@@ -6,6 +7,64 @@ export const productsRepository = createRepository<Product>('products');
 export const categoriesRepository = createRepository<Category>('categories');
 export const modifierGroupsRepository = createRepository<ModifierGroup>('modifier_groups');
 export const modifiersRepository = createRepository<MenuModifier>('modifiers');
+export const recipesRepository = createRepository<Recipe>('recipes');
+
+function roundFoodCostPercentage(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+export async function calculateProductFoodCostPercentage(
+  recipeId: string | null | undefined,
+  productPrice: number
+): Promise<number | null> {
+  if (!recipeId || productPrice <= 0) return null;
+  const recipe = await recipesRepository.findById(recipeId);
+  if (!recipe) return null;
+
+  const costPerUnit = recipe.cost_per_unit;
+
+  if (!Number.isFinite(costPerUnit) || costPerUnit < 0) return null;
+
+  return roundFoodCostPercentage((costPerUnit / productPrice) * 100);
+}
+
+export async function createProductWithFoodCost(
+  data: Omit<Product, 'created_at' | 'updated_at'>
+): Promise<Product> {
+  const foodCostPercentage = await calculateProductFoodCostPercentage(
+    data.recipe_id,
+    data.price
+  );
+
+  return productsRepository.create({
+    ...data,
+    food_cost_percentage: foodCostPercentage,
+  });
+}
+
+export async function updateProductWithFoodCost(
+  id: string,
+  data: Partial<Product>
+): Promise<Product> {
+  const existingProduct = await productsRepository.findById(id);
+  if (!existingProduct) {
+    throw new Error(`Product ${id} not found`);
+  }
+
+  const nextPrice = data.price ?? existingProduct.price;
+  const nextRecipeId =
+    data.recipe_id === undefined ? existingProduct.recipe_id : data.recipe_id;
+
+  const foodCostPercentage = await calculateProductFoodCostPercentage(
+    nextRecipeId,
+    nextPrice
+  );
+
+  return productsRepository.update(id, {
+    ...data,
+    food_cost_percentage: foodCostPercentage,
+  });
+}
 
 export async function getProductsByCategory(categoryId: string): Promise<Product[]> {
   return productsRepository.findMany((p) => p.category_id === categoryId && p.is_available);

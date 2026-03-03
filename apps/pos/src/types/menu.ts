@@ -86,6 +86,7 @@ export interface Product extends BaseEntity {
   category_id: string;
   type: ProductType;
   price: number; // Cena bazowa (backward compatibility)
+  food_cost_percentage?: number | null; // Snapshot FC% liczony dla aktualnej ceny produktu
   original_price?: number | null; // Cena regularna przed promocją
   promo_label?: string | null; // Etykieta promocji (np. "Happy Hour")
   promo_starts_at?: string | null; // ISO datetime
