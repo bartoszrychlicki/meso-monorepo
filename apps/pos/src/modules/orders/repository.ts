@@ -1,7 +1,6 @@
 import { Order } from '@/types/order';
 import { OrderStatus, OrderChannel, LoyaltyPointReason } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
-import { format } from 'date-fns';
 import { crmRepository } from '@/modules/crm/repository';
 import {
   calculatePointsFromOrder,
@@ -15,6 +14,7 @@ import {
   isValidPhoneNumber,
   formatPhoneForSMS,
 } from '@/lib/sms/templates';
+import { supabase } from '@/lib/supabase/client';
 
 const baseRepo = createRepository<Order>('orders');
 
@@ -246,22 +246,31 @@ async function getTodaysOrders(): Promise<Order[]> {
 }
 
 async function generateOrderNumber(channel?: OrderChannel): Promise<string> {
-  const today = format(new Date(), 'yyyyMMdd');
+  try {
+    const { data, error } = await supabase.rpc('next_order_number', {
+      p_channel: channel ?? OrderChannel.POS,
+    });
+
+    if (!error && typeof data === 'string' && data.length > 0) {
+      return data;
+    }
+  } catch {
+    // Fall through to local fallback.
+  }
+
+  const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const prefixCode = channel === OrderChannel.DELIVERY_APP ? 'WEB' : 'ZAM';
   const prefix = `${prefixCode}-${today}-`;
-
-  const allOrders = await baseRepo.findMany(
-    (order) => order.order_number.startsWith(prefix)
+  const allOrders = await baseRepo.findMany((order) =>
+    order.order_number.startsWith(prefix)
   );
-
   const maxNum = allOrders.reduce((max, order) => {
     const numStr = order.order_number.replace(prefix, '');
-    const num = parseInt(numStr, 10);
-    return isNaN(num) ? max : Math.max(max, num);
+    const parsed = parseInt(numStr, 10);
+    return Number.isNaN(parsed) ? max : Math.max(max, parsed);
   }, 0);
 
-  const nextNum = String(maxNum + 1).padStart(3, '0');
-  return `${prefix}${nextNum}`;
+  return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
 }
 
 export const ordersRepository = {

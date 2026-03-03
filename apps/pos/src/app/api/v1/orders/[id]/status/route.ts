@@ -61,6 +61,23 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
   const { status: newStatus, note, payment_status } = validation.data;
 
+  // Idempotent no-op: repeating the same status should not fail.
+  if (newStatus === order.status) {
+    if (!payment_status || payment_status === order.payment_status) {
+      return apiSuccess(order);
+    }
+
+    const serverOrdersRepo = createServerRepository<Order>('orders');
+    const paymentUpdate: Record<string, unknown> = {
+      payment_status,
+    };
+    if (payment_status === 'paid') {
+      paymentUpdate.paid_at = new Date().toISOString();
+    }
+    const updated = await serverOrdersRepo.update(id, paymentUpdate as Partial<Order>);
+    return apiSuccess(updated);
+  }
+
   // Validate status transition
   const allowedTransitions = VALID_TRANSITIONS[order.status];
   if (!allowedTransitions.includes(newStatus)) {
