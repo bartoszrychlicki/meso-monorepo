@@ -61,6 +61,8 @@ export interface ProductDetailProduct {
   description?: string
   story?: string
   price: number
+  original_price?: number | null
+  promo_label?: string | null
   image_url?: string
   is_vegetarian?: boolean
   is_vegan?: boolean
@@ -206,6 +208,9 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   )
 
   const tags = (product.tags || []).filter(Boolean)
+  const hasPromotion = Boolean(product.original_price && product.original_price > product.price)
+  const promotionLabel = product.promo_label?.trim() || 'Promocja'
+  const promoSavings = hasPromotion ? (product.original_price as number) - product.price : 0
 
   const nutritionItems = [
     calories !== null ? { label: 'kcal', value: formatNutritionValue(calories) } : null,
@@ -350,6 +355,29 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
       {product.description && (
         <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{product.description}</p>
       )}
+
+      <div className="mb-4 rounded-xl border border-border bg-card/80 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn('font-display font-bold text-foreground', hasPromotion ? 'text-3xl' : 'text-2xl')}>
+            {formatPrice(product.price)}
+          </span>
+          {hasPromotion && (
+            <>
+              <span className="text-base font-medium text-muted-foreground line-through">
+                {formatPrice(product.original_price as number)}
+              </span>
+              <Badge className="border-emerald-400/30 bg-emerald-500/15 text-emerald-300">
+                {promotionLabel}
+              </Badge>
+            </>
+          )}
+        </div>
+        {hasPromotion && promoSavings > 0 && (
+          <p className="mt-1 text-xs font-medium text-emerald-400">
+            Oszczędzasz {formatPrice(promoSavings)}
+          </p>
+        )}
+      </div>
 
       {(hasDietBadges || prepTimeLabel) && (
         <div className="mb-4 flex flex-wrap items-center gap-2">

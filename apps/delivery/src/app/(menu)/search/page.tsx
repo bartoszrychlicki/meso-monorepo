@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createClient } from '@/lib/supabase/client'
 import { ProductCard } from '@/components/menu/ProductCard'
 
-const PRODUCT_FIELDS = 'id, name, name_jp, slug, description, price, original_price, image_url, is_vegetarian, is_vegan, is_bestseller, is_signature, is_new, has_variants, has_addons'
+const PRODUCT_FIELDS = 'id, name, name_jp, slug, description, price, original_price, promo_label, image_url, is_vegetarian, is_vegan, is_bestseller, is_signature, is_new, has_variants, has_addons'
 
 interface Product {
   id: string
@@ -16,6 +16,7 @@ interface Product {
   description?: string
   price: number
   original_price?: number
+  promo_label?: string | null
   image_url?: string
   is_spicy?: boolean
   spice_level?: 1 | 2 | 3

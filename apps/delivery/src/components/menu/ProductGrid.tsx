@@ -12,6 +12,7 @@ interface Product {
   description?: string
   price: number
   original_price?: number
+  promo_label?: string | null
   image_url?: string
   is_spicy?: boolean
   spice_level?: 1 | 2 | 3

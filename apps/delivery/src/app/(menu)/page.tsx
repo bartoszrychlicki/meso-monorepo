@@ -23,6 +23,7 @@ async function getMenuData() {
         description,
         price,
         original_price,
+        promo_label,
         image_url,
         images,
         is_vegetarian,

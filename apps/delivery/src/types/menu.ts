@@ -19,6 +19,7 @@ export interface Product {
   story?: string
   price: number
   original_price?: number
+  promo_label?: string | null
   image_url?: string
   prep_time_min: number
   prep_time_max: number
