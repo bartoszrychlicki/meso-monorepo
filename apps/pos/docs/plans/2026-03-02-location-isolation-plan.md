@@ -138,3 +138,48 @@ oraz utrzymac dane wspolne:
 2. Czy pracownicy maja byc finalnie globalni (zgodnie z wymaganiem biznesowym), czy przypisani do lokalizacji jak obecnie w modelu?
 3. Czy API publiczne ma wymagac `location_id` dla odczytu list zamowien, czy domyslnie zwracac wszystko (jak dzis)?
 
+## Aktualizacja 2026-03-03 (odkrycia Delivery + remote Supabase)
+
+### 1. Skad Delivery bierze konfiguracje lokalizacji
+- Delivery nie bierze oplat z hardcode POS.
+- Delivery wybiera lokalizacje z `users_locations`:
+  - warunek: `is_active = true`
+  - sortowanie: `updated_at DESC`, potem `id ASC`
+  - limit: `1`
+- Referencje:
+  - `apps/delivery/src/hooks/useCheckout.ts:81`
+  - `apps/delivery/src/app/(main)/checkout/page.tsx:125`
+  - `apps/delivery/src/app/(menu)/page.tsx:44`
+  - `apps/delivery/src/app/api/menu/route.ts:52`
+
+### 2. Skad bierze oplaty i progi (np. pay on pickup fee)
+- Po wyborze aktywnej lokalizacji Delivery czyta `orders_delivery_config` po `location_id`.
+- Z tej tabeli pochodza m.in.: `pay_on_pickup_fee`, `pay_on_pickup_enabled`, `pay_on_pickup_max_order`, `min_order_amount`, `delivery_fee`.
+- Referencje:
+  - `apps/delivery/src/app/(main)/checkout/page.tsx:135`
+  - `apps/delivery/src/app/(menu)/page.tsx:61`
+  - `apps/delivery/src/app/api/menu/route.ts:66`
+
+### 3. Fallbacki runtime (gdy brakuje configu)
+- Jesli rekord `orders_delivery_config` nie istnieje albo ma puste wartosci, Delivery wpada na defaulty z kodu:
+  - `payOnPickupFee = 2`
+  - `payOnPickupMaxOrder = 100`
+  - `minOrderAmount = 35`
+  - `deliveryFee = 7.99`
+- Referencja:
+  - `apps/delivery/src/lib/location-config.ts:32`
+
+### 4. Wnioski dla funkcjonalnosci multi-placowek
+- W praktyce Delivery powinno miec dokladnie jedna aktywna lokalizacje (`users_locations.is_active = true`).
+- Przy wielu aktywnych lokalizacjach wynik bylby biznesowo niejednoznaczny; technicznie obecnie jest deterministiczny przez sortowanie.
+- Konfiguracja Delivery jest per lokalizacja przez relacje `orders_delivery_config.location_id -> users_locations.id`.
+
+### 5. Co zostalo zrobione migracjami (remote)
+- `supabase/migrations/20260303000001_single_active_location.sql`
+  - wybiera jedna lokalizacje "keeper",
+  - ustawia tylko ja jako aktywna,
+  - zapewnia istnienie `orders_delivery_config` dla keepera,
+  - ustawia `is_delivery_active = true` tylko dla keepera.
+- `supabase/migrations/20260303000002_remove_foreign_beautyapp_artifacts.sql`
+  - usuwa obce artefakty DB po omylkowym podpieciu innego projektu Supabase.
+- Operacyjnie: migracje w tym repo sa `REMOTE ONLY` (bez lokalnej instancji Supabase).
