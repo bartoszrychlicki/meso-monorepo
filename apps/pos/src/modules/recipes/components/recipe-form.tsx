@@ -804,31 +804,33 @@ export function RecipeForm({
               <FormField
                 control={form.control}
                 name="yield_quantity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        className="w-[80px]"
-                        data-field="yield-quantity"
-                        {...field}
-                        value={field.value ?? ''}
-                        onChange={(e) => {
-                          const raw = e.target.value.replace(',', '.');
-                          if (raw === '' || raw === '.') {
-                            field.onChange(raw === '.' ? 0 : '');
-                            return;
-                          }
-                          if (/^\d*\.?\d*$/.test(raw)) {
-                            field.onChange(parseFloat(raw) || 0);
-                          }
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  // eslint-disable-next-line react-hooks/rules-of-hooks
+                  const [raw, setRaw] = useState(String(field.value ?? ''));
+                  return (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          className="w-[80px]"
+                          data-field="yield-quantity"
+                          value={raw}
+                          onChange={(e) => {
+                            const v = e.target.value.replace(',', '.');
+                            if (/^\d*\.?\d*$/.test(v)) setRaw(v);
+                          }}
+                          onBlur={() => {
+                            const n = parseFloat(raw) || 0;
+                            field.onChange(n);
+                            setRaw(n ? String(n) : '');
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
               <span className="text-sm text-muted-foreground" data-field="yield-unit">{watchedCategory === ProductCategory.SEMI_FINISHED ? 'kg' : 'szt'}</span>
             </div>
