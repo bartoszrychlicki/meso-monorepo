@@ -6,16 +6,14 @@ vi.mock('@/lib/api/auth', () => ({
   isApiKey: vi.fn(),
 }))
 
-vi.mock('@/modules/orders/repository', () => ({
-  ordersRepository: {
-    findMany: vi.fn(),
-  },
-}))
-
-vi.mock('@/modules/menu/repository', () => ({
-  productsRepository: {
-    findById: vi.fn(),
-  },
+const mockServerRepo = {
+  findMany: vi.fn(),
+  findById: vi.fn(),
+  findAll: vi.fn(),
+  create: vi.fn(),
+}
+vi.mock('@/lib/data/server-repository-factory', () => ({
+  createServerRepository: () => mockServerRepo,
 }))
 
 const mockRpc = vi.fn()
@@ -26,14 +24,10 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 import { authorizeRequest, isApiKey } from '@/lib/api/auth'
-import { ordersRepository } from '@/modules/orders/repository'
-import { productsRepository } from '@/modules/menu/repository'
 import { POST } from '../route'
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>
 const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>
-const mockFindMany = ordersRepository.findMany as ReturnType<typeof vi.fn>
-const mockFindById = productsRepository.findById as ReturnType<typeof vi.fn>
 
 const validApiKey = {
   id: 'key-1',
@@ -80,8 +74,8 @@ describe('POST /api/v1/orders — transactional create payload', () => {
 
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
-    mockFindById.mockResolvedValue(mockProduct)
-    mockFindMany.mockResolvedValue([])
+    mockServerRepo.findById.mockResolvedValue(mockProduct)
+    mockServerRepo.findMany.mockResolvedValue([])
 
     mockRpc.mockImplementation((fn: string) => {
       if (fn === 'next_order_number') {
