@@ -1,5 +1,6 @@
 import { ApiKey, ApiKeyPermission } from '@/types/api-key';
 import { createRepository } from '@/lib/data/repository-factory';
+import { createServiceClient } from '@/lib/supabase/server';
 
 const apiKeysRepository = createRepository<ApiKey>('api_keys');
 
@@ -47,16 +48,21 @@ export async function createApiKey(params: {
   return { apiKey, rawKey };
 }
 
-/** Validate an API key and return the key record if valid */
+/** Validate an API key and return the key record if valid.
+ *  Uses service_role client to bypass RLS (called from API routes without user session). */
 export async function validateApiKey(rawKey: string): Promise<ApiKey | null> {
   const keyHash = await hashApiKey(rawKey);
-  const keys = await apiKeysRepository.findMany(
-    (k) => k.key_hash === keyHash && k.is_active
-  );
 
-  if (keys.length === 0) return null;
+  const supabase = createServiceClient();
+  const { data: keys } = await supabase
+    .from('integrations_api_keys')
+    .select('*')
+    .eq('key_hash', keyHash)
+    .eq('is_active', true);
 
-  const apiKey = keys[0];
+  if (!keys || keys.length === 0) return null;
+
+  const apiKey = keys[0] as ApiKey;
 
   // Check expiration
   if (apiKey.expires_at && new Date(apiKey.expires_at) < new Date()) {
@@ -64,9 +70,10 @@ export async function validateApiKey(rawKey: string): Promise<ApiKey | null> {
   }
 
   // Update last_used_at
-  await apiKeysRepository.update(apiKey.id, {
-    last_used_at: new Date().toISOString(),
-  } as Partial<ApiKey>);
+  await supabase
+    .from('integrations_api_keys')
+    .update({ last_used_at: new Date().toISOString() })
+    .eq('id', apiKey.id);
 
   return apiKey;
 }
