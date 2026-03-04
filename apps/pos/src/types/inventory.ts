@@ -50,6 +50,7 @@ export interface Warehouse extends BaseEntity {
   name: string;
   location_id: string | null;
   is_active: boolean;
+  is_default: boolean;
 }
 
 export interface WarehouseStock extends BaseEntity {

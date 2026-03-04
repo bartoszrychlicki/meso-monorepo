@@ -21,6 +21,7 @@ export const UpdateStockItemSchema = CreateStockItemSchema.partial();
 export const CreateWarehouseSchema = z.object({
   name: z.string().min(1, 'Nazwa magazynu jest wymagana').describe('Warehouse name'),
   location_id: z.string().nullable().optional().describe('Optional location reference'),
+  is_default: z.boolean().default(false).describe('Whether this warehouse is the default'),
 });
 
 export const UpdateWarehouseSchema = CreateWarehouseSchema.partial();

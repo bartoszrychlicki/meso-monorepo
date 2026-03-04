@@ -42,6 +42,7 @@ export default function InventoryPage() {
     createWarehouse,
     updateWarehouse,
     deleteWarehouse,
+    setDefaultWarehouse,
     createInventoryCategory,
     updateInventoryCategory,
     deleteInventoryCategory,
@@ -282,6 +283,7 @@ export default function InventoryPage() {
         onCreateWarehouse={createWarehouse}
         onUpdateWarehouse={updateWarehouse}
         onDeleteWarehouse={deleteWarehouse}
+        onSetDefaultWarehouse={setDefaultWarehouse}
       />
 
       <InventoryCategoryManager

@@ -41,6 +41,7 @@ interface InventoryStore {
   createWarehouse: (data: Omit<Warehouse, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateWarehouse: (id: string, data: Partial<Warehouse>) => Promise<void>;
   deleteWarehouse: (id: string) => Promise<void>;
+  setDefaultWarehouse: (id: string) => Promise<void>;
 
   createInventoryCategory: (data: Omit<InventoryCategory, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateInventoryCategory: (id: string, data: Partial<InventoryCategory>) => Promise<void>;
@@ -177,6 +178,12 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
 
   deleteWarehouse: async (id) => {
     await inventoryRepository.deleteWarehouse(id);
+    const warehouses = await inventoryRepository.getAllWarehouses();
+    set({ warehouses });
+  },
+
+  setDefaultWarehouse: async (id) => {
+    await inventoryRepository.setDefaultWarehouse(id);
     const warehouses = await inventoryRepository.getAllWarehouses();
     set({ warehouses });
   },

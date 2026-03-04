@@ -127,6 +127,14 @@ export const inventoryRepository = {
     return warehouseRepo.update(id, data);
   },
 
+  async setDefaultWarehouse(id: string): Promise<void> {
+    const allWarehouses = await warehouseRepo.findMany((w) => w.is_active);
+    await Promise.all(
+      allWarehouses.map((w) => warehouseRepo.update(w.id, { is_default: false } as Partial<Warehouse>))
+    );
+    await warehouseRepo.update(id, { is_default: true } as Partial<Warehouse>);
+  },
+
   async deleteWarehouse(id: string): Promise<void> {
     // Soft-delete: set is_active = false
     // First check no stock is assigned

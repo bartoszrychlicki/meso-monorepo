@@ -83,8 +83,8 @@ describe('inventoryRepository', () => {
   describe('getAllWarehouses', () => {
     it('returns only active warehouses', async () => {
       const warehouses = [
-        { id: 'wh-1', name: 'WH 1', is_active: true },
-        { id: 'wh-2', name: 'WH 2', is_active: false },
+        { id: 'wh-1', name: 'WH 1', is_active: true, is_default: false },
+        { id: 'wh-2', name: 'WH 2', is_active: false, is_default: false },
       ];
 
       mockFindMany.mockImplementation((filter: (item: Record<string, unknown>) => boolean) => {
@@ -245,6 +245,28 @@ describe('inventoryRepository', () => {
       await expect(
         inventoryRepository.deleteInventoryCategory('cat-001')
       ).rejects.toThrow('Nie mozna usunac kategorii z przypisanymi pozycjami');
+    });
+  });
+
+  describe('setDefaultWarehouse', () => {
+    it('clears is_default on all warehouses then sets target', async () => {
+      const warehouses = [
+        { id: 'wh-1', name: 'WH 1', is_active: true, is_default: true },
+        { id: 'wh-2', name: 'WH 2', is_active: true, is_default: false },
+      ];
+
+      mockFindMany.mockImplementation((filter: (item: Record<string, unknown>) => boolean) => {
+        return Promise.resolve(warehouses.filter(filter));
+      });
+      mockUpdate.mockResolvedValue({});
+
+      await inventoryRepository.setDefaultWarehouse('wh-2');
+
+      // Should clear is_default on all active warehouses
+      expect(mockUpdate).toHaveBeenCalledWith('wh-1', { is_default: false });
+      expect(mockUpdate).toHaveBeenCalledWith('wh-2', { is_default: false });
+      // Then set is_default on target
+      expect(mockUpdate).toHaveBeenCalledWith('wh-2', { is_default: true });
     });
   });
 

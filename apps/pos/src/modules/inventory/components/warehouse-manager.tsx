@@ -21,7 +21,8 @@ import {
 import { Warehouse } from '@/types/inventory';
 import { Location } from '@/types/common';
 import { createRepository } from '@/lib/data/repository-factory';
-import { Pencil, Trash2, Plus } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Pencil, Trash2, Plus, Star } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface WarehouseManagerProps {
@@ -29,9 +30,10 @@ interface WarehouseManagerProps {
   onOpenChange: (open: boolean) => void;
   warehouses: Warehouse[];
   warehouseStockItemCounts: Record<string, number>;
-  onCreateWarehouse: (data: { name: string; location_id: string | null; is_active: boolean }) => Promise<void>;
+  onCreateWarehouse: (data: { name: string; location_id: string | null; is_active: boolean; is_default: boolean }) => Promise<void>;
   onUpdateWarehouse: (id: string, data: Partial<Warehouse>) => Promise<void>;
   onDeleteWarehouse: (id: string) => Promise<void>;
+  onSetDefaultWarehouse: (id: string) => Promise<void>;
 }
 
 const locationRepo = createRepository<Location>('locations');
@@ -46,6 +48,7 @@ export function WarehouseManager({
   onCreateWarehouse,
   onUpdateWarehouse,
   onDeleteWarehouse,
+  onSetDefaultWarehouse,
 }: WarehouseManagerProps) {
   const [locations, setLocations] = useState<Location[]>([]);
   const [newName, setNewName] = useState('');
@@ -75,6 +78,7 @@ export function WarehouseManager({
         name: newName.trim(),
         location_id: newLocationId === NONE_LOCATION ? null : newLocationId,
         is_active: true,
+        is_default: false,
       });
       toast.success(`Utworzono magazyn: ${newName}`);
       setNewName('');
@@ -181,11 +185,40 @@ export function WarehouseManager({
                 ) : (
                   <>
                     <div className="flex-1">
-                      <p className="font-medium">{w.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{w.name}</p>
+                        {w.is_default && (
+                          <Badge variant="secondary" className="text-xs">
+                            Domyslny
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
                         {warehouseStockItemCounts[w.id] ?? 0} pozycji
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-8 w-8 ${w.is_default ? 'text-yellow-500' : ''}`}
+                      onClick={async () => {
+                        setIsSubmitting(true);
+                        try {
+                          await onSetDefaultWarehouse(w.id);
+                          toast.success(`Ustawiono domyslny magazyn: ${w.name}`);
+                        } catch {
+                          toast.error('Nie udalo sie ustawic domyslnego magazynu');
+                        } finally {
+                          setIsSubmitting(false);
+                        }
+                      }}
+                      disabled={w.is_default || isSubmitting}
+                      data-action="set-default-warehouse"
+                      data-id={w.id}
+                      title="Ustaw jako domyslny"
+                    >
+                      <Star className={`h-4 w-4 ${w.is_default ? 'fill-current' : ''}`} />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="icon"

@@ -96,7 +96,9 @@ export function StockItemForm({
   const [shelfLifeDays, setShelfLifeDays] = useState(0);
   const [storageLocation, setStorageLocation] = useState('');
   const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>([]);
-  const [warehouseId, setWarehouseId] = useState('');
+  const [warehouseId, setWarehouseId] = useState(() =>
+    warehouses.find((w) => w.is_default)?.id ?? ''
+  );
   const [quantity, setQuantity] = useState(0);
   const [minQuantity, setMinQuantity] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);

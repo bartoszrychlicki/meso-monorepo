@@ -16,6 +16,7 @@ const mockAssignToWarehouse = vi.fn();
 const mockCreateWarehouse = vi.fn();
 const mockUpdateWarehouse = vi.fn();
 const mockDeleteWarehouse = vi.fn();
+const mockSetDefaultWarehouse = vi.fn();
 const mockCreateInventoryCategory = vi.fn();
 const mockUpdateInventoryCategory = vi.fn();
 const mockDeleteInventoryCategory = vi.fn();
@@ -39,6 +40,7 @@ vi.mock('../repository', () => ({
     createWarehouse: (...args: unknown[]) => mockCreateWarehouse(...args),
     updateWarehouse: (...args: unknown[]) => mockUpdateWarehouse(...args),
     deleteWarehouse: (...args: unknown[]) => mockDeleteWarehouse(...args),
+    setDefaultWarehouse: (...args: unknown[]) => mockSetDefaultWarehouse(...args),
     createInventoryCategory: (...args: unknown[]) => mockCreateInventoryCategory(...args),
     updateInventoryCategory: (...args: unknown[]) => mockUpdateInventoryCategory(...args),
     deleteInventoryCategory: (...args: unknown[]) => mockDeleteInventoryCategory(...args),
@@ -81,6 +83,7 @@ const makeWarehouse = (overrides: Partial<Warehouse> = {}): Warehouse => ({
   name: 'Test Warehouse',
   location_id: null,
   is_active: true,
+  is_default: false,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
@@ -485,6 +488,7 @@ describe('useInventoryStore', () => {
         name: 'New WH',
         location_id: null,
         is_active: true,
+        is_default: false,
       });
 
       expect(useInventoryStore.getState().warehouses).toEqual(newWarehouses);
@@ -507,6 +511,20 @@ describe('useInventoryStore', () => {
       await useInventoryStore.getState().deleteWarehouse('wh-001');
 
       expect(useInventoryStore.getState().warehouses).toEqual([]);
+    });
+
+    it('sets default warehouse and reloads', async () => {
+      const updatedWarehouses = [
+        makeWarehouse({ id: 'wh-001', is_default: false }),
+        makeWarehouse({ id: 'wh-002', name: 'WH 2', is_default: true }),
+      ];
+      mockSetDefaultWarehouse.mockResolvedValue(undefined);
+      mockGetAllWarehouses.mockResolvedValue(updatedWarehouses);
+
+      await useInventoryStore.getState().setDefaultWarehouse('wh-002');
+
+      expect(mockSetDefaultWarehouse).toHaveBeenCalledWith('wh-002');
+      expect(useInventoryStore.getState().warehouses).toEqual(updatedWarehouses);
     });
   });
 });
