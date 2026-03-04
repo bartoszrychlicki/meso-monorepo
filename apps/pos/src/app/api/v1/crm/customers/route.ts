@@ -6,8 +6,9 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { crmRepository } from '@/modules/crm/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { CreateCustomerSchema } from '@/schemas/crm';
+import type { Customer } from '@/types/crm';
 import { LoyaltyTier, CustomerSource } from '@/types/enums';
 
 /**
@@ -26,9 +27,14 @@ export async function GET(request: NextRequest) {
   const phone = searchParams.get('phone');
   const email = searchParams.get('email');
 
+  const serverCustomersRepo = createServerRepository<Customer>('customers');
+
   // Search by phone (exact match)
   if (phone) {
-    const customer = await crmRepository.findCustomerByPhone(phone);
+    const customers = await serverCustomersRepo.findMany(
+      (c) => c.phone === phone && c.is_active
+    );
+    const customer = customers[0] ?? null;
     return apiSuccess(customer ? [customer] : [], {
       total: customer ? 1 : 0,
       page: 1,
@@ -38,7 +44,10 @@ export async function GET(request: NextRequest) {
 
   // Search by email (exact match)
   if (email) {
-    const customer = await crmRepository.findCustomerByEmail(email);
+    const customers = await serverCustomersRepo.findMany(
+      (c) => c.email === email && c.is_active
+    );
+    const customer = customers[0] ?? null;
     return apiSuccess(customer ? [customer] : [], {
       total: customer ? 1 : 0,
       page: 1,
@@ -48,7 +57,15 @@ export async function GET(request: NextRequest) {
 
   // Search by query string (name, email, phone)
   if (search) {
-    const customers = await crmRepository.searchCustomers(search);
+    const lowerQuery = search.toLowerCase();
+    const allActive = await serverCustomersRepo.findMany((c) => c.is_active);
+    const customers = allActive.filter(
+      (c) =>
+        c.first_name.toLowerCase().includes(lowerQuery) ||
+        c.last_name.toLowerCase().includes(lowerQuery) ||
+        c.email?.toLowerCase().includes(lowerQuery) ||
+        c.phone.includes(search)
+    );
     const start = (page - 1) * perPage;
     const paged = customers.slice(start, start + perPage);
     return apiSuccess(paged, {
@@ -60,7 +77,9 @@ export async function GET(request: NextRequest) {
 
   // Filter by loyalty tier
   if (tier && Object.values(LoyaltyTier).includes(tier)) {
-    const customers = await crmRepository.getCustomersByTier(tier);
+    const customers = await serverCustomersRepo.findMany(
+      (c) => c.loyalty_tier === tier && c.is_active
+    );
     const start = (page - 1) * perPage;
     const paged = customers.slice(start, start + perPage);
     return apiSuccess(paged, {
@@ -71,7 +90,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Default: list all customers
-  const result = await crmRepository.customers.findAll({
+  const result = await serverCustomersRepo.findAll({
     page,
     per_page: perPage,
     sort_by: 'created_at',
@@ -111,10 +130,13 @@ export async function POST(request: NextRequest) {
   }
 
   const input = validation.data;
+  const serverCustomersRepo = createServerRepository<Customer>('customers');
 
   // Check for duplicate phone number
-  const existingByPhone = await crmRepository.findCustomerByPhone(input.phone);
-  if (existingByPhone) {
+  const existingByPhone = await serverCustomersRepo.findMany(
+    (c) => c.phone === input.phone && c.is_active
+  );
+  if (existingByPhone.length > 0) {
     return apiError(
       'DUPLICATE_PHONE',
       `Klient z numerem telefonu ${input.phone} juz istnieje`,
@@ -124,8 +146,10 @@ export async function POST(request: NextRequest) {
 
   // Check for duplicate email if provided
   if (input.email) {
-    const existingByEmail = await crmRepository.findCustomerByEmail(input.email);
-    if (existingByEmail) {
+    const existingByEmail = await serverCustomersRepo.findMany(
+      (c) => c.email === input.email && c.is_active
+    );
+    if (existingByEmail.length > 0) {
       return apiError(
         'DUPLICATE_EMAIL',
         `Klient z adresem email ${input.email} juz istnieje`,
@@ -136,7 +160,7 @@ export async function POST(request: NextRequest) {
 
   const now = new Date().toISOString();
 
-  const customer = await crmRepository.customers.create({
+  const customer = await serverCustomersRepo.create({
     first_name: input.first_name,
     last_name: input.last_name,
     email: input.email ?? null,
@@ -155,7 +179,7 @@ export async function POST(request: NextRequest) {
     addresses: input.addresses?.map((addr) => ({
       ...addr,
       id: crypto.randomUUID(),
-      customer_id: '', // will be set after creation
+      customer_id: '',
       apartment_number: addr.apartment_number ?? null,
       delivery_instructions: addr.delivery_instructions ?? null,
       created_at: now,
@@ -170,7 +194,7 @@ export async function POST(request: NextRequest) {
     },
     notes: input.notes ?? null,
     is_active: true,
-  });
+  } as Omit<Customer, 'id' | 'created_at' | 'updated_at'>);
 
   return apiCreated(customer);
 }

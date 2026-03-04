@@ -6,8 +6,9 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { categoriesRepository } from '@/modules/menu/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { CreateCategorySchema } from '@/schemas/menu';
+import type { Category } from '@/types/menu';
 
 /**
  * GET /api/v1/menu/categories
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get('page') || '1', 10);
   const perPage = Math.min(parseInt(searchParams.get('per_page') || '50', 10), 100);
 
-  const result = await categoriesRepository.findAll({
+  const serverCategoriesRepo = createServerRepository<Category>('categories');
+  const result = await serverCategoriesRepo.findAll({
     page,
     per_page: perPage,
     sort_by: 'sort_order',
@@ -60,6 +62,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const category = await categoriesRepository.create(validation.data);
+  const serverCategoriesRepo = createServerRepository<Category>('categories');
+  const category = await serverCategoriesRepo.create(validation.data);
   return apiCreated(category);
 }

@@ -6,9 +6,9 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { productsRepository } from '@/modules/menu/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { UpdateProductSchema } from '@/schemas/menu';
-import { Product } from '@/types/menu';
+import type { Product } from '@/types/menu';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -23,7 +23,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const product = await productsRepository.findById(id);
+  const serverProductsRepo = createServerRepository<Product>('products');
+  const product = await serverProductsRepo.findById(id);
   if (!product) return apiNotFound('Produkt');
 
   return apiSuccess(product);
@@ -38,7 +39,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await productsRepository.findById(id);
+  const serverProductsRepo = createServerRepository<Product>('products');
+  const existing = await serverProductsRepo.findById(id);
   if (!existing) return apiNotFound('Produkt');
 
   let body: unknown;
@@ -58,7 +60,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const updated = await productsRepository.update(id, validation.data as Partial<Product>);
+  const updated = await serverProductsRepo.update(id, validation.data as Partial<Product>);
   return apiSuccess(updated);
 }
 
@@ -71,9 +73,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await productsRepository.findById(id);
+  const serverProductsRepo = createServerRepository<Product>('products');
+  const existing = await serverProductsRepo.findById(id);
   if (!existing) return apiNotFound('Produkt');
 
-  await productsRepository.delete(id);
+  await serverProductsRepo.delete(id);
   return apiSuccess({ deleted: true });
 }

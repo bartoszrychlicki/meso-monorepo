@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
 import { authorizeRequest, isApiKey } from '@/lib/api/auth';
 import { apiSuccess } from '@/lib/api/response';
-import { productsRepository, categoriesRepository } from '@/modules/menu/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
+import type { Product, Category } from '@/types/menu';
 
 /**
  * GET /api/v1/menu/sync-status
@@ -11,13 +12,16 @@ export async function GET(request: NextRequest) {
   const auth = await authorizeRequest(request, 'menu:read');
   if (!isApiKey(auth)) return auth;
 
-  const allProducts = await productsRepository.findAll({
+  const serverProductsRepo = createServerRepository<Product>('products');
+  const serverCategoriesRepo = createServerRepository<Category>('categories');
+
+  const allProducts = await serverProductsRepo.findAll({
     page: 1,
     per_page: 10000,
     sort_by: 'id',
     sort_order: 'asc',
   });
-  const allCategories = await categoriesRepository.findAll({
+  const allCategories = await serverCategoriesRepo.findAll({
     page: 1,
     per_page: 10000,
     sort_by: 'id',

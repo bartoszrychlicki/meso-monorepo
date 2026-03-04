@@ -174,8 +174,10 @@ export async function loginPosUser(page: Page) {
   const { data: { users } } = await admin.auth.admin.listUsers()
   const existing = users?.find(u => u.email === POS_TEST_EMAIL)
 
+  let userId: string | undefined
+
   if (!existing) {
-    const { error } = await admin.auth.admin.createUser({
+    const { data, error } = await admin.auth.admin.createUser({
       email: POS_TEST_EMAIL,
       password: POS_TEST_PASSWORD,
       email_confirm: true,
@@ -188,6 +190,20 @@ export async function loginPosUser(page: Page) {
     if (error && !error.message.includes('already been registered')) {
       throw new Error(`Failed to create POS test user: ${error.message}`)
     }
+    userId = data?.user?.id
+  } else {
+    userId = existing.id
+  }
+
+  // Ensure users_users record exists so RLS is_staff() check passes
+  if (userId) {
+    await admin.from('users_users').upsert({
+      id: userId,
+      email: POS_TEST_EMAIL,
+      name: 'E2E POS',
+      role: 'cashier',
+      is_active: true,
+    }, { onConflict: 'id' })
   }
 
   await page.goto('http://localhost:3000/login', { timeout: 60_000 })

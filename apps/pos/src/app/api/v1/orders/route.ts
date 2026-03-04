@@ -6,13 +6,12 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { ordersRepository } from '@/modules/orders/repository';
-import { productsRepository } from '@/modules/menu/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { createServiceClient } from '@/lib/supabase/server';
 import { CreateOrderSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
-import { Product } from '@/types/menu';
-import { Order } from '@/types/order';
+import type { Product } from '@/types/menu';
+import type { Order } from '@/types/order';
 import { KitchenItem } from '@/types/kitchen';
 
 type PersistedOrderItem = {
@@ -68,7 +67,8 @@ function calculateIncludedTaxFromGross(grossAmount: number, rate: number): numbe
 async function findExistingByExternalOrderId(
   externalOrderId: string
 ): Promise<Order | null> {
-  const existing = await ordersRepository.findMany(
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+  const existing = await serverOrdersRepo.findMany(
     (order) => order.external_order_id === externalOrderId
   );
   return existing[0] ?? null;
@@ -90,9 +90,13 @@ export async function GET(request: NextRequest) {
   const dateTo = searchParams.get('date_to');
   const customer = searchParams.get('customer');
 
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+
   // Use specific filters if provided
   if (status && Object.values(OrderStatus).includes(status)) {
-    const orders = await ordersRepository.findByStatus(status);
+    const orders = await serverOrdersRepo.findMany(
+      (o) => o.status === status
+    );
     const start = (page - 1) * perPage;
     const paged = orders.slice(start, start + perPage);
     return apiSuccess(paged, {
@@ -103,7 +107,9 @@ export async function GET(request: NextRequest) {
   }
 
   if (dateFrom && dateTo) {
-    const orders = await ordersRepository.findByDateRange(dateFrom, dateTo);
+    const orders = await serverOrdersRepo.findMany(
+      (o) => o.created_at >= dateFrom && o.created_at <= dateTo
+    );
     const start = (page - 1) * perPage;
     const paged = orders.slice(start, start + perPage);
     return apiSuccess(paged, {
@@ -114,7 +120,9 @@ export async function GET(request: NextRequest) {
   }
 
   if (customer) {
-    const orders = await ordersRepository.findByCustomer(customer);
+    const orders = await serverOrdersRepo.findMany(
+      (o) => o.customer_id === customer || o.customer_name?.includes(customer) || o.customer_phone === customer
+    );
     const start = (page - 1) * perPage;
     const paged = orders.slice(start, start + perPage);
     return apiSuccess(paged, {
@@ -124,7 +132,7 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const result = await ordersRepository.findAll({
+  const result = await serverOrdersRepo.findAll({
     page,
     per_page: perPage,
     sort_by: 'created_at',
@@ -179,9 +187,10 @@ export async function POST(request: NextRequest) {
   // Validate that all products exist and are available
   const uniqueProductIds = [...new Set(input.items.map((item) => item.product_id))];
   const productMap = new Map<string, Product>();
+  const serverProductsRepo = createServerRepository<Product>('products');
 
   for (const productId of uniqueProductIds) {
-    const product = await productsRepository.findById(productId);
+    const product = await serverProductsRepo.findById(productId);
     if (!product) {
       return apiValidationError([
         {

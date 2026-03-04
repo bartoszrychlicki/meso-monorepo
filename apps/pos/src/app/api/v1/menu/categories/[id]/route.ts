@@ -6,8 +6,9 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { categoriesRepository } from '@/modules/menu/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { UpdateCategorySchema } from '@/schemas/menu';
+import type { Category } from '@/types/menu';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -21,7 +22,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const category = await categoriesRepository.findById(id);
+  const serverCategoriesRepo = createServerRepository<Category>('categories');
+  const category = await serverCategoriesRepo.findById(id);
   if (!category) return apiNotFound('Kategoria');
 
   return apiSuccess(category);
@@ -35,7 +37,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await categoriesRepository.findById(id);
+  const serverCategoriesRepo = createServerRepository<Category>('categories');
+  const existing = await serverCategoriesRepo.findById(id);
   if (!existing) return apiNotFound('Kategoria');
 
   let body: unknown;
@@ -55,7 +58,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     );
   }
 
-  const updated = await categoriesRepository.update(id, validation.data as Record<string, unknown>);
+  const updated = await serverCategoriesRepo.update(id, validation.data as Partial<Category>);
   return apiSuccess(updated);
 }
 
@@ -67,9 +70,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await categoriesRepository.findById(id);
+  const serverCategoriesRepo = createServerRepository<Category>('categories');
+  const existing = await serverCategoriesRepo.findById(id);
   if (!existing) return apiNotFound('Kategoria');
 
-  await categoriesRepository.delete(id);
+  await serverCategoriesRepo.delete(id);
   return apiSuccess({ deleted: true });
 }

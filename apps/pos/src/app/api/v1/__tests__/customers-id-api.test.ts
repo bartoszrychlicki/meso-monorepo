@@ -6,19 +6,16 @@ vi.mock('@/lib/api/auth', () => ({
   isApiKey: vi.fn(),
 }));
 
-vi.mock('@/modules/crm/repository', () => ({
-  crmRepository: {
-    customers: {
-      findById: vi.fn(),
-      update: vi.fn(),
-    },
-    findCustomerByPhone: vi.fn(),
-    findCustomerByEmail: vi.fn(),
-  },
+const mockServerRepo = {
+  findById: vi.fn(),
+  findMany: vi.fn(),
+  update: vi.fn(),
+};
+vi.mock('@/lib/data/server-repository-factory', () => ({
+  createServerRepository: () => mockServerRepo,
 }));
 
 import { authorizeRequest, isApiKey } from '@/lib/api/auth';
-import { crmRepository } from '@/modules/crm/repository';
 import { GET, PUT, DELETE } from '../crm/customers/[id]/route';
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>;
@@ -65,7 +62,7 @@ describe('GET /api/v1/crm/customers/:id', () => {
   });
 
   it('returns a customer by ID', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockCustomer);
+    mockServerRepo.findById.mockResolvedValue(mockCustomer);
 
     const req = makeRequest('http://localhost:3000/api/v1/crm/customers/cust-1');
     const res = await GET(req, makeParams('cust-1'));
@@ -78,7 +75,7 @@ describe('GET /api/v1/crm/customers/:id', () => {
   });
 
   it('returns 404 for non-existent customer', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    mockServerRepo.findById.mockResolvedValue(null);
 
     const req = makeRequest('http://localhost:3000/api/v1/crm/customers/nonexistent');
     const res = await GET(req, makeParams('nonexistent'));
@@ -110,8 +107,8 @@ describe('PUT /api/v1/crm/customers/:id', () => {
   });
 
   it('updates customer fields', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockCustomer);
-    (crmRepository.customers.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockServerRepo.findById.mockResolvedValue(mockCustomer);
+    mockServerRepo.update.mockResolvedValue({
       ...mockCustomer,
       first_name: 'Janusz',
       marketing_consent: true,
@@ -129,7 +126,7 @@ describe('PUT /api/v1/crm/customers/:id', () => {
   });
 
   it('returns 404 when updating non-existent customer', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    mockServerRepo.findById.mockResolvedValue(null);
 
     const req = makeRequest('http://localhost:3000/api/v1/crm/customers/nonexistent', {
       method: 'PUT',
@@ -141,11 +138,12 @@ describe('PUT /api/v1/crm/customers/:id', () => {
   });
 
   it('returns 409 for duplicate phone on update', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockCustomer);
-    (crmRepository.findCustomerByPhone as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockServerRepo.findById.mockResolvedValue(mockCustomer);
+    mockServerRepo.findMany.mockResolvedValue([{
       id: 'other-cust',
       phone: '+48999888777',
-    });
+      is_active: true,
+    }]);
 
     const req = makeRequest('http://localhost:3000/api/v1/crm/customers/cust-1', {
       method: 'PUT',
@@ -159,11 +157,14 @@ describe('PUT /api/v1/crm/customers/:id', () => {
   });
 
   it('returns 409 for duplicate email on update', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockCustomer);
-    (crmRepository.findCustomerByEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockServerRepo.findById.mockResolvedValue(mockCustomer);
+    // First findMany (phone check) - not called because phone isn't changing
+    // findMany for email check returns existing
+    mockServerRepo.findMany.mockResolvedValue([{
       id: 'other-cust',
       email: 'taken@example.com',
-    });
+      is_active: true,
+    }]);
 
     const req = makeRequest('http://localhost:3000/api/v1/crm/customers/cust-1', {
       method: 'PUT',
@@ -177,7 +178,7 @@ describe('PUT /api/v1/crm/customers/:id', () => {
   });
 
   it('returns 400 for invalid JSON', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockCustomer);
+    mockServerRepo.findById.mockResolvedValue(mockCustomer);
 
     const req = makeRequest('http://localhost:3000/api/v1/crm/customers/cust-1', {
       method: 'PUT',
@@ -200,8 +201,8 @@ describe('DELETE /api/v1/crm/customers/:id', () => {
   });
 
   it('soft-deletes a customer', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockCustomer);
-    (crmRepository.customers.update as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockServerRepo.findById.mockResolvedValue(mockCustomer);
+    mockServerRepo.update.mockResolvedValue({
       ...mockCustomer,
       is_active: false,
     });
@@ -214,14 +215,14 @@ describe('DELETE /api/v1/crm/customers/:id', () => {
 
     expect(res.status).toBe(200);
     expect(body.data.deleted).toBe(true);
-    expect(crmRepository.customers.update).toHaveBeenCalledWith(
+    expect(mockServerRepo.update).toHaveBeenCalledWith(
       'cust-1',
       expect.objectContaining({ is_active: false })
     );
   });
 
   it('returns 404 when deleting non-existent customer', async () => {
-    (crmRepository.customers.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    mockServerRepo.findById.mockResolvedValue(null);
 
     const req = makeRequest('http://localhost:3000/api/v1/crm/customers/nonexistent', {
       method: 'DELETE',

@@ -6,8 +6,9 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { crmRepository } from '@/modules/crm/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { UpdateCustomerSchema } from '@/schemas/crm';
+import type { Customer } from '@/types/crm';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -22,7 +23,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const customer = await crmRepository.customers.findById(id);
+  const serverCustomersRepo = createServerRepository<Customer>('customers');
+  const customer = await serverCustomersRepo.findById(id);
   if (!customer) return apiNotFound('Klient');
 
   return apiSuccess(customer);
@@ -37,7 +39,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await crmRepository.customers.findById(id);
+  const serverCustomersRepo = createServerRepository<Customer>('customers');
+  const existing = await serverCustomersRepo.findById(id);
   if (!existing) return apiNotFound('Klient');
 
   let body: unknown;
@@ -61,8 +64,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   // Check for duplicate phone if changing phone
   if (updateData.phone && updateData.phone !== existing.phone) {
-    const existingByPhone = await crmRepository.findCustomerByPhone(updateData.phone);
-    if (existingByPhone) {
+    const existingByPhone = await serverCustomersRepo.findMany(
+      (c) => c.phone === updateData.phone && c.is_active
+    );
+    if (existingByPhone.length > 0) {
       return apiError(
         'DUPLICATE_PHONE',
         `Klient z numerem telefonu ${updateData.phone} juz istnieje`,
@@ -73,8 +78,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
 
   // Check for duplicate email if changing email
   if (updateData.email && updateData.email !== existing.email) {
-    const existingByEmail = await crmRepository.findCustomerByEmail(updateData.email);
-    if (existingByEmail) {
+    const existingByEmail = await serverCustomersRepo.findMany(
+      (c) => c.email === updateData.email && c.is_active
+    );
+    if (existingByEmail.length > 0) {
       return apiError(
         'DUPLICATE_EMAIL',
         `Klient z adresem email ${updateData.email} juz istnieje`,
@@ -83,10 +90,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     }
   }
 
-  const updated = await crmRepository.customers.update(id, {
+  const updated = await serverCustomersRepo.update(id, {
     ...updateData,
     updated_at: new Date().toISOString(),
-  } as Partial<typeof existing>);
+  } as Partial<Customer>);
 
   return apiSuccess(updated);
 }
@@ -100,13 +107,14 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await crmRepository.customers.findById(id);
+  const serverCustomersRepo = createServerRepository<Customer>('customers');
+  const existing = await serverCustomersRepo.findById(id);
   if (!existing) return apiNotFound('Klient');
 
-  await crmRepository.customers.update(id, {
+  await serverCustomersRepo.update(id, {
     is_active: false,
     updated_at: new Date().toISOString(),
-  } as Partial<typeof existing>);
+  } as Partial<Customer>);
 
   return apiSuccess({ deleted: true });
 }

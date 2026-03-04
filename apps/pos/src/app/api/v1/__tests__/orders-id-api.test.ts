@@ -6,15 +6,8 @@ vi.mock('@/lib/api/auth', () => ({
   isApiKey: vi.fn(),
 }));
 
-vi.mock('@/modules/orders/repository', () => ({
-  ordersRepository: {
-    findById: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
-
 const mockServerRepo = {
+  findById: vi.fn(),
   update: vi.fn(),
   delete: vi.fn(),
 };
@@ -46,7 +39,6 @@ vi.mock('@/schemas/order', () => ({
 }));
 
 import { authorizeRequest, isApiKey } from '@/lib/api/auth';
-import { ordersRepository } from '@/modules/orders/repository';
 import { GET, PUT, DELETE } from '../orders/[id]/route';
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>;
@@ -85,7 +77,7 @@ describe('GET /api/v1/orders/:id', () => {
   });
 
   it('returns an order by ID', async () => {
-    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockOrder);
+    mockServerRepo.findById.mockResolvedValue(mockOrder);
 
     const req = makeRequest('http://localhost:3000/api/v1/orders/order-1');
     const res = await GET(req, makeParams('order-1'));
@@ -97,7 +89,7 @@ describe('GET /api/v1/orders/:id', () => {
   });
 
   it('returns 404 for non-existent order', async () => {
-    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    mockServerRepo.findById.mockResolvedValue(null);
 
     const req = makeRequest('http://localhost:3000/api/v1/orders/nonexistent');
     const res = await GET(req, makeParams('nonexistent'));
@@ -116,7 +108,7 @@ describe('PUT /api/v1/orders/:id', () => {
   });
 
   it('updates an order', async () => {
-    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockOrder);
+    mockServerRepo.findById.mockResolvedValue(mockOrder);
     mockServerRepo.update.mockResolvedValue({
       ...mockOrder,
       notes: 'Bez cebuli',
@@ -134,7 +126,7 @@ describe('PUT /api/v1/orders/:id', () => {
   });
 
   it('uses transactional replace_order_items RPC when items are provided', async () => {
-    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockOrder);
+    mockServerRepo.findById.mockResolvedValue(mockOrder);
     mockRpc.mockResolvedValue({
       data: {
         ...mockOrder,
@@ -186,7 +178,7 @@ describe('PUT /api/v1/orders/:id', () => {
   });
 
   it('returns 404 when updating non-existent order', async () => {
-    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    mockServerRepo.findById.mockResolvedValue(null);
 
     const req = makeRequest('http://localhost:3000/api/v1/orders/nonexistent', {
       method: 'PUT',
@@ -206,7 +198,7 @@ describe('DELETE /api/v1/orders/:id', () => {
   });
 
   it('deletes an order', async () => {
-    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(mockOrder);
+    mockServerRepo.findById.mockResolvedValue(mockOrder);
     mockServerRepo.delete.mockResolvedValue(undefined);
 
     const req = makeRequest('http://localhost:3000/api/v1/orders/order-1', {
@@ -220,7 +212,7 @@ describe('DELETE /api/v1/orders/:id', () => {
   });
 
   it('returns 404 when deleting non-existent order', async () => {
-    (ordersRepository.findById as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    mockServerRepo.findById.mockResolvedValue(null);
 
     const req = makeRequest('http://localhost:3000/api/v1/orders/nonexistent', {
       method: 'DELETE',

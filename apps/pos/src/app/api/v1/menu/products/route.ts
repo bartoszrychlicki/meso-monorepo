@@ -6,9 +6,9 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { productsRepository } from '@/modules/menu/repository';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { CreateProductSchema } from '@/schemas/menu';
-import { Product } from '@/types/menu';
+import type { Product } from '@/types/menu';
 import { SalesChannel } from '@/types/enums';
 
 /**
@@ -34,13 +34,15 @@ export async function GET(request: NextRequest) {
   const updatedSince = searchParams.get('updated_since');
   const include = searchParams.get('include');
 
+  const serverProductsRepo = createServerRepository<Product>('products');
+
   const filters: Record<string, unknown> = {};
   if (categoryId) filters.category_id = categoryId;
   if (isAvailable !== null && isAvailable !== undefined && isAvailable !== '') {
     filters.is_available = isAvailable === 'true';
   }
 
-  let result = await productsRepository.findAll({
+  let result = await serverProductsRepo.findAll({
     page,
     per_page: perPage,
     sort_by: 'sort_order',
@@ -143,6 +145,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const product = await productsRepository.create(validation.data as Omit<Product, 'id' | 'created_at' | 'updated_at'>);
+  const serverProductsRepo = createServerRepository<Product>('products');
+  const product = await serverProductsRepo.create(validation.data as Omit<Product, 'id' | 'created_at' | 'updated_at'>);
   return apiCreated(product);
 }

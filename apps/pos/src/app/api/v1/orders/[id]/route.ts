@@ -6,7 +6,6 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { ordersRepository } from '@/modules/orders/repository';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { createServiceClient } from '@/lib/supabase/server';
 import { CreateOrderSchema } from '@/schemas/order';
@@ -25,7 +24,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const order = await ordersRepository.findById(id);
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+  const order = await serverOrdersRepo.findById(id);
   if (!order) return apiNotFound('Zamówienie');
 
   return apiSuccess(order);
@@ -40,7 +40,8 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await ordersRepository.findById(id);
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+  const existing = await serverOrdersRepo.findById(id);
   if (!existing) return apiNotFound('Zamówienie');
 
   let body: unknown;
@@ -63,9 +64,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const updateData = validation.data;
-
-  // Use server repository (service role) for writes — API routes bypass RLS
-  const serverOrdersRepo = createServerRepository<Order>('orders');
 
   // If items are being updated, sync JSON + relational rows transactionally via RPC.
   if (updateData.items) {
@@ -156,10 +154,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const existing = await ordersRepository.findById(id);
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+  const existing = await serverOrdersRepo.findById(id);
   if (!existing) return apiNotFound('Zamówienie');
 
-  const serverOrdersRepo = createServerRepository<Order>('orders');
   await serverOrdersRepo.delete(id);
   return apiSuccess({ deleted: true });
 }

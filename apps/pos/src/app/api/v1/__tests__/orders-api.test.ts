@@ -6,20 +6,14 @@ vi.mock('@/lib/api/auth', () => ({
   isApiKey: vi.fn(),
 }))
 
-vi.mock('@/modules/orders/repository', () => ({
-  ordersRepository: {
-    findAll: vi.fn(),
-    findMany: vi.fn(),
-    findByStatus: vi.fn(),
-    findByDateRange: vi.fn(),
-    findByCustomer: vi.fn(),
-  },
-}))
-
-vi.mock('@/modules/menu/repository', () => ({
-  productsRepository: {
-    findById: vi.fn(),
-  },
+const mockServerRepo = {
+  findAll: vi.fn(),
+  findMany: vi.fn(),
+  findById: vi.fn(),
+  create: vi.fn(),
+}
+vi.mock('@/lib/data/server-repository-factory', () => ({
+  createServerRepository: () => mockServerRepo,
 }))
 
 const mockRpc = vi.fn()
@@ -30,14 +24,10 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 import { authorizeRequest, isApiKey } from '@/lib/api/auth'
-import { ordersRepository } from '@/modules/orders/repository'
-import { productsRepository } from '@/modules/menu/repository'
 import { GET, POST } from '../orders/route'
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>
 const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>
-const mockFindMany = ordersRepository.findMany as ReturnType<typeof vi.fn>
-const mockFindById = productsRepository.findById as ReturnType<typeof vi.fn>
 
 const validApiKey = {
   id: 'key-1',
@@ -97,7 +87,7 @@ describe('GET /api/v1/orders', () => {
       { id: 'order-1', order_number: 'ZAM-001', status: 'pending' },
       { id: 'order-2', order_number: 'ZAM-002', status: 'preparing' },
     ]
-    ;(ordersRepository.findAll as ReturnType<typeof vi.fn>).mockResolvedValue({
+    mockServerRepo.findAll.mockResolvedValue({
       data: mockOrders,
       total: 2,
       page: 1,
@@ -119,8 +109,8 @@ describe('POST /api/v1/orders', () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
-    mockFindById.mockResolvedValue(mockProduct)
-    mockFindMany.mockResolvedValue([])
+    mockServerRepo.findById.mockResolvedValue(mockProduct)
+    mockServerRepo.findMany.mockResolvedValue([])
     mockRpc.mockImplementation((fn: string) => {
       if (fn === 'next_order_number') {
         return Promise.resolve({
@@ -166,7 +156,7 @@ describe('POST /api/v1/orders', () => {
   })
 
   it('returns existing order for duplicate external_order_id (idempotency fast path)', async () => {
-    mockFindMany.mockResolvedValue([
+    mockServerRepo.findMany.mockResolvedValue([
       {
         id: 'existing-order-id',
         external_order_id: 'EXT-001',
@@ -195,7 +185,7 @@ describe('POST /api/v1/orders', () => {
       external_order_id: 'EXT-RACE',
       status: 'pending',
     }
-    mockFindMany
+    mockServerRepo.findMany
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([existingOrder])
 
@@ -260,7 +250,7 @@ describe('POST /api/v1/orders', () => {
   })
 
   it('returns 422 for unavailable product', async () => {
-    mockFindById.mockResolvedValue({
+    mockServerRepo.findById.mockResolvedValue({
       ...mockProduct,
       is_available: false,
     })
