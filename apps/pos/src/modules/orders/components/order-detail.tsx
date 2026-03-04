@@ -141,6 +141,7 @@ export function OrderDetail({
   const canCancel =
     order.status !== OrderStatus.CANCELLED &&
     order.status !== OrderStatus.DELIVERED;
+  const netAmount = order.total - order.tax;
 
   const handleNextStatus = async () => {
     if (!nextStatus) return;
@@ -319,8 +320,19 @@ export function OrderDetail({
                   </div>
                 )}
                 <Separator />
-                <div className="flex justify-between text-base font-semibold">
-                  <span>Razem</span>
+                <div className="flex justify-between" data-field="order-net">
+                  <span className="text-muted-foreground">Kwota netto</span>
+                  <span>{formatCurrency(netAmount)}</span>
+                </div>
+                <div className="flex justify-between" data-field="order-vat">
+                  <span className="text-muted-foreground">Podatek VAT</span>
+                  <span>{formatCurrency(order.tax)}</span>
+                </div>
+                <div
+                  className="flex justify-between text-base font-semibold"
+                  data-field="order-gross"
+                >
+                  <span>Kwota brutto</span>
                   <span>{formatCurrency(order.total)}</span>
                 </div>
               </div>

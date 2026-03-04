@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { OrderDetail } from '../order-detail';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
+import { formatCurrency } from '@/lib/utils';
 import {
   OrderStatus,
   OrderChannel,
@@ -278,8 +279,24 @@ describe('OrderDetail', () => {
 
     // Discount label visible
     expect(screen.getByText('Rabat')).toBeInTheDocument();
-    // "Razem" (total) label
-    expect(screen.getByText('Razem')).toBeInTheDocument();
+    expect(screen.getByText('Kwota netto')).toBeInTheDocument();
+    expect(screen.getByText('Podatek VAT')).toBeInTheDocument();
+    expect(screen.getByText('Kwota brutto')).toBeInTheDocument();
+
+    const netRow = document.querySelector('[data-field="order-net"]');
+    const vatRow = document.querySelector('[data-field="order-vat"]');
+    const grossRow = document.querySelector('[data-field="order-gross"]');
+    const normalize = (value: string) => value.replace(/\s/g, '');
+
+    expect(normalize(netRow?.textContent || '')).toContain(
+      normalize(formatCurrency(orderWithModifiers.total - orderWithModifiers.tax))
+    );
+    expect(normalize(vatRow?.textContent || '')).toContain(
+      normalize(formatCurrency(orderWithModifiers.tax))
+    );
+    expect(normalize(grossRow?.textContent || '')).toContain(
+      normalize(formatCurrency(orderWithModifiers.total))
+    );
   });
 
   it('renders extended order metadata block', () => {

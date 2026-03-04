@@ -39,6 +39,12 @@ const P24_AUTOMATE = process.env.E2E_P24_AUTOMATE !== '0'
 const P24_REDIRECT_TIMEOUT_MS = Number(process.env.E2E_P24_REDIRECT_TIMEOUT_MS || 300_000)
 const SHARED_DELIVERY_EMAIL = process.env.E2E_DELIVERY_EMAIL || 'e2e-order-supabase@meso.dev'
 const SHARED_DELIVERY_PASSWORD = process.env.E2E_DELIVERY_PASSWORD || 'SandboxP24-test-123!'
+const POS_TEST_EMAIL = process.env.E2E_POS_TEST_EMAIL || 'e2e-pos@meso.dev'
+const POS_TEST_PASSWORD = process.env.E2E_POS_TEST_PASSWORD || 'e2e-pos-password-123!'
+const POS_API_BASE_URL = (
+  process.env.E2E_POS_API_URL || `${POS_BASE_URL}/api/v1`
+).replace(/\/+$/, '')
+const POS_API_KEY = process.env.POS_API_KEY || ''
 
 const UNIQUE = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 const FALLBACK_DELIVERY_EMAIL = `e2e-sandbox-${UNIQUE}@meso.dev`
@@ -57,6 +63,121 @@ function getAdminClient(): SupabaseClient {
   })
 }
 
+function readNumber(value: unknown): number {
+  const parsed = Number(value ?? 0)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function roundCurrency(value: number): number {
+  return Number(value.toFixed(2))
+}
+
+function parsePln(valueText: string): number {
+  const normalized = valueText
+    .replace(/\s/g, '')
+    .replace(/zł/gi, '')
+    .replace(',', '.')
+  const match = normalized.match(/-?\d+(?:\.\d+)?/)
+  if (!match) {
+    throw new Error(`Cannot parse PLN value from: "${valueText}"`)
+  }
+  return Number(match[0])
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+async function readSummaryValueByLabel(page: Page, label: string): Promise<string | null> {
+  return page.evaluate((targetLabel) => {
+    const allSpans = Array.from(document.querySelectorAll('span'))
+    const labelSpan = allSpans.find(
+      (span) => (span.textContent || '').trim() === targetLabel
+    )
+    if (!labelSpan) return null
+    const row = labelSpan.closest('div')
+    if (!row) return null
+    const rowSpans = Array.from(row.querySelectorAll('span'))
+    const valueSpan = rowSpans[rowSpans.length - 1]
+    return (valueSpan?.textContent || '').trim() || null
+  }, label)
+}
+
+async function readSummaryValueByLabels(page: Page, labels: string[]): Promise<string | null> {
+  for (const label of labels) {
+    const value = await readSummaryValueByLabel(page, label)
+    if (value) return value
+  }
+  return null
+}
+
+async function getOrderTotals(admin: SupabaseClient, orderId: string) {
+  const { data, error } = await admin
+    .from('orders_orders')
+    .select('subtotal, tax, discount, promo_discount, delivery_fee, tip, total')
+    .eq('id', orderId)
+    .single()
+
+  if (error || !data) {
+    throw new Error(`Failed to fetch order totals for ${orderId}: ${error?.message}`)
+  }
+
+  const subtotal = readNumber(data.subtotal)
+  const tax = readNumber(data.tax)
+  const discount = readNumber(data.discount ?? data.promo_discount)
+  const deliveryFee = readNumber(data.delivery_fee)
+  const tip = readNumber(data.tip)
+  const total = readNumber(data.total)
+  const expectedGrossTotal = roundCurrency(subtotal - discount + deliveryFee + tip)
+  const expectedNet = roundCurrency(total - tax)
+
+  return {
+    subtotal,
+    tax,
+    discount,
+    deliveryFee,
+    tip,
+    total,
+    expectedGrossTotal,
+    expectedNet,
+  }
+}
+
+type OrderDisplayItem = {
+  productName: string
+  variantName?: string
+  modifierNames: string[]
+}
+
+async function getOrderDisplayItems(admin: SupabaseClient, orderId: string): Promise<OrderDisplayItem[]> {
+  const { data, error } = await admin
+    .from('orders_orders')
+    .select('items')
+    .eq('id', orderId)
+    .single()
+
+  if (error || !data) {
+    throw new Error(`Failed to fetch order items for ${orderId}: ${error?.message}`)
+  }
+
+  const rawItems = Array.isArray(data.items) ? data.items : []
+  return rawItems
+    .map((item) => {
+      const rawModifiers = Array.isArray((item as Record<string, unknown>)?.modifiers)
+        ? (item as Record<string, unknown>).modifiers as Array<Record<string, unknown>>
+        : []
+
+      return {
+        productName: String((item as Record<string, unknown>)?.product_name || ''),
+        variantName: ((item as Record<string, unknown>)?.variant_name || undefined) as string | undefined,
+        modifierNames: rawModifiers
+          .map((modifier) => String(modifier?.name || '').trim())
+          .filter(Boolean),
+      }
+    })
+    .filter((item) => item.productName.length > 0)
+}
+
 async function setGateCookie(page: Page, appUrl: string) {
   const parsed = new URL(appUrl)
   await page.context().addCookies([{
@@ -68,6 +189,93 @@ async function setGateCookie(page: Page, appUrl: string) {
     httpOnly: false,
     sameSite: 'Lax',
   }])
+}
+
+async function ensurePosAuthUser(admin: SupabaseClient) {
+  for (let page = 1; page <= 10; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error) throw new Error(`Failed to list POS auth users: ${error.message}`)
+    const users = data?.users || []
+    const existing = users.find((user) => (user.email || '').toLowerCase() === POS_TEST_EMAIL.toLowerCase())
+    if (existing?.id) {
+      const { error: updateError } = await admin.auth.admin.updateUserById(existing.id, {
+        password: POS_TEST_PASSWORD,
+        email_confirm: true,
+        user_metadata: {
+          ...(existing.user_metadata || {}),
+          app_role: 'cashier',
+          first_name: 'E2E',
+          last_name: 'POS',
+        },
+      })
+      if (updateError) throw new Error(`Failed to update POS auth user: ${updateError.message}`)
+      return
+    }
+    if (users.length < 200) break
+  }
+
+  const { error: createError } = await admin.auth.admin.createUser({
+    email: POS_TEST_EMAIL,
+    password: POS_TEST_PASSWORD,
+    email_confirm: true,
+    user_metadata: {
+      app_role: 'cashier',
+      first_name: 'E2E',
+      last_name: 'POS',
+    },
+  })
+  if (createError) throw new Error(`Failed to create POS auth user: ${createError.message}`)
+}
+
+async function loginPosUser(page: Page) {
+  await setGateCookie(page, POS_BASE_URL)
+  await page.goto(`${POS_BASE_URL}/login`, { timeout: 60_000 })
+
+  const emailField = page.locator('[data-field="email"]').first()
+  const passwordField = page.locator('[data-field="password"]').first()
+  const loginButton = page.locator('[data-action="login-email"]').first()
+
+  const hasCustomLoginFields = await emailField.isVisible().catch(() => false)
+  if (hasCustomLoginFields) {
+    await emailField.fill(POS_TEST_EMAIL)
+    await passwordField.fill(POS_TEST_PASSWORD)
+    await loginButton.click()
+  } else {
+    await page.locator('input[type="email"]').first().fill(POS_TEST_EMAIL)
+    await page.locator('input[type="password"]').first().fill(POS_TEST_PASSWORD)
+    await page.locator('button[type="submit"]').first().click()
+  }
+
+  await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 30_000 })
+}
+
+async function getPosOrderViaApi(orderId: string): Promise<Record<string, unknown> | null> {
+  if (!POS_API_KEY) {
+    console.warn('[E2E] POS_API_KEY missing, cannot verify POS totals via API fallback.')
+    return null
+  }
+
+  let response: Response
+  try {
+    response = await fetch(`${POS_API_BASE_URL}/orders/${orderId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-API-Key': POS_API_KEY,
+      },
+    })
+  } catch (error) {
+    console.warn(`[E2E] POS API request failed: ${String(error)}`)
+    return null
+  }
+
+  if (!response.ok) {
+    console.warn(`[E2E] POS API GET /orders/${orderId} returned ${response.status}`)
+    return null
+  }
+
+  const body = await response.json() as { data?: Record<string, unknown> }
+  return body?.data || null
 }
 
 type DeliveryAuthUser = {
@@ -242,7 +450,7 @@ async function waitForKitchenTicket(admin: SupabaseClient, orderId: string, time
   while (true) {
     const { data, error } = await admin
       .from('orders_kitchen_tickets')
-      .select('id, status')
+      .select('id, status, items')
       .eq('order_id', orderId)
       .limit(1)
       .maybeSingle()
@@ -280,6 +488,28 @@ async function clickFirstVisibleLocator(page: Page, locators: Array<ReturnType<P
     }
   }
   return false
+}
+
+async function ensurePosLocationSelected(page: Page) {
+  const locationButton = page.getByRole('button', { name: /Wybierz lokalizacj/i }).first()
+  const isVisible = await locationButton.isVisible().catch(() => false)
+  if (!isVisible) return
+
+  await locationButton.click({ timeout: 5_000 })
+  const selected = await clickFirstVisibleLocator(page, [
+    page.locator('[role="option"]'),
+    page.locator('[cmdk-item]'),
+    page.locator('[data-slot="command-item"]'),
+    page.locator('[data-radix-collection-item]'),
+    page.locator('button').filter({ hasText: /Kuchnia|Lokalizacja|Centralna|MESO/i }),
+  ])
+
+  if (!selected) {
+    await page.keyboard.press('ArrowDown').catch(() => {})
+    await page.keyboard.press('Enter').catch(() => {})
+  }
+
+  await page.waitForTimeout(1_200)
 }
 
 async function runP24BlikSandboxFlow(page: Page) {
@@ -506,6 +736,29 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
     )
     orderNumber = paidOrder.order_number as string
     expect(orderNumber).toMatch(/^WEB-/)
+    const orderTotals = await getOrderTotals(admin, createdOrderId)
+    const orderDisplayItems = await getOrderDisplayItems(admin, createdOrderId)
+    expect(Math.abs(orderTotals.total - orderTotals.expectedGrossTotal)).toBeLessThan(0.01)
+
+    // Customer-facing confirmation must reflect gross pricing contract.
+    const confirmationProducts = await readSummaryValueByLabel(page, 'Produkty')
+    const confirmationTotal = await readSummaryValueByLabel(page, 'Razem')
+    expect(confirmationProducts).toBeTruthy()
+    expect(confirmationTotal).toBeTruthy()
+
+    const confirmationProductsValue = parsePln(confirmationProducts!)
+    const confirmationTotalValue = parsePln(confirmationTotal!)
+    expect(Math.abs(confirmationProductsValue - orderTotals.subtotal)).toBeLessThan(0.01)
+    expect(Math.abs(confirmationTotalValue - orderTotals.total)).toBeLessThan(0.01)
+
+    const confirmationDelivery = await readSummaryValueByLabel(page, 'Dostawa')
+    if (orderTotals.deliveryFee > 0) {
+      expect(confirmationDelivery).toBeTruthy()
+      const confirmationDeliveryValue = parsePln(confirmationDelivery!)
+      expect(Math.abs(confirmationDeliveryValue - orderTotals.deliveryFee)).toBeLessThan(0.01)
+    } else {
+      expect((confirmationDelivery || '').toLowerCase()).toContain('gratis')
+    }
 
     // 6) Wait for kitchen ticket
     const kitchenTicket = await waitForKitchenTicket(admin, createdOrderId, 90_000)
@@ -526,11 +779,112 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
     const ticketCard = ticketCards
       .filter({ has: posPage.locator('[data-action="start-preparing"]') })
       .first()
+
+    const kitchenItems = Array.isArray(kitchenTicket.items)
+      ? kitchenTicket.items as Array<Record<string, unknown>>
+      : []
+    for (const kitchenItem of kitchenItems) {
+      const variantName = String(kitchenItem.variant_name || '').trim()
+      const modifierNames = Array.isArray(kitchenItem.modifiers)
+        ? kitchenItem.modifiers.map((name) => String(name || '').trim()).filter(Boolean)
+        : []
+
+      if (variantName) {
+        await expect(ticketCard.getByText(`(${variantName})`).first()).toBeVisible({ timeout: 10_000 })
+      }
+      if (modifierNames.length > 0) {
+        await expect(ticketCard.getByText(modifierNames.join(', ')).first()).toBeVisible({ timeout: 10_000 })
+      }
+    }
+
     await ticketCard.locator('[data-action="start-preparing"]').click()
 
     await expect(
       posPage.locator(`[data-ticket-id="${kitchenTicket.id}"][data-status="preparing"]`).first()
     ).toBeVisible({ timeout: 20_000 })
+
+    // 7b) Verify POS totals from UI (with login fallback) or POS API.
+    await posPage.goto(`${POS_BASE_URL}/orders/${createdOrderId}`, { timeout: 60_000 })
+
+    if (new URL(posPage.url()).pathname.includes('/login')) {
+      await ensurePosAuthUser(admin)
+      await loginPosUser(posPage)
+      await posPage.goto(`${POS_BASE_URL}/orders/${createdOrderId}`, { timeout: 60_000 })
+    }
+
+    const posDetailVisible = await posPage
+      .locator('[data-page="order-detail"]')
+      .first()
+      .isVisible({ timeout: 20_000 })
+      .catch(() => false)
+
+    if (posDetailVisible) {
+      for (const orderItem of orderDisplayItems) {
+        await expect(posPage.getByText(orderItem.productName).first()).toBeVisible({ timeout: 10_000 })
+        if (orderItem.variantName) {
+          await expect(posPage.getByText(`(${orderItem.variantName})`).first()).toBeVisible({ timeout: 10_000 })
+        }
+        for (const modifierName of orderItem.modifierNames) {
+          await expect(
+            posPage.getByText(new RegExp(escapeRegExp(modifierName), 'i')).first()
+          ).toBeVisible({ timeout: 10_000 })
+        }
+      }
+
+      const readHasSummaryRows = async () => posPage
+        .locator('span')
+        .filter({ hasText: /^Suma czesciowa$|^VAT$|^Podatek VAT$|^Razem$|^Kwota brutto$|^Kwota netto$/ })
+        .count()
+        .then((count) => count >= 3)
+        .catch(() => false)
+
+      let hasSummaryRows = await readHasSummaryRows()
+      if (!hasSummaryRows) {
+        await ensurePosLocationSelected(posPage)
+        hasSummaryRows = await readHasSummaryRows()
+      }
+
+      if (!hasSummaryRows) {
+        const posOrder = await getPosOrderViaApi(createdOrderId)
+        expect(posOrder).toBeTruthy()
+        const posSubtotal = readNumber(posOrder?.subtotal)
+        const posVat = readNumber(posOrder?.tax)
+        const posTotal = readNumber(posOrder?.total)
+        expect(Math.abs(posSubtotal - orderTotals.subtotal)).toBeLessThan(0.01)
+        expect(Math.abs(posVat - orderTotals.tax)).toBeLessThan(0.01)
+        expect(Math.abs(posTotal - orderTotals.total)).toBeLessThan(0.01)
+        console.warn('[E2E] POS order detail opened but summary rows are unavailable (likely location context). Verified totals via POS API.')
+      } else {
+        const posSubtotalText = await readSummaryValueByLabels(posPage, ['Suma czesciowa'])
+        const posVatText = await readSummaryValueByLabels(posPage, ['Podatek VAT', 'VAT'])
+        const posTotalText = await readSummaryValueByLabels(posPage, ['Kwota brutto', 'Razem'])
+        const posNetText = await readSummaryValueByLabels(posPage, ['Kwota netto', 'Netto'])
+
+        expect(posSubtotalText).toBeTruthy()
+        expect(posVatText).toBeTruthy()
+        expect(posTotalText).toBeTruthy()
+        expect(posNetText).toBeTruthy()
+
+        const posSubtotalValue = parsePln(posSubtotalText!)
+        const posVatValue = parsePln(posVatText!)
+        const posTotalValue = parsePln(posTotalText!)
+        const posNetValue = parsePln(posNetText!)
+        expect(Math.abs(posSubtotalValue - orderTotals.subtotal)).toBeLessThan(0.01)
+        expect(Math.abs(posVatValue - orderTotals.tax)).toBeLessThan(0.01)
+        expect(Math.abs(posTotalValue - orderTotals.total)).toBeLessThan(0.01)
+        expect(Math.abs(posNetValue - orderTotals.expectedNet)).toBeLessThan(0.01)
+      }
+    } else {
+      const posOrder = await getPosOrderViaApi(createdOrderId)
+      expect(posOrder).toBeTruthy()
+      const posSubtotal = readNumber(posOrder?.subtotal)
+      const posVat = readNumber(posOrder?.tax)
+      const posTotal = readNumber(posOrder?.total)
+      expect(Math.abs(posSubtotal - orderTotals.subtotal)).toBeLessThan(0.01)
+      expect(Math.abs(posVat - orderTotals.tax)).toBeLessThan(0.01)
+      expect(Math.abs(posTotal - orderTotals.total)).toBeLessThan(0.01)
+      console.warn('[E2E] POS order detail UI unavailable; totals verified through POS API fallback.')
+    }
 
     await posContext.close()
 
