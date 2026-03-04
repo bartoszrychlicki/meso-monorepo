@@ -14,6 +14,7 @@ vi.mock('@/modules/orders/repository', () => ({
 }))
 
 const mockServerRepo = {
+  findById: vi.fn(),
   update: vi.fn(),
 }
 vi.mock('@/lib/data/server-repository-factory', () => ({
@@ -33,7 +34,7 @@ import { PATCH } from '../orders/[id]/status/route'
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>
 const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>
-const mockFindById = ordersRepository.findById as ReturnType<typeof vi.fn>
+const mockFindById = mockServerRepo.findById as ReturnType<typeof vi.fn>
 
 const validApiKey = {
   id: 'key-1',
