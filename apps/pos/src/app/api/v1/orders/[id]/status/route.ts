@@ -39,7 +39,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (!isApiKey(auth)) return auth;
 
   const { id } = await params;
-  const order = await ordersRepository.findById(id);
+  const serverOrdersRepo = createServerRepository<Order>('orders');
+  const order = await serverOrdersRepo.findById(id);
   if (!order) return apiNotFound('Zamówienie');
 
   let body: unknown;
@@ -67,7 +68,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return apiSuccess(order);
     }
 
-    const serverOrdersRepo = createServerRepository<Order>('orders');
     const paymentUpdate: Record<string, unknown> = {
       payment_status,
     };
@@ -87,9 +87,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       422
     );
   }
-
-  // Use server repository (service role) for writes — API routes bypass RLS
-  const serverOrdersRepo = createServerRepository<Order>('orders');
 
   const statusEntry = {
     status: newStatus,
