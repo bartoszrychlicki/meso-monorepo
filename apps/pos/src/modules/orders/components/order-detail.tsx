@@ -303,10 +303,6 @@ export function OrderDetail({
                     <span>-{formatCurrency(order.discount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">VAT</span>
-                  <span>{formatCurrency(order.tax)}</span>
-                </div>
                 {typeof order.delivery_fee === 'number' && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Dostawa</span>
