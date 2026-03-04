@@ -182,9 +182,9 @@ export async function loginPosUser(page: Page) {
       password: POS_TEST_PASSWORD,
       email_confirm: true,
       user_metadata: {
-        app_role: 'cashier',
-        first_name: 'E2E',
-        last_name: 'POS',
+        app_role: 'staff',
+        name: 'E2E POS',
+        role: 'cashier',
       },
     })
     if (error && !error.message.includes('already been registered')) {
@@ -200,6 +200,7 @@ export async function loginPosUser(page: Page) {
     await admin.from('users_users').upsert({
       id: userId,
       email: POS_TEST_EMAIL,
+      username: POS_TEST_EMAIL.split('@')[0],
       name: 'E2E POS',
       role: 'cashier',
       is_active: true,
