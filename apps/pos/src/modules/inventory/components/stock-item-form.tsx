@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { StockItem, Warehouse, InventoryCategory } from '@/types/inventory';
 import { ProductCategory, Allergen, VatRate, ConsumptionType } from '@/types/enums';
 import { ALLERGEN_LABELS } from '@/lib/constants';
@@ -76,6 +83,39 @@ function getCreateStockItemErrorMessage(error: unknown): string {
   }
 
   return 'Nie udalo sie dodac pozycji';
+}
+
+function FieldLabel({
+  htmlFor,
+  children,
+  tooltip,
+}: {
+  htmlFor: string;
+  children: ReactNode;
+  tooltip?: string;
+}) {
+  if (!tooltip) return <Label htmlFor={htmlFor}>{children}</Label>;
+  return (
+    <div className="flex items-center gap-1">
+      <Label htmlFor={htmlFor}>{children}</Label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-64">
+          {tooltip}
+        </TooltipContent>
+      </Tooltip>
+    </div>
+  );
+}
+
+function SectionHeader({ children }: { children: ReactNode }) {
+  return (
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-1">
+      {children}
+    </p>
+  );
 }
 
 export function StockItemForm({
@@ -189,151 +229,156 @@ export function StockItemForm({
         <DialogHeader>
           <DialogTitle>Nowa pozycja magazynowa</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="stock-name">Nazwa *</Label>
-              <Input
-                id="stock-name"
-                placeholder="np. Wolowina mielona"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                data-field="name"
-              />
+        <TooltipProvider>
+          <div className="grid gap-3 py-2">
+            {/* Group 1 — Identyfikacja */}
+            <SectionHeader>Identyfikacja</SectionHeader>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="stock-name">Nazwa *</Label>
+                <Input
+                  id="stock-name"
+                  placeholder="np. Wolowina mielona"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  data-field="name"
+                />
+              </div>
+              <div className="space-y-2">
+                <FieldLabel
+                  htmlFor="stock-sku"
+                  tooltip="Unikalny kod pozycji. Zostaw puste — system wygeneruje automatycznie."
+                >
+                  SKU
+                </FieldLabel>
+                <Input
+                  id="stock-sku"
+                  placeholder="np. WOL-001 (opcjonalnie)"
+                  value={sku}
+                  onChange={(e) => setSku(e.target.value)}
+                  data-field="sku"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-sku">SKU</Label>
-              <Input
-                id="stock-sku"
-                placeholder="np. WOL-001 (opcjonalnie)"
-                value={sku}
-                onChange={(e) => setSku(e.target.value)}
-                data-field="sku"
-              />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <FieldLabel
+                  htmlFor="stock-category"
+                  tooltip="Surowiec = kupowany z zewnatrz, Polprodukt = wytwarzany w kuchni, Gotowy produkt = sprzedawany klientowi."
+                >
+                  Typ produktu
+                </FieldLabel>
+                <Select value={category} onValueChange={(v) => setCategory(v as ProductCategory)}>
+                  <SelectTrigger id="stock-category" data-field="category">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(ProductCategory).map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {CATEGORY_LABELS[cat]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <FieldLabel
+                  htmlFor="stock-inventory-category"
+                  tooltip="Grupowanie pozycji do raportow i filtrow. Nie wplywa na logike systemu."
+                >
+                  Kategoria magazynowa
+                </FieldLabel>
+                <Select value={inventoryCategoryId} onValueChange={setInventoryCategoryId}>
+                  <SelectTrigger id="stock-inventory-category" data-field="inventory-category">
+                    <SelectValue placeholder="Bez kategorii" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_CATEGORY}>Bez kategorii</SelectItem>
+                    {inventoryCategories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="stock-category">Typ produktu</Label>
-            <Select value={category} onValueChange={(v) => setCategory(v as ProductCategory)}>
-              <SelectTrigger id="stock-category" data-field="category">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.values(ProductCategory).map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {CATEGORY_LABELS[cat]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="stock-inventory-category">Kategoria magazynowa</Label>
-            <Select value={inventoryCategoryId} onValueChange={setInventoryCategoryId}>
-              <SelectTrigger id="stock-inventory-category" data-field="inventory-category">
-                <SelectValue placeholder="Bez kategorii" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE_CATEGORY}>Bez kategorii</SelectItem>
-                {inventoryCategories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="stock-unit">Jednostka</Label>
-            <Select value={unit} onValueChange={setUnit}>
-              <SelectTrigger id="stock-unit" data-field="unit">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {UNIT_OPTIONS.map((u) => (
-                  <SelectItem key={u.value} value={u.value}>
-                    {u.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="stock-cost">Koszt/jedn. (PLN) *</Label>
-              <DecimalInput
-                value={costPerUnit}
-                onChange={setCostPerUnit}
-                placeholder="0,00"
-                data-field="cost-per-unit"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="stock-unit">Jednostka</Label>
+                <Select value={unit} onValueChange={setUnit}>
+                  <SelectTrigger id="stock-unit" data-field="unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {UNIT_OPTIONS.map((u) => (
+                      <SelectItem key={u.value} value={u.value}>
+                        {u.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <FieldLabel
+                  htmlFor="stock-consumption"
+                  tooltip={'"Produkt" = rozchod sztuka po sztuce. "Skladniki" = rozchod automatyczny wg receptury (BOM).'}
+                >
+                  Rozchod
+                </FieldLabel>
+                <Select value={consumptionType} onValueChange={(v) => setConsumptionType(v as ConsumptionType)}>
+                  <SelectTrigger id="stock-consumption" data-field="consumption-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(ConsumptionType).map((ct) => (
+                      <SelectItem key={ct} value={ct}>
+                        {CONSUMPTION_TYPE_LABELS[ct]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-vat">Stawka VAT (PTU)</Label>
-              <Select value={vatRate} onValueChange={(v) => setVatRate(v as VatRate)}>
-                <SelectTrigger id="stock-vat" data-field="vat-rate">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(VatRate).map((rate) => (
-                    <SelectItem key={rate} value={rate}>
-                      {VAT_RATE_LABELS[rate]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="stock-consumption">Rozchod</Label>
-              <Select value={consumptionType} onValueChange={(v) => setConsumptionType(v as ConsumptionType)}>
-                <SelectTrigger id="stock-consumption" data-field="consumption-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(ConsumptionType).map((ct) => (
-                    <SelectItem key={ct} value={ct}>
-                      {CONSUMPTION_TYPE_LABELS[ct]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="stock-shelf-life">Waznosc (dni)</Label>
-              <Input
-                id="stock-shelf-life"
-                type="number"
-                min={0}
-                value={shelfLifeDays}
-                onChange={(e) => setShelfLifeDays(Number(e.target.value))}
-                data-field="shelf-life-days"
-              />
-              <p className="text-xs text-muted-foreground">0 = brak sledzenia</p>
-            </div>
-          </div>
+            {/* Group 2 — Koszty i podatki */}
+            <SectionHeader>Koszty i podatki</SectionHeader>
 
-          <div className="space-y-2">
-            <Label htmlFor="stock-storage">Polozenie</Label>
-            <Input
-              id="stock-storage"
-              value={storageLocation}
-              onChange={(e) => setStorageLocation(e.target.value)}
-              placeholder="np. Regal A, Polka 3"
-              data-field="storage-location"
-            />
-          </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="stock-cost">Koszt/jedn. (PLN) *</Label>
+                <DecimalInput
+                  value={costPerUnit}
+                  onChange={setCostPerUnit}
+                  placeholder="0,00"
+                  data-field="cost-per-unit"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stock-vat">Stawka VAT (PTU)</Label>
+                <Select value={vatRate} onValueChange={(v) => setVatRate(v as VatRate)}>
+                  <SelectTrigger id="stock-vat" data-field="vat-rate">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.values(VatRate).map((rate) => (
+                      <SelectItem key={rate} value={rate}>
+                        {VAT_RATE_LABELS[rate]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
 
-          <div className="border-t pt-4 space-y-4">
-            <p className="text-sm font-medium">Przypisanie do magazynu *</p>
+            {/* Group 3 — Magazyn */}
+            <SectionHeader>Magazyn</SectionHeader>
+
             <div className="space-y-2">
-              <Label htmlFor="stock-warehouse">Magazyn</Label>
+              <Label htmlFor="stock-warehouse">Magazyn *</Label>
               <Select value={warehouseId} onValueChange={setWarehouseId}>
                 <SelectTrigger id="stock-warehouse" data-field="warehouse">
                   <SelectValue placeholder="Wybierz magazyn..." />
@@ -347,7 +392,8 @@ export function StockItemForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="stock-quantity">Ilosc poczatkowa</Label>
                 <DecimalInput
@@ -358,7 +404,12 @@ export function StockItemForm({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="stock-min">Stan minimalny</Label>
+                <FieldLabel
+                  htmlFor="stock-min"
+                  tooltip="Ponizej tej wartosci pozycja pojawi sie na liscie brakow."
+                >
+                  Stan minimalny
+                </FieldLabel>
                 <DecimalInput
                   value={minQuantity}
                   onChange={setMinQuantity}
@@ -367,28 +418,64 @@ export function StockItemForm({
                 />
               </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <Label>Alergeny</Label>
-            <div className="flex flex-wrap gap-2">
-              {Object.values(Allergen).map((allergen) => (
-                <Button
-                  key={allergen}
-                  type="button"
-                  variant={selectedAllergens.includes(allergen) ? 'default' : 'outline'}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => toggleAllergen(allergen)}
-                  data-field={`allergen-${allergen}`}
-                  data-value={selectedAllergens.includes(allergen) ? 'selected' : 'unselected'}
-                >
-                  {ALLERGEN_LABELS[allergen]}
-                </Button>
-              ))}
+            <div className="space-y-2">
+              <FieldLabel
+                htmlFor="stock-storage"
+                tooltip="Fizyczne miejsce w magazynie, np. regal, polka. Czysto informacyjne."
+              >
+                Polozenie
+              </FieldLabel>
+              <Input
+                id="stock-storage"
+                value={storageLocation}
+                onChange={(e) => setStorageLocation(e.target.value)}
+                placeholder="np. Regal A, Polka 3"
+                data-field="storage-location"
+              />
+            </div>
+
+            {/* Group 4 — Dodatkowe */}
+            <SectionHeader>Dodatkowe</SectionHeader>
+
+            <div className="space-y-2 max-w-[50%]">
+              <FieldLabel
+                htmlFor="stock-shelf-life"
+                tooltip="Ile dni od przyjecia pozycja jest zdatna do uzycia. 0 = brak sledzenia terminu."
+              >
+                Waznosc (dni)
+              </FieldLabel>
+              <Input
+                id="stock-shelf-life"
+                type="number"
+                min={0}
+                value={shelfLifeDays}
+                onChange={(e) => setShelfLifeDays(Number(e.target.value))}
+                data-field="shelf-life-days"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Alergeny</Label>
+              <div className="flex flex-wrap gap-2">
+                {Object.values(Allergen).map((allergen) => (
+                  <Button
+                    key={allergen}
+                    type="button"
+                    variant={selectedAllergens.includes(allergen) ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={() => toggleAllergen(allergen)}
+                    data-field={`allergen-${allergen}`}
+                    data-value={selectedAllergens.includes(allergen) ? 'selected' : 'unselected'}
+                  >
+                    {ALLERGEN_LABELS[allergen]}
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
+        </TooltipProvider>
         <DialogFooter>
           <Button
             variant="outline"
