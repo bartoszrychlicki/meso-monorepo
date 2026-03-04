@@ -808,15 +808,22 @@ export function RecipeForm({
                   <FormItem>
                     <FormControl>
                       <Input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
+                        type="text"
+                        inputMode="decimal"
                         className="w-[80px]"
                         data-field="yield-quantity"
                         {...field}
-                        onChange={(e) =>
-                          field.onChange(parseFloat(e.target.value) || 0)
-                        }
+                        value={field.value ?? ''}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(',', '.');
+                          if (raw === '' || raw === '.') {
+                            field.onChange(raw === '.' ? 0 : '');
+                            return;
+                          }
+                          if (/^\d*\.?\d*$/.test(raw)) {
+                            field.onChange(parseFloat(raw) || 0);
+                          }
+                        }}
                       />
                     </FormControl>
                     <FormMessage />
