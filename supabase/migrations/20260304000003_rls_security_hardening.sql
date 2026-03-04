@@ -32,7 +32,7 @@ RETURNS boolean AS $$
     WHERE email = (auth.jwt() ->> 'email')
     AND is_active = true
   );
-$$ LANGUAGE sql SECURITY DEFINER STABLE;
+$$ LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public, auth;
 
 -- ============================================================================
 -- 2. Re-GRANT permissions revoked by 20260301100001_rls_delivery_readonly.sql
