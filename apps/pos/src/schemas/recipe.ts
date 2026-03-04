@@ -74,11 +74,10 @@ export const CreateRecipeSchema = z.object({
   yield_quantity: z
     .number()
     .positive('Wydajność musi być większa od 0')
-    .describe('Ile sztuk/kg/litrów produkuje receptura'),
+    .describe('Ile jednostek produkuje receptura (np. 1.5 szt lub 2.7 kg)'),
   yield_unit: z
-    .string()
-    .min(1, 'Jednostka wydajności jest wymagana')
-    .describe('Jednostka wydajności (szt, kg, l)'),
+    .enum(['szt', 'kg'])
+    .describe('Jednostka wydajności — szt dla produktów finalnych, kg dla półproduktów'),
   preparation_time_minutes: z
     .number()
     .int('Czas przygotowania musi być liczbą całkowitą')

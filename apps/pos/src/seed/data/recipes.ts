@@ -383,7 +383,7 @@ export const recipes: Recipe[] = [
     ],
 
     yield_quantity: 1,
-    yield_unit: 'porcja',
+    yield_unit: 'szt',
     preparation_time_minutes: 5,
     instructions: '1. Pokrój ziemniaki\n2. Smaż w 180°C przez 5-6 min\n3. Odsącz i posyp solą',
 
@@ -438,7 +438,7 @@ export const recipes: Recipe[] = [
     ],
 
     yield_quantity: 1,
-    yield_unit: 'porcja',
+    yield_unit: 'szt',
     preparation_time_minutes: 8,
     instructions:
       '1. Grilluj kurczaka\n2. Porwij sałatę\n3. Dodaj grzanki i ser\n4. Polej dressingiem cezar',
@@ -492,7 +492,7 @@ export const recipes: Recipe[] = [
     ],
 
     yield_quantity: 1,
-    yield_unit: 'porcja',
+    yield_unit: 'szt',
     preparation_time_minutes: 10,
     instructions:
       '1. Grilluj kurczaka\n2. Pokrój warzywa\n3. Ułóż na talerzu\n4. Polej dressingiem',
@@ -735,7 +735,7 @@ export const recipes: Recipe[] = [
     ],
 
     yield_quantity: 1,
-    yield_unit: 'porcja',
+    yield_unit: 'szt',
     preparation_time_minutes: 2,
     instructions: '1. Nałóż 2 gałki lodów\n2. Podaj w pucharku',
 

@@ -573,7 +573,7 @@ export function RecipeForm({
         defaultValues?.product_category || ProductCategory.FINISHED_GOOD,
       ingredients: normalizedDefaultIngredients,
       yield_quantity: defaultValues?.yield_quantity || 1,
-      yield_unit: defaultValues?.yield_unit || 'szt',
+      yield_unit: (defaultValues?.product_category === ProductCategory.SEMI_FINISHED ? 'kg' : 'szt') as 'szt' | 'kg',
       preparation_time_minutes:
         defaultValues?.preparation_time_minutes || 10,
       instructions: defaultValues?.instructions || '',
@@ -586,6 +586,15 @@ export function RecipeForm({
     control: form.control,
     name: 'ingredients',
   });
+
+  // Sync yield_unit with product_category
+  const watchedCategory = form.watch('product_category');
+  useEffect(() => {
+    const expectedUnit = watchedCategory === ProductCategory.SEMI_FINISHED ? 'kg' : 'szt';
+    if (form.getValues('yield_unit') !== expectedUnit) {
+      form.setValue('yield_unit', expectedUnit);
+    }
+  }, [watchedCategory, form]);
 
   // --- Draft auto-save (sessionStorage) ---
   const DRAFT_KEY = 'mesopos_recipe_draft';
@@ -681,7 +690,6 @@ export function RecipeForm({
 
   // Calculate estimated cost
   const watchedIngredients = form.watch('ingredients');
-  const watchedCategory = form.watch('product_category') as RecipeProductCategory;
   const estimatedCost = (watchedIngredients || []).reduce(
     (sum: number, ing: RecipeIngredientField) => {
       if (ing.type === 'recipe') {
@@ -788,7 +796,7 @@ export function RecipeForm({
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
                 <TooltipContent side="top">
-                  Ile porcji/sztuk powstaje z tej receptury
+                  Wydajność receptury: szt dla produktów finalnych, kg dla półproduktów
                 </TooltipContent>
               </Tooltip>
             </FormLabel>
@@ -801,9 +809,9 @@ export function RecipeForm({
                     <FormControl>
                       <Input
                         type="number"
-                        step="0.1"
-                        min="0.1"
-                        className="w-[70px]"
+                        step="0.01"
+                        min="0.01"
+                        className="w-[80px]"
                         data-field="yield-quantity"
                         {...field}
                         onChange={(e) =>
@@ -815,31 +823,7 @@ export function RecipeForm({
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="yield_unit"
-                render={({ field }) => (
-                  <FormItem>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-[90px]" data-field="yield-unit">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="szt">szt</SelectItem>
-                        <SelectItem value="porcja">porcja</SelectItem>
-                        <SelectItem value="kg">kg</SelectItem>
-                        <SelectItem value="l">l</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <span className="text-sm text-muted-foreground" data-field="yield-unit">{watchedCategory === ProductCategory.SEMI_FINISHED ? 'kg' : 'szt'}</span>
             </div>
           </div>
 

@@ -175,7 +175,7 @@ describe('RecipeForm', () => {
             },
           ],
           yield_quantity: 1,
-          yield_unit: 'porcja',
+          yield_unit: 'szt',
           preparation_time_minutes: 10,
         }}
         onSubmit={mockSubmit}
@@ -218,7 +218,7 @@ describe('RecipeForm', () => {
             },
           ] as unknown as CreateRecipeInput['ingredients'],
           yield_quantity: 1,
-          yield_unit: 'porcja',
+          yield_unit: 'szt',
           preparation_time_minutes: 10,
         }}
         onSubmit={mockSubmit}
