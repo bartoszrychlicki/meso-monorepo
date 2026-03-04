@@ -91,7 +91,7 @@ export async function deleteStaffUser(userId: string) {
   const serviceClient = createServiceClient();
 
   const { error: authError } = await serviceClient.auth.admin.deleteUser(userId);
-  if (authError) {
+  if (authError && !authError.message.includes('not found')) {
     return { error: `Nie udalo sie usunac uzytkownika z auth: ${authError.message}` };
   }
 
