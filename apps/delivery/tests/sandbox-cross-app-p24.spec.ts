@@ -385,7 +385,7 @@ test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () =>
     await expect(posPage.locator('[data-component="kds-board"]')).toBeVisible({ timeout: 15_000 })
 
     const ticketSelector = `[data-ticket-id="${kitchenTicketId}"][data-status="pending"]`
-    let ticketVisible = await posPage.locator(ticketSelector).first().isVisible({ timeout: 15_000 }).catch(() => false)
+    const ticketVisible = await posPage.locator(ticketSelector).first().isVisible({ timeout: 15_000 }).catch(() => false)
 
     if (!ticketVisible) {
       await ensurePosAuthUser(admin)
