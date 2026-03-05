@@ -85,10 +85,14 @@ async function markServed(id: string): Promise<KitchenTicket> {
 }
 
 async function bumpOrder(id: string): Promise<KitchenTicket> {
-  const ticket = await baseRepo.findById(id);
-  if (!ticket) throw new Error(`Kitchen ticket with id ${id} not found`);
-
   if (isSupabaseBackend) {
+    // Fetch current ticket via server API to determine status
+    const res = await fetch('/api/kitchen/tickets');
+    if (!res.ok) throw new Error(`Failed to fetch tickets for bump (${res.status})`);
+    const json = await res.json();
+    const ticket = (json.tickets as KitchenTicket[]).find((t) => t.id === id);
+    if (!ticket) throw new Error(`Kitchen ticket with id ${id} not found`);
+
     const actionByStatus: Record<string, TransitionAction> = {
       [OrderStatus.PENDING]: 'start_preparing',
       [OrderStatus.PREPARING]: 'mark_ready',
@@ -99,6 +103,9 @@ async function bumpOrder(id: string): Promise<KitchenTicket> {
     if (!action) throw new Error(`Cannot bump ticket in status ${ticket.status}`);
     return callTransition(id, action);
   }
+
+  const ticket = await baseRepo.findById(id);
+  if (!ticket) throw new Error(`Kitchen ticket with id ${id} not found`);
 
   const statusFlow: Record<string, OrderStatus> = {
     [OrderStatus.PENDING]: OrderStatus.PREPARING,
@@ -121,6 +128,12 @@ async function bumpOrder(id: string): Promise<KitchenTicket> {
 }
 
 async function getActiveTickets(): Promise<KitchenTicket[]> {
+  if (isSupabaseBackend) {
+    const res = await fetch('/api/kitchen/tickets');
+    if (!res.ok) throw new Error(`Failed to fetch active tickets (${res.status})`);
+    const json = await res.json();
+    return json.tickets as KitchenTicket[];
+  }
   return baseRepo.findMany(
     (ticket) =>
       ticket.status === OrderStatus.PENDING ||
@@ -130,6 +143,12 @@ async function getActiveTickets(): Promise<KitchenTicket[]> {
 }
 
 async function getCompletedToday(): Promise<KitchenTicket[]> {
+  if (isSupabaseBackend) {
+    const res = await fetch('/api/kitchen/tickets?filter=completed_today');
+    if (!res.ok) throw new Error(`Failed to fetch completed tickets (${res.status})`);
+    const json = await res.json();
+    return json.tickets as KitchenTicket[];
+  }
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
