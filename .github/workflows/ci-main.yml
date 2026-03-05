@@ -71,7 +71,17 @@ jobs:
       - name: Install Playwright (Chromium)
         run: pnpm --filter meso-app exec playwright install chromium --with-deps
 
-      - name: Run live sandbox E2E (Delivery -> P24 -> POS KDS)
+      - name: Run sandbox smoke tests
+        working-directory: apps/delivery
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://gyxcdrcdnnzjdmcrwbpr.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          E2E_DELIVERY_BASE_URL: https://order.mesofood.pl
+          E2E_POS_BASE_URL: https://pos.mesofood.pl
+          E2E_GATE_PASSWORD: ${{ secrets.E2E_GATE_PASSWORD }}
+        run: pnpm test:e2e:sandbox:smoke
+
+      - name: Run sandbox P24 flow (Delivery -> P24 -> POS KDS)
         working-directory: apps/delivery
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://gyxcdrcdnnzjdmcrwbpr.supabase.co

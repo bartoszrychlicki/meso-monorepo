@@ -12,6 +12,7 @@
     "test:e2e:smoke": "playwright test tests/cross-app-lifecycle.spec.ts --project=chromium",
     "test:e2e:regression": "playwright test tests/cross-app-lifecycle.spec.ts tests/full-lifecycle-e2e.spec.ts tests/full-flow.spec.ts tests/menu-cart.spec.ts tests/navigation.spec.ts tests/p24-payment.spec.ts --project=chromium",
     "test:e2e:sandbox": "playwright test tests/sandbox-cross-app-p24.spec.ts --config=playwright.sandbox.config.ts --project=chromium",
+    "test:e2e:sandbox:smoke": "playwright test tests/sandbox-smoke.spec.ts --config=playwright.sandbox.config.ts --project=chromium",
     "test:e2e:sandbox:headed": "playwright test tests/sandbox-cross-app-p24.spec.ts --config=playwright.sandbox.config.ts --project=chromium --headed"
   },
   "dependencies": {
