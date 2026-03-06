@@ -51,7 +51,7 @@ export interface Recipe extends BaseEntity {
 
   // Yield
   yield_quantity: number; // How many units this recipe produces (e.g. 1.5)
-  yield_unit: 'szt' | 'kg'; // FINISHED_GOOD → szt, SEMI_FINISHED → kg
+  yield_unit: 'szt' | 'kg'; // FINISHED_GOOD → szt, SEMI_FINISHED → szt or kg
 
   // Preparation
   preparation_time_minutes: number; // Time to prepare

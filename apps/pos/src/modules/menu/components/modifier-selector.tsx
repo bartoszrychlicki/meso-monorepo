@@ -5,6 +5,7 @@ import { ModifierType, ModifierAction } from '@/types/enums';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DecimalInput } from '@/components/ui/decimal-input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import {
   Select,
@@ -156,13 +157,12 @@ export function ModifierSelector({ modifierGroups, onChange }: ModifierSelectorP
                 />
                 <div className="flex items-center gap-1">
                   <Label className="text-xs text-muted-foreground whitespace-nowrap">+/- PLN:</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
+                  <DecimalInput
+                    allowNegative
                     value={modifier.price}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       updateModifier(group.id, modifier.id, {
-                        price: parseFloat(e.target.value) || 0,
+                        price: value ?? 0,
                       })
                     }
                     placeholder="0"

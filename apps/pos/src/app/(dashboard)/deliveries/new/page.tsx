@@ -30,7 +30,11 @@ export default function NewDeliveryPage() {
       stock_item_id: item.stock_item_id,
       quantity_ordered: item.quantity_ordered ?? undefined,
       quantity_received: item.quantity_received ?? 0,
+      supplier_quantity_received:
+        item.supplier_quantity_received ?? undefined,
+      supplier_unit: item.supplier_unit ?? undefined,
       unit_price_net: item.unit_price_net ?? undefined,
+      price_per_kg_net: item.price_per_kg_net ?? undefined,
       vat_rate: item.vat_rate ?? undefined,
       expiry_date: item.expiry_date ?? undefined,
       ai_matched_name: item.ai_matched_name ?? undefined,

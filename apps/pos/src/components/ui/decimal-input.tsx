@@ -1,15 +1,21 @@
 'use client';
 
+import type { ComponentProps } from 'react';
 import { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
-import { parseLocaleNumber } from '@/lib/utils/parse-locale-number';
+import {
+  formatLocaleNumber,
+  parseLocaleNumber,
+} from '@/lib/utils/parse-locale-number';
 
-interface DecimalInputProps {
-  value: number;
-  onChange: (value: number) => void;
-  className?: string;
-  placeholder?: string;
-  'data-field'?: string;
+interface DecimalInputProps
+  extends Omit<
+    ComponentProps<typeof Input>,
+    'value' | 'onChange' | 'type' | 'inputMode'
+  > {
+  allowNegative?: boolean;
+  onChange: (value: number | null) => void;
+  value: number | null | undefined;
 }
 
 /**
@@ -20,17 +26,16 @@ interface DecimalInputProps {
 export function DecimalInput({
   value,
   onChange,
-  className,
-  placeholder,
+  allowNegative = false,
   ...props
 }: DecimalInputProps) {
-  const [raw, setRaw] = useState(value ? String(value) : '');
+  const [raw, setRaw] = useState(formatLocaleNumber(value));
   const isFocused = useRef(false);
 
   // Sync from parent only when not focused (e.g. external reset)
   useEffect(() => {
     if (!isFocused.current) {
-      setRaw(value ? String(value) : '');
+      setRaw(formatLocaleNumber(value));
     }
   }, [value]);
 
@@ -38,25 +43,26 @@ export function DecimalInput({
     <Input
       type="text"
       inputMode="decimal"
-      className={className}
-      placeholder={placeholder}
       value={raw}
       onFocus={() => {
         isFocused.current = true;
       }}
       onChange={(e) => {
-        const v = e.target.value;
-        // Allow digits, dot, comma, and empty string
-        if (/^[0-9]*[.,]?[0-9]*$/.test(v) || v === '') {
-          setRaw(v);
-          onChange(parseLocaleNumber(v));
+        const nextValue = e.target.value;
+        const pattern = allowNegative
+          ? /^-?(?:\d*(?:[.,]\d*)?)?$/
+          : /^\d*(?:[.,]\d*)?$/;
+
+        if (pattern.test(nextValue) || nextValue === '') {
+          setRaw(nextValue);
+          onChange(parseLocaleNumber(nextValue));
         }
       }}
       onBlur={() => {
         isFocused.current = false;
-        // Clean up display on blur
         const parsed = parseLocaleNumber(raw);
-        setRaw(parsed ? String(parsed) : '');
+        setRaw(formatLocaleNumber(parsed));
+        onChange(parsed);
       }}
       {...props}
     />

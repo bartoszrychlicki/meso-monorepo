@@ -97,8 +97,9 @@ export default function DeliveryDetailPage() {
     const hasAnyPrice = items.some((i) => i.unit_price_net != null);
     if (!hasAnyPrice) return null;
     return items.reduce((sum, i) => {
+      const supplierQuantity = i.supplier_quantity_received ?? i.quantity_received;
       if (i.unit_price_net != null) {
-        return sum + i.unit_price_net * i.quantity_received;
+        return sum + i.unit_price_net * supplierQuantity;
       }
       return sum;
     }, 0);
@@ -322,7 +323,8 @@ export default function DeliveryDetailPage() {
               <TableHead>Produkt</TableHead>
               <TableHead>SKU</TableHead>
               <TableHead className="text-right">Zamowiono</TableHead>
-              <TableHead className="text-right">Przyjeto</TableHead>
+              <TableHead className="text-right">Dostawca</TableHead>
+              <TableHead className="text-right">Magazyn</TableHead>
               <TableHead className="text-right">Cena netto</TableHead>
               <TableHead>VAT</TableHead>
               <TableHead>Data waznosci</TableHead>
@@ -332,7 +334,7 @@ export default function DeliveryDetailPage() {
           <TableBody>
             {items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   Brak pozycji
                 </TableCell>
               </TableRow>
@@ -352,16 +354,27 @@ export default function DeliveryDetailPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     {item.quantity_ordered != null
-                      ? `${item.quantity_ordered} ${item.stock_item_unit}`
+                      ? `${item.quantity_ordered} ${item.supplier_unit ?? item.stock_item_unit}`
                       : '—'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {item.supplier_quantity_received ?? item.quantity_received}{' '}
+                    {item.supplier_unit ?? item.stock_item_unit}
                   </TableCell>
                   <TableCell className="text-right">
                     {item.quantity_received} {item.stock_item_unit}
                   </TableCell>
                   <TableCell className="text-right">
-                    {item.unit_price_net != null
-                      ? formatCurrency(item.unit_price_net)
-                      : '—'}
+                    {item.unit_price_net != null ? (
+                      <div className="space-y-0.5">
+                        <div>{formatCurrency(item.unit_price_net)}</div>
+                        {item.price_per_kg_net != null && (
+                          <div className="text-[11px] text-muted-foreground">
+                            {formatCurrency(item.price_per_kg_net)}/kg
+                          </div>
+                        )}
+                      </div>
+                    ) : '—'}
                   </TableCell>
                   <TableCell>{item.vat_rate ?? '—'}</TableCell>
                   <TableCell>

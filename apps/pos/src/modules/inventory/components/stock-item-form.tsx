@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -31,6 +32,7 @@ import { ALLERGEN_LABELS } from '@/lib/constants';
 import { UNIT_OPTIONS, VAT_RATE_LABELS, CONSUMPTION_TYPE_LABELS } from '@/lib/constants/inventory';
 import { toast } from 'sonner';
 import { DecimalInput } from '@/components/ui/decimal-input';
+import { getCostLabelForUnit, isWeightUnit } from '@/lib/utils/unit-conversion';
 
 interface StockItemFormProps {
   open: boolean;
@@ -130,7 +132,8 @@ export function StockItemForm({
   const [unit, setUnit] = useState('kg');
   const [category, setCategory] = useState<ProductCategory>(ProductCategory.RAW_MATERIAL);
   const [inventoryCategoryId, setInventoryCategoryId] = useState<string>(NONE_CATEGORY);
-  const [costPerUnit, setCostPerUnit] = useState(0);
+  const [costPerUnit, setCostPerUnit] = useState<number | null>(null);
+  const [purchaseUnitWeightKg, setPurchaseUnitWeightKg] = useState<number | null>(null);
   const [vatRate, setVatRate] = useState<VatRate>(VatRate.PTU_B);
   const [consumptionType, setConsumptionType] = useState<ConsumptionType>(ConsumptionType.PRODUCT);
   const [shelfLifeDays, setShelfLifeDays] = useState(0);
@@ -139,8 +142,8 @@ export function StockItemForm({
   const [warehouseId, setWarehouseId] = useState(() =>
     warehouses.find((w) => w.is_default)?.id ?? ''
   );
-  const [quantity, setQuantity] = useState(0);
-  const [minQuantity, setMinQuantity] = useState(0);
+  const [quantity, setQuantity] = useState<number | null>(null);
+  const [minQuantity, setMinQuantity] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const resetForm = () => {
@@ -149,15 +152,16 @@ export function StockItemForm({
     setUnit('kg');
     setCategory(ProductCategory.RAW_MATERIAL);
     setInventoryCategoryId(NONE_CATEGORY);
-    setCostPerUnit(0);
+    setCostPerUnit(null);
+    setPurchaseUnitWeightKg(null);
     setVatRate(VatRate.PTU_B);
     setConsumptionType(ConsumptionType.PRODUCT);
     setShelfLifeDays(0);
     setStorageLocation('');
     setSelectedAllergens([]);
     setWarehouseId('');
-    setQuantity(0);
-    setMinQuantity(0);
+    setQuantity(null);
+    setMinQuantity(null);
   };
 
   const toggleAllergen = (allergen: Allergen) => {
@@ -173,12 +177,16 @@ export function StockItemForm({
       toast.error('Podaj nazwe produktu');
       return;
     }
-    if (costPerUnit <= 0) {
-      toast.error('Podaj cene za jednostke');
+    if (costPerUnit == null || costPerUnit <= 0) {
+      toast.error(`Podaj ${getCostLabelForUnit(unit).toLowerCase()}`);
       return;
     }
     if (!warehouseId) {
       toast.error('Wybierz magazyn');
+      return;
+    }
+    if (unit === 'kg' && purchaseUnitWeightKg != null && purchaseUnitWeightKg <= 0) {
+      toast.error('Waga jednostki zakupu musi byc dodatnia');
       return;
     }
 
@@ -195,17 +203,18 @@ export function StockItemForm({
           inventory_category_id: inventoryCategoryId === NONE_CATEGORY ? null : inventoryCategoryId,
           unit,
           cost_per_unit: costPerUnit,
+          purchase_unit_weight_kg: unit === 'kg' ? purchaseUnitWeightKg ?? null : null,
           allergens: selectedAllergens,
           is_active: true,
           vat_rate: vatRate,
           consumption_type: consumptionType,
           shelf_life_days: shelfLifeDays,
-          default_min_quantity: minQuantity,
+          default_min_quantity: minQuantity ?? 0,
           storage_location: storageLocation.trim() || null,
         },
         warehouseId,
-        quantity,
-        minQuantity
+        quantity ?? 0,
+        minQuantity ?? 0
       );
       toast.success(`Dodano pozycje: ${name}`);
       resetForm();
@@ -228,6 +237,9 @@ export function StockItemForm({
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto" data-component="stock-item-form">
         <DialogHeader>
           <DialogTitle>Nowa pozycja magazynowa</DialogTitle>
+          <DialogDescription>
+            Dodaj pozycje magazynowa wraz z jednostka bazowa, kosztem i parametrami zapasu.
+          </DialogDescription>
         </DialogHeader>
         <TooltipProvider>
           <div className="grid gap-3 py-2">
@@ -349,7 +361,7 @@ export function StockItemForm({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="stock-cost">Koszt/jedn. (PLN) *</Label>
+                <Label htmlFor="stock-cost">{getCostLabelForUnit(unit)} (PLN) *</Label>
                 <DecimalInput
                   value={costPerUnit}
                   onChange={setCostPerUnit}
@@ -373,6 +385,24 @@ export function StockItemForm({
                 </Select>
               </div>
             </div>
+
+            {isWeightUnit(unit) && (
+              <div className="space-y-2">
+                <FieldLabel
+                  htmlFor="stock-purchase-unit-weight"
+                  tooltip="Opcjonalna waga jednej jednostki zakupu od dostawcy, np. 2,5 kg dla 1 opakowania."
+                >
+                  Waga jednostki zakupu (kg)
+                </FieldLabel>
+                <DecimalInput
+                  id="stock-purchase-unit-weight"
+                  value={purchaseUnitWeightKg}
+                  onChange={setPurchaseUnitWeightKg}
+                  placeholder="np. 2,5"
+                  data-field="purchase-unit-weight-kg"
+                />
+              </div>
+            )}
 
             {/* Group 3 — Magazyn */}
             <SectionHeader>Magazyn</SectionHeader>

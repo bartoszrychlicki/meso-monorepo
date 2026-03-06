@@ -16,6 +16,8 @@ import { StockItem, InventoryCategory } from '@/types/inventory';
 import { ProductCategory } from '@/types/enums';
 import { toast } from 'sonner';
 import { Save } from 'lucide-react';
+import { DecimalInput } from '@/components/ui/decimal-input';
+import { getCostLabelForUnit, isWeightUnit } from '@/lib/utils/unit-conversion';
 
 interface OptionsTabProps {
   item: StockItem;
@@ -34,9 +36,12 @@ const NONE_CATEGORY = '__none__';
 export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProps) {
   const [category, setCategory] = useState<ProductCategory>(item.product_category);
   const [inventoryCategoryId, setInventoryCategoryId] = useState<string>(item.inventory_category_id ?? NONE_CATEGORY);
-  const [costPerUnit, setCostPerUnit] = useState(item.cost_per_unit);
+  const [costPerUnit, setCostPerUnit] = useState<number | null>(item.cost_per_unit);
+  const [purchaseUnitWeightKg, setPurchaseUnitWeightKg] = useState<number | null>(
+    item.purchase_unit_weight_kg ?? null
+  );
   const [shelfLifeDays, setShelfLifeDays] = useState(item.shelf_life_days);
-  const [defaultMinQuantity, setDefaultMinQuantity] = useState(item.default_min_quantity);
+  const [defaultMinQuantity, setDefaultMinQuantity] = useState<number | null>(item.default_min_quantity);
   const [storageLocation, setStorageLocation] = useState(item.storage_location ?? '');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -44,6 +49,7 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
     category !== item.product_category ||
     (inventoryCategoryId === NONE_CATEGORY ? null : inventoryCategoryId) !== (item.inventory_category_id ?? null) ||
     costPerUnit !== item.cost_per_unit ||
+    purchaseUnitWeightKg !== (item.purchase_unit_weight_kg ?? null) ||
     shelfLifeDays !== item.shelf_life_days ||
     defaultMinQuantity !== item.default_min_quantity ||
     (storageLocation || null) !== item.storage_location;
@@ -54,9 +60,10 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
       await onSave(item.id, {
         product_category: category,
         inventory_category_id: inventoryCategoryId === NONE_CATEGORY ? null : inventoryCategoryId,
-        cost_per_unit: costPerUnit,
+        cost_per_unit: costPerUnit ?? item.cost_per_unit,
+        purchase_unit_weight_kg: item.unit === 'kg' ? purchaseUnitWeightKg ?? null : null,
         shelf_life_days: shelfLifeDays,
-        default_min_quantity: defaultMinQuantity,
+        default_min_quantity: defaultMinQuantity ?? 0,
         storage_location: storageLocation.trim() || null,
       });
       toast.success('Zapisano zmiany');
@@ -112,18 +119,30 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="item-cost">Koszt/jedn. (PLN)</Label>
-            <Input
+            <Label htmlFor="item-cost">{getCostLabelForUnit(item.unit)} (PLN)</Label>
+            <DecimalInput
               id="item-cost"
-              type="number"
-              min={0}
-              step={0.01}
               value={costPerUnit}
-              onChange={(e) => setCostPerUnit(Number(e.target.value))}
+              onChange={setCostPerUnit}
               data-field="cost-per-unit"
             />
           </div>
         </div>
+
+        {isWeightUnit(item.unit) && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="item-purchase-weight">Waga jednostki zakupu (kg)</Label>
+              <DecimalInput
+                id="item-purchase-weight"
+                value={purchaseUnitWeightKg}
+                onChange={setPurchaseUnitWeightKg}
+                placeholder="np. 2,5"
+                data-field="purchase-unit-weight-kg"
+              />
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
@@ -154,13 +173,10 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="item-default-min">Domyslny stan minimalny</Label>
-            <Input
+            <DecimalInput
               id="item-default-min"
-              type="number"
-              min={0}
-              step={0.01}
               value={defaultMinQuantity}
-              onChange={(e) => setDefaultMinQuantity(Number(e.target.value))}
+              onChange={setDefaultMinQuantity}
               data-field="default-min-quantity"
             />
             <p className="text-xs text-muted-foreground">

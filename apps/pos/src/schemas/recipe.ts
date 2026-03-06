@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod';
-import { Allergen } from '@/types/enums';
+import { Allergen, ProductCategory } from '@/types/enums';
 import { RECIPE_PRODUCT_CATEGORIES } from '@/types/recipe';
 
 /**
@@ -49,7 +49,7 @@ export const RecipeIngredientSchema = z.discriminatedUnion('type', [
 /**
  * Create Recipe Schema
  */
-export const CreateRecipeSchema = z.object({
+const RecipeSchemaBase = z.object({
   product_id: z
     .string()
     .min(1, 'ID produktu jest wymagane')
@@ -95,17 +95,44 @@ export const CreateRecipeSchema = z.object({
     .describe('Użytkownik tworzący recepturę'),
 });
 
+export const CreateRecipeSchema = RecipeSchemaBase.superRefine((data, ctx) => {
+  if (
+    data.product_category === ProductCategory.FINISHED_GOOD &&
+    data.yield_unit !== 'szt'
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['yield_unit'],
+      message: 'Produkt finalny musi miec wydajnosc w sztukach',
+    });
+  }
+});
+
 /**
  * Update Recipe Schema
  * All fields optional for partial updates
  */
-export const UpdateRecipeSchema = CreateRecipeSchema.partial().extend({
-  last_updated_by: z
-    .string()
-    .min(1, 'ID użytkownika jest wymagane')
-    .optional(),
-  version: z.number().int().positive().optional(),
-});
+export const UpdateRecipeSchema = RecipeSchemaBase.partial()
+  .extend({
+    last_updated_by: z
+      .string()
+      .min(1, 'ID użytkownika jest wymagane')
+      .optional(),
+    version: z.number().int().positive().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.product_category === ProductCategory.FINISHED_GOOD &&
+      data.yield_unit != null &&
+      data.yield_unit !== 'szt'
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['yield_unit'],
+        message: 'Produkt finalny musi miec wydajnosc w sztukach',
+      });
+    }
+  });
 
 /**
  * Calculate Recipe Cost Schema

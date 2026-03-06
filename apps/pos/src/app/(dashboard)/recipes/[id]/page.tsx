@@ -77,10 +77,7 @@ export default function RecipeDetailPage() {
   const handleDelete = async () => {
     if (!recipe) return;
     try {
-      await recipesRepository.recipes.update(recipe.id, {
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      });
+      await recipesRepository.deactivateRecipe(recipe.id);
       toast.success(`Receptura "${recipe.name}" zostala dezaktywowana`);
       router.push('/recipes');
     } catch {
@@ -179,7 +176,7 @@ export default function RecipeDetailPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <DollarSign className="h-3 w-3" /> Koszt / szt
+              <DollarSign className="h-3 w-3" /> Koszt / {recipe.yield_unit}
             </div>
             <div className="text-2xl font-bold mt-1">
               {recipe.cost_per_unit.toFixed(2)} zl
@@ -353,7 +350,7 @@ export default function RecipeDetailPage() {
                     <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                       <span>{v.ingredients.length} skladnikow</span>
                       <span>Koszt: {v.total_cost.toFixed(2)} zl</span>
-                      <span>{v.cost_per_unit.toFixed(2)} zl/szt</span>
+                      <span>{v.cost_per_unit.toFixed(2)} zl/{recipe.yield_unit}</span>
                     </div>
                   </div>
                 </div>

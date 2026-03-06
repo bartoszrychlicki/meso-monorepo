@@ -7,6 +7,7 @@ export const CreateStockItemSchema = z.object({
   product_category: z.nativeEnum(ProductCategory).describe('Product category'),
   unit: z.string().min(1, 'Jednostka jest wymagana').describe('Unit of measure'),
   cost_per_unit: z.number().positive('Cena jest wymagana').describe('Cost per unit in PLN'),
+  purchase_unit_weight_kg: z.number().positive('Waga jednostki zakupu musi byc dodatnia').nullable().optional().default(null),
   allergens: z.array(z.nativeEnum(Allergen)).default([]).describe('EU allergens list'),
   is_active: z.boolean().default(true).describe('Whether this item is active'),
   vat_rate: z.nativeEnum(VatRate).default(VatRate.PTU_B).describe('VAT rate group (PTU)'),

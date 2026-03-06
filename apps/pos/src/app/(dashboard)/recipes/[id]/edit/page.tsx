@@ -120,6 +120,7 @@ export default function EditRecipePage() {
       <Card>
         <CardContent className="pt-6">
           <RecipeForm
+            recipeId={recipe.id}
             defaultValues={{
               name: recipe.name,
               description: recipe.description ?? '',

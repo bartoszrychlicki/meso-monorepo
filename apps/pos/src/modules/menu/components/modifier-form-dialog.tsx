@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { HelpCircle } from 'lucide-react';
+import { DecimalInput } from '@/components/ui/decimal-input';
 
 interface ModifierFormDialogProps {
   open: boolean;
@@ -47,7 +48,7 @@ export function ModifierFormDialog({
   onSave,
 }: ModifierFormDialogProps) {
   const [name, setName] = useState('');
-  const [price, setPrice] = useState('0');
+  const [price, setPrice] = useState<number | null>(0);
   const [modifierAction, setModifierAction] = useState<ModifierAction>(ModifierAction.ADD);
   const [recipeId, setRecipeId] = useState<string | null>(null);
   const [isAvailable, setIsAvailable] = useState(true);
@@ -59,13 +60,13 @@ export function ModifierFormDialog({
     if (open) {
       if (modifier) {
         setName(modifier.name);
-        setPrice(String(modifier.price));
+        setPrice(modifier.price);
         setModifierAction(modifier.modifier_action);
         setRecipeId(modifier.recipe_id ?? null);
         setIsAvailable(modifier.is_available);
       } else {
         setName('');
-        setPrice('0');
+        setPrice(0);
         setModifierAction(ModifierAction.ADD);
         setRecipeId(null);
         setIsAvailable(true);
@@ -81,8 +82,7 @@ export function ModifierFormDialog({
       return;
     }
 
-    const parsedPrice = parseFloat(price);
-    if (isNaN(parsedPrice)) {
+    if (price == null) {
       setError('Cena musi byc liczba');
       return;
     }
@@ -92,7 +92,7 @@ export function ModifierFormDialog({
     try {
       await onSave({
         name: name.trim(),
-        price: parsedPrice,
+        price,
         modifier_action: modifierAction,
         recipe_id: recipeId || null,
         is_available: isAvailable,
@@ -147,13 +147,12 @@ export function ModifierFormDialog({
                   </TooltipContent>
                 </Tooltip>
               </Label>
-              <Input
+              <DecimalInput
                 id="modifier-price"
                 data-field="modifier-price"
-                type="number"
-                step={0.01}
+                allowNegative
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={setPrice}
               />
             </div>
 

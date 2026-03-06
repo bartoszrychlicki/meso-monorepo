@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted to define mocks that are available when vi.mock factories run
-const { mockRecipesRepo, mockVersionsRepo, mockUsageLogsRepo, mockGetAllStockItems } = vi.hoisted(() => {
+const {
+  mockRecipesRepo,
+  mockVersionsRepo,
+  mockUsageLogsRepo,
+  mockProductsRepo,
+  mockGetAllStockItems,
+} = vi.hoisted(() => {
   const makeMockRepo = () => ({
     findAll: vi.fn(),
     findById: vi.fn(),
@@ -16,6 +22,7 @@ const { mockRecipesRepo, mockVersionsRepo, mockUsageLogsRepo, mockGetAllStockIte
     mockRecipesRepo: makeMockRepo(),
     mockVersionsRepo: makeMockRepo(),
     mockUsageLogsRepo: makeMockRepo(),
+    mockProductsRepo: makeMockRepo(),
     mockGetAllStockItems: vi.fn(),
   };
 });
@@ -32,6 +39,7 @@ vi.mock('@/lib/data/repository-factory', () => ({
   createRepository: (collectionName: string) => {
     if (collectionName === 'recipes') return mockRecipesRepo;
     if (collectionName === 'recipe_versions') return mockVersionsRepo;
+    if (collectionName === 'products') return mockProductsRepo;
     return mockUsageLogsRepo;
   },
 }));
@@ -54,6 +62,7 @@ const mockStockItems = [
     consumption_type: 'ingredient',
     shelf_life_days: 7,
     default_min_quantity: 1000,
+    purchase_unit_weight_kg: null,
     storage_location: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -71,6 +80,7 @@ const mockStockItems = [
     consumption_type: 'ingredient',
     shelf_life_days: 3,
     default_min_quantity: 100,
+    purchase_unit_weight_kg: null,
     storage_location: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -88,6 +98,7 @@ const mockStockItems = [
     consumption_type: 'ingredient',
     shelf_life_days: 30,
     default_min_quantity: 500,
+    purchase_unit_weight_kg: null,
     storage_location: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -150,14 +161,16 @@ describe('Nested Recipe Cost Calculation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAllStockItems.mockResolvedValue(mockStockItems);
+    mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
+      Promise.resolve(
+        [semiFinishedRecipe, finishedRecipe].filter((recipe) =>
+          predicate ? predicate(recipe) : true
+        )
+      )
+    );
   });
 
   it('calculates cost for recipe with sub-recipe ingredient', async () => {
-    mockRecipesRepo.findById.mockImplementation((id: string) => {
-      if (id === 'recipe-patty') return Promise.resolve(semiFinishedRecipe);
-      return Promise.resolve(null);
-    });
-
     const breakdown = await recipesRepository.calculateRecipeCost(finishedRecipe);
 
     // buns: 1 * 1.20 = 1.20
@@ -187,11 +200,35 @@ describe('Nested Recipe Cost Calculation', () => {
   });
 
   it('throws when sub-recipe not found', async () => {
-    mockRecipesRepo.findById.mockResolvedValue(null);
+    mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
+      Promise.resolve(
+        [finishedRecipe].filter((recipe) => (predicate ? predicate(recipe) : true))
+      )
+    );
 
     await expect(
       recipesRepository.calculateRecipeCost(finishedRecipe)
     ).rejects.toThrow('Sub-recipe not found: recipe-patty');
+  });
+
+  it('converts weight ingredients to stock-item base unit when cost is stored per kg', async () => {
+    mockGetAllStockItems.mockResolvedValue([
+      {
+        ...mockStockItems[0],
+        unit: 'kg',
+        cost_per_unit: 32,
+      },
+    ]);
+
+    const breakdown = await recipesRepository.calculateRecipeCost({
+      ...semiFinishedRecipe,
+      ingredients: [
+        { type: 'stock_item', reference_id: 'stock-beef', quantity: 150, unit: 'g' },
+      ],
+    });
+
+    expect(breakdown.total_cost).toBeCloseTo(4.8, 2);
+    expect(breakdown.cost_per_unit).toBeCloseTo(4.8, 2);
   });
 });
 
@@ -199,14 +236,24 @@ describe('Nested Recipe Allergen Calculation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAllStockItems.mockResolvedValue(mockStockItems);
+    mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
+      Promise.resolve(
+        [semiFinishedRecipe, finishedRecipe].filter((recipe) =>
+          predicate ? predicate(recipe) : true
+        )
+      )
+    );
   });
 
   it('collects allergens from both stock items and sub-recipes', async () => {
-    const pattyWithAllergens = { ...semiFinishedRecipe, allergens: [Allergen.SULPHITES] };
-    mockRecipesRepo.findById.mockImplementation((id: string) => {
-      if (id === 'recipe-patty') return Promise.resolve(pattyWithAllergens);
-      return Promise.resolve(null);
-    });
+    mockGetAllStockItems.mockResolvedValue([
+      {
+        ...mockStockItems[0],
+        allergens: [Allergen.SULPHITES],
+      },
+      mockStockItems[1],
+      mockStockItems[2],
+    ]);
 
     const allergens = await recipesRepository.getAllergensInRecipe(finishedRecipe);
 
@@ -219,7 +266,13 @@ describe('Nested Recipe Allergen Calculation', () => {
 
   it('deduplicates allergens', async () => {
     const pattyWithGluten = { ...semiFinishedRecipe, allergens: [Allergen.GLUTEN] };
-    mockRecipesRepo.findById.mockResolvedValue(pattyWithGluten);
+    mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
+      Promise.resolve(
+        [pattyWithGluten, finishedRecipe].filter((recipe) =>
+          predicate ? predicate(recipe) : true
+        )
+      )
+    );
 
     const allergens = await recipesRepository.getAllergensInRecipe(finishedRecipe);
     const glutenCount = allergens.filter((a) => a === Allergen.GLUTEN).length;
@@ -249,5 +302,110 @@ describe('findRecipesUsingSubRecipe', () => {
 
     const parents = await recipesRepository.findRecipesUsingSubRecipe('recipe-nonexistent');
     expect(parents).toHaveLength(0);
+  });
+});
+
+describe('Recipe dependency validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetAllStockItems.mockResolvedValue(mockStockItems);
+  });
+
+  it('blocks indirect dependency cycles', async () => {
+    const recipeA: Recipe = {
+      ...semiFinishedRecipe,
+      id: 'recipe-a',
+      name: 'A',
+      ingredients: [],
+    };
+    const recipeB: Recipe = {
+      ...semiFinishedRecipe,
+      id: 'recipe-b',
+      name: 'B',
+      ingredients: [
+        { type: 'recipe', reference_id: 'recipe-a', quantity: 1, unit: 'szt' },
+      ],
+    };
+
+    mockRecipesRepo.findMany.mockResolvedValue([recipeA, recipeB]);
+
+    await expect(
+      recipesRepository.validateRecipeDependencies('recipe-a', {
+        ...recipeA,
+        ingredients: [
+          { type: 'recipe', reference_id: 'recipe-b', quantity: 1, unit: 'szt' },
+        ],
+      })
+    ).rejects.toThrow('Recipe dependency cycle detected');
+  });
+});
+
+describe('Recipe closure recalculation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRecipesRepo.update.mockImplementation((id: string, data: Partial<Recipe>) => {
+      const recipes = [baseSemiRecipe, nestedSemiRecipe, topLevelRecipe];
+      const existing = recipes.find((recipe) => recipe.id === id);
+      return Promise.resolve({ ...existing, ...data });
+    });
+  });
+
+  const baseSemiRecipe: Recipe = {
+    ...semiFinishedRecipe,
+    id: 'recipe-base',
+    name: 'Baza miesna',
+    ingredients: [
+      { type: 'stock_item', reference_id: 'stock-beef', quantity: 1, unit: 'kg' },
+    ],
+    yield_quantity: 1,
+    yield_unit: 'kg',
+  };
+
+  const nestedSemiRecipe: Recipe = {
+    ...semiFinishedRecipe,
+    id: 'recipe-middle',
+    name: 'Patty blend',
+    ingredients: [
+      { type: 'recipe', reference_id: 'recipe-base', quantity: 0.2, unit: 'kg' },
+    ],
+    yield_quantity: 1,
+    yield_unit: 'szt',
+  };
+
+  const topLevelRecipe: Recipe = {
+    ...finishedRecipe,
+    id: 'recipe-top',
+    name: 'Top burger',
+    ingredients: [
+      { type: 'recipe', reference_id: 'recipe-middle', quantity: 1, unit: 'szt' },
+      { type: 'stock_item', reference_id: 'stock-buns', quantity: 1, unit: 'szt' },
+    ],
+  };
+
+  it('recalculates all ancestors for a nested semi-finished recipe', async () => {
+    mockGetAllStockItems.mockResolvedValue([
+      {
+        ...mockStockItems[0],
+        unit: 'kg',
+        cost_per_unit: 32,
+      },
+      mockStockItems[1],
+    ]);
+    mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
+      Promise.resolve(
+        [baseSemiRecipe, nestedSemiRecipe, topLevelRecipe].filter((recipe) =>
+          predicate ? predicate(recipe) : true
+        )
+      )
+    );
+
+    const updatedRecipes = await recipesRepository.recalculateRecipeClosure('recipe-base');
+
+    expect(updatedRecipes).toHaveLength(3);
+    expect(mockRecipesRepo.update.mock.calls.map(([recipeId]) => recipeId)).toEqual([
+      'recipe-base',
+      'recipe-middle',
+      'recipe-top',
+    ]);
   });
 });

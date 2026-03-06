@@ -27,6 +27,7 @@ vi.mock('@/modules/inventory/repository', () => ({
         unit: 'kg',
         cost_per_unit: 25.0,
         allergens: [],
+        purchase_unit_weight_kg: null,
       },
       {
         id: 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e',
@@ -34,6 +35,7 @@ vi.mock('@/modules/inventory/repository', () => ({
         unit: 'szt',
         cost_per_unit: 1.2,
         allergens: [],
+        purchase_unit_weight_kg: null,
       },
     ]),
     getAllWarehouses: vi.fn().mockResolvedValue([
@@ -59,6 +61,7 @@ vi.mock('@/modules/inventory/repository', () => ({
 vi.mock('@/modules/recipes/repository', () => ({
   recipesRepository: {
     getRecipesByCategory: vi.fn().mockResolvedValue([]),
+    getBlockedSubRecipeIds: vi.fn().mockResolvedValue(new Set()),
   },
 }));
 

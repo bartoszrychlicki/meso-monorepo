@@ -26,7 +26,10 @@ export interface DeliveryItem extends BaseEntity {
   stock_item_id: string;
   quantity_ordered: number | null;
   quantity_received: number;
+  supplier_quantity_received?: number | null;
+  supplier_unit?: string | null;
   unit_price_net: number | null;
+  price_per_kg_net?: number | null;
   vat_rate: VatRate | null;
   expiry_date: string | null;
   ai_matched_name: string | null;

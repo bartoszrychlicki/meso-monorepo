@@ -2,6 +2,7 @@ import { createRepository } from '@/lib/data/repository-factory';
 import { Supplier, Delivery, DeliveryItem, DeliveryWithDetails, DeliveryItemWithDetails } from '@/types/delivery';
 import { DeliveryStatus, DeliverySource } from '@/types/enums';
 import { inventoryRepository } from '@/modules/inventory/repository';
+import { normalizeDeliveryValues } from './utils/normalization';
 
 const supplierRepo = createRepository<Supplier>('suppliers');
 const deliveryRepo = createRepository<Delivery>('deliveries');
@@ -52,8 +53,9 @@ export const deliveryRepository = {
       .map((d) => {
         const deliveryItems = items.filter((i) => i.delivery_id === d.id);
         const totalNet = deliveryItems.reduce((sum, i) => {
-          if (i.unit_price_net != null) {
-            return sum + i.unit_price_net * i.quantity_received;
+          const supplierQuantity = i.supplier_quantity_received ?? i.quantity_received;
+          if (i.unit_price_net != null && supplierQuantity != null) {
+            return sum + i.unit_price_net * supplierQuantity;
           }
           return sum;
         }, 0);
@@ -107,7 +109,10 @@ export const deliveryRepository = {
       stock_item_id: string;
       quantity_ordered?: number | null;
       quantity_received: number;
+      supplier_quantity_received?: number | null;
+      supplier_unit?: string | null;
       unit_price_net?: number | null;
+      price_per_kg_net?: number | null;
       vat_rate?: string | null;
       expiry_date?: string | null;
       ai_matched_name?: string | null;
@@ -116,6 +121,8 @@ export const deliveryRepository = {
     }[]
   ): Promise<Delivery> {
     const deliveryNumber = await this.generateDeliveryNumber();
+    const stockItems = await inventoryRepository.getAllStockItems();
+    const stockItemMap = new Map(stockItems.map((stockItem) => [stockItem.id, stockItem]));
 
     const delivery = await deliveryRepo.create({
       delivery_number: deliveryNumber,
@@ -130,12 +137,34 @@ export const deliveryRepository = {
     });
 
     for (const item of items) {
+      const stockItem = stockItemMap.get(item.stock_item_id);
+      const supplierQuantityReceived =
+        item.supplier_quantity_received ?? item.quantity_received;
+      const supplierUnit = item.supplier_unit ?? stockItem?.unit ?? null;
+      const normalized =
+        stockItem && supplierQuantityReceived != null && supplierUnit
+          ? normalizeDeliveryValues(
+              stockItem,
+              supplierQuantityReceived,
+              supplierUnit,
+              item.unit_price_net ?? null
+            )
+          : {
+              quantity_received: item.quantity_received,
+              price_per_kg_net: item.price_per_kg_net ?? null,
+            };
+
       await deliveryItemRepo.create({
         delivery_id: delivery.id,
         stock_item_id: item.stock_item_id,
         quantity_ordered: item.quantity_ordered ?? null,
-        quantity_received: item.quantity_received,
+        quantity_received:
+          normalized.quantity_received ?? item.quantity_received,
+        supplier_quantity_received: supplierQuantityReceived ?? null,
+        supplier_unit: supplierUnit,
         unit_price_net: item.unit_price_net ?? null,
+        price_per_kg_net:
+          normalized.price_per_kg_net ?? item.price_per_kg_net ?? null,
         vat_rate: (item.vat_rate as DeliveryItem['vat_rate']) ?? null,
         expiry_date: item.expiry_date ?? null,
         ai_matched_name: item.ai_matched_name ?? null,
@@ -153,6 +182,8 @@ export const deliveryRepository = {
     if (delivery.status === DeliveryStatus.COMPLETED) throw new Error('Delivery already completed');
 
     const items = await deliveryItemRepo.findMany((i) => i.delivery_id === deliveryId);
+    const stockItems = await inventoryRepository.getAllStockItems();
+    const stockItemMap = new Map(stockItems.map((stockItem) => [stockItem.id, stockItem]));
 
     for (const item of items) {
       await inventoryRepository.adjustStock(
@@ -161,6 +192,27 @@ export const deliveryRepository = {
         item.quantity_received,
         `Dostawa ${delivery.delivery_number}`
       );
+
+      const stockItem = stockItemMap.get(item.stock_item_id);
+      if (!stockItem) continue;
+
+      if (stockItem.unit === 'kg' && item.price_per_kg_net != null) {
+        await inventoryRepository.stockItems.update(item.stock_item_id, {
+          cost_per_unit: item.price_per_kg_net,
+        });
+        continue;
+      }
+
+      const supplierUnit = item.supplier_unit ?? stockItem.unit;
+      if (
+        item.unit_price_net != null &&
+        supplierUnit === stockItem.unit &&
+        stockItem.unit !== 'kg'
+      ) {
+        await inventoryRepository.stockItems.update(item.stock_item_id, {
+          cost_per_unit: item.unit_price_net,
+        });
+      }
     }
 
     await deliveryRepo.update(deliveryId, {

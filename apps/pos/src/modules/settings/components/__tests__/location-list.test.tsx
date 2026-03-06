@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { LocationType, UserRole } from '@/types/enums';
 import { Location } from '@/types/common';
+import { User } from '@/types/user';
 
 // --- Polyfill for Radix / shadcn components ---
 beforeAll(() => {
@@ -79,7 +80,7 @@ function setupStores({
   isLoading?: boolean;
   role?: UserRole;
   locationId?: string;
-  currentUser?: ReturnType<typeof useUserStore>['currentUser'];
+  currentUser?: User | null;
 } = {}) {
   mockUseLocationSettingsStore.mockReturnValue({
     allLocations: locations,

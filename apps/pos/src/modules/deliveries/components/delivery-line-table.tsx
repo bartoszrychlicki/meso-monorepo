@@ -14,14 +14,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StockItem } from '@/types/inventory';
 import { X, Plus, PackagePlus } from 'lucide-react';
+import { DecimalInput } from '@/components/ui/decimal-input';
+import { normalizeDeliveryValues } from '../utils/normalization';
 
 export interface DeliveryLineRow {
   id: string;
   stock_item_id: string;
   stock_item_name: string;
   quantity_ordered: number | null;
+  supplier_quantity_received: number | null;
+  supplier_unit: string | null;
   quantity_received: number | null;
   unit_price_net: number | null;
+  price_per_kg_net: number | null;
   vat_rate: string | null;
   expiry_date: string | null;
   notes: string;
@@ -39,8 +44,11 @@ export function createEmptyRow(): DeliveryLineRow {
     stock_item_id: '',
     stock_item_name: '',
     quantity_ordered: null,
+    supplier_quantity_received: null,
+    supplier_unit: null,
     quantity_received: null,
     unit_price_net: null,
+    price_per_kg_net: null,
     vat_rate: null,
     expiry_date: null,
     notes: '',
@@ -54,6 +62,7 @@ function isRowEmpty(row: DeliveryLineRow): boolean {
     !row.stock_item_id &&
     !row.stock_item_name &&
     row.quantity_ordered == null &&
+    row.supplier_quantity_received == null &&
     row.quantity_received == null &&
     row.unit_price_net == null &&
     !row.notes
@@ -80,6 +89,7 @@ export function DeliveryLineTable({
   const productInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const notesInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const stockItemMap = new Map(stockItems.map((stockItem) => [stockItem.id, stockItem]));
 
   // Ensure there's always an empty row at the bottom
   useEffect(() => {
@@ -130,9 +140,38 @@ export function DeliveryLineTable({
     [searchTerms, stockItems]
   );
 
+  const normalizeRow = useCallback(
+    (row: DeliveryLineRow): DeliveryLineRow => {
+      const stockItem = stockItemMap.get(row.stock_item_id);
+      if (!stockItem) {
+        return {
+          ...row,
+          price_per_kg_net: null,
+          quantity_received: null,
+        };
+      }
+
+      const supplierUnit = row.supplier_unit ?? stockItem.unit;
+      const normalized = normalizeDeliveryValues(
+        stockItem,
+        row.supplier_quantity_received,
+        supplierUnit,
+        row.unit_price_net
+      );
+
+      return {
+        ...row,
+        supplier_unit: supplierUnit,
+        price_per_kg_net: normalized.price_per_kg_net,
+        quantity_received: normalized.quantity_received,
+      };
+    },
+    [stockItemMap]
+  );
+
   const updateRow = (index: number, updates: Partial<DeliveryLineRow>) => {
     const newItems = items.map((item, i) =>
-      i === index ? { ...item, ...updates } : item
+      i === index ? normalizeRow({ ...item, ...updates }) : item
     );
     onItemsChange(newItems);
   };
@@ -141,6 +180,7 @@ export function DeliveryLineTable({
     updateRow(rowIndex, {
       stock_item_id: stockItem.id,
       stock_item_name: stockItem.name,
+      supplier_unit: stockItem.unit,
       unit_price_net: stockItem.cost_per_unit || null,
     });
     setActiveDropdown(null);
@@ -175,6 +215,10 @@ export function DeliveryLineTable({
       updateRow(rowIndex, {
         stock_item_id: '',
         stock_item_name: '',
+        supplier_unit: null,
+        quantity_received: null,
+        unit_price_net: null,
+        price_per_kg_net: null,
       });
     }
   };
@@ -338,6 +382,7 @@ export function DeliveryLineTable({
                 <TableHead className="w-[280px] text-xs font-semibold">Produkt</TableHead>
                 <TableHead className="w-[100px] text-xs font-semibold text-right pr-3">Zamowiono</TableHead>
                 <TableHead className="w-[100px] text-xs font-semibold text-right pr-3">Przyjeto</TableHead>
+                <TableHead className="w-[80px] text-xs font-semibold">Jedn.</TableHead>
                 <TableHead className="w-[120px] text-xs font-semibold text-right pr-3">Cena netto</TableHead>
                 <TableHead className="w-[130px] text-xs font-semibold">Data waznosci</TableHead>
                 <TableHead className="w-[160px] text-xs font-semibold">Notatki</TableHead>
@@ -406,65 +451,81 @@ export function DeliveryLineTable({
 
                     {/* Quantity ordered */}
                     <TableCell className="p-1.5">
-                      <input
-                        type="number"
-                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
+                      <DecimalInput
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums"
                         placeholder="—"
-                        value={row.quantity_ordered ?? ''}
-                        onChange={(e) =>
-                          updateRow(index, {
-                            quantity_ordered: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          })
+                        value={row.quantity_ordered}
+                        onChange={(value) =>
+                          updateRow(index, { quantity_ordered: value })
                         }
-                        step="any"
-                        min="0"
                         data-field="quantity-ordered"
                         aria-label="Ilosc zamowiona"
                       />
                     </TableCell>
 
-                    {/* Quantity received */}
+                    {/* Supplier quantity received */}
+                    <TableCell className="p-1.5">
+                      <div className="space-y-1">
+                        <DecimalInput
+                          className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums"
+                          placeholder="0"
+                          value={row.supplier_quantity_received}
+                          onChange={(value) =>
+                            updateRow(index, {
+                              supplier_quantity_received: value,
+                            })
+                          }
+                          data-field="quantity-received"
+                          aria-label="Ilosc przyjeta"
+                        />
+                        {row.stock_item_id && row.supplier_quantity_received != null && (
+                          <div className="text-[10px] text-muted-foreground text-right">
+                            {row.quantity_received != null
+                              ? `mag.: ${row.quantity_received} ${stockItemMap.get(row.stock_item_id)?.unit ?? ''}`
+                              : 'brak przelicznika do magazynu'}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    {/* Supplier unit */}
                     <TableCell className="p-1.5">
                       <input
-                        type="number"
-                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
-                        placeholder="0"
-                        value={row.quantity_received ?? ''}
+                        type="text"
+                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
+                        placeholder={stockItemMap.get(row.stock_item_id)?.unit ?? 'kg'}
+                        value={row.supplier_unit ?? ''}
                         onChange={(e) =>
                           updateRow(index, {
-                            quantity_received: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
+                            supplier_unit: e.target.value || null,
                           })
                         }
-                        step="any"
-                        min="0"
-                        data-field="quantity-received"
-                        aria-label="Ilosc przyjeta"
+                        data-field="supplier-unit"
+                        aria-label="Jednostka dostawcy"
                       />
                     </TableCell>
 
                     {/* Unit price net */}
                     <TableCell className="p-1.5">
-                      <input
-                        type="number"
-                        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/70 focus:border-transparent transition-all"
-                        placeholder="—"
-                        value={row.unit_price_net ?? ''}
-                        onChange={(e) =>
-                          updateRow(index, {
-                            unit_price_net: e.target.value
-                              ? parseFloat(e.target.value)
-                              : null,
-                          })
-                        }
-                        step="0.01"
-                        min="0"
-                        data-field="unit-price-net"
-                        aria-label="Cena netto"
-                      />
+                      <div className="space-y-1">
+                        <DecimalInput
+                          className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-right tabular-nums"
+                          placeholder="—"
+                          value={row.unit_price_net}
+                          onChange={(value) =>
+                            updateRow(index, {
+                              unit_price_net: value,
+                            })
+                          }
+                          data-field="unit-price-net"
+                          aria-label="Cena netto"
+                        />
+                        {row.price_per_kg_net != null && (
+                          <div className="text-[10px] text-muted-foreground text-right">
+                            {row.price_per_kg_net.toFixed(2)} PLN/kg
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
 
                     {/* Expiry date */}

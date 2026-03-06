@@ -49,6 +49,7 @@ import {
 import { Trash2, Save, X, Search, DollarSign, HelpCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { DecimalInput } from '@/components/ui/decimal-input';
+import { convertQuantity } from '@/lib/utils/unit-conversion';
 
 interface RecipeIngredientField {
   type: 'stock_item' | 'recipe';
@@ -124,6 +125,7 @@ function normalizeRecipeIngredients(rawIngredients: unknown): RecipeIngredientFi
 }
 
 interface IngredientChecklistProps {
+  blockedRecipeIds: Set<string>;
   stockItems: StockItem[];
   semiFinishedRecipes: Recipe[];
   productCategory: RecipeProductCategory;
@@ -148,6 +150,7 @@ interface IngredientChecklistProps {
 }
 
 function IngredientChecklist({
+  blockedRecipeIds,
   stockItems,
   semiFinishedRecipes,
   productCategory,
@@ -165,7 +168,7 @@ function IngredientChecklist({
   canAddStockItem,
 }: IngredientChecklistProps) {
   const [activeTab, setActiveTab] = useState<'stock_items' | 'recipes'>('stock_items');
-  const showRecipesTab = productCategory === ProductCategory.FINISHED_GOOD;
+  const showRecipesTab = true;
 
   const selectedIds = useMemo(() => {
     return new Set(
@@ -197,6 +200,7 @@ function IngredientChecklist({
   // Recipe filtering
   const selectedRecipes = semiFinishedRecipes.filter((r) => selectedRecipeIds.has(r.id));
   const availableRecipes = semiFinishedRecipes
+    .filter((r) => !blockedRecipeIds.has(r.id))
     .filter((r) => !selectedRecipeIds.has(r.id))
     .filter((r) => !searchLower || r.name.toLowerCase().includes(searchLower));
 
@@ -511,6 +515,7 @@ function IngredientChecklist({
 
 interface RecipeFormProps {
   defaultValues?: Partial<CreateRecipeInput>;
+  recipeId?: string;
   onSubmit: (data: CreateRecipeInput) => Promise<void>;
   onCancel?: () => void;
   isLoading?: boolean;
@@ -519,6 +524,7 @@ interface RecipeFormProps {
 
 export function RecipeForm({
   defaultValues,
+  recipeId,
   onSubmit,
   onCancel,
   isLoading = false,
@@ -527,6 +533,7 @@ export function RecipeForm({
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [semiFinishedRecipes, setSemiFinishedRecipes] = useState<Recipe[]>([]);
+  const [blockedRecipeIds, setBlockedRecipeIds] = useState<Set<string>>(new Set());
   const [ingredientSearch, setIngredientSearch] = useState('');
   const [isSavingIngredients, setIsSavingIngredients] = useState(false);
   const [showStockItemForm, setShowStockItemForm] = useState(false);
@@ -542,11 +549,15 @@ export function RecipeForm({
   }, []);
 
   const loadSemiFinishedRecipes = useCallback(async () => {
-    const recipes = await recipesRepository.getRecipesByCategory(
-      ProductCategory.SEMI_FINISHED
-    );
+    const [recipes, blockedIds] = await Promise.all([
+      recipesRepository.getRecipesByCategory(ProductCategory.SEMI_FINISHED),
+      recipeId
+        ? recipesRepository.getBlockedSubRecipeIds(recipeId)
+        : Promise.resolve([]),
+    ]);
     setSemiFinishedRecipes(recipes);
-  }, []);
+    setBlockedRecipeIds(new Set(blockedIds));
+  }, [recipeId]);
 
   const loadWarehouses = useCallback(async () => {
     const warehouseList = await inventoryRepository.getAllWarehouses();
@@ -573,7 +584,11 @@ export function RecipeForm({
         defaultValues?.product_category || ProductCategory.FINISHED_GOOD,
       ingredients: normalizedDefaultIngredients,
       yield_quantity: defaultValues?.yield_quantity || 1,
-      yield_unit: (defaultValues?.product_category === ProductCategory.SEMI_FINISHED ? 'kg' : 'szt') as 'szt' | 'kg',
+      yield_unit:
+        defaultValues?.yield_unit ||
+        (defaultValues?.product_category === ProductCategory.SEMI_FINISHED
+          ? 'kg'
+          : 'szt'),
       preparation_time_minutes:
         defaultValues?.preparation_time_minutes || 10,
       instructions: defaultValues?.instructions || '',
@@ -589,10 +604,17 @@ export function RecipeForm({
 
   // Sync yield_unit with product_category
   const watchedCategory = form.watch('product_category');
+  const watchedYieldUnit = form.watch('yield_unit');
   useEffect(() => {
-    const expectedUnit = watchedCategory === ProductCategory.SEMI_FINISHED ? 'kg' : 'szt';
-    if (form.getValues('yield_unit') !== expectedUnit) {
-      form.setValue('yield_unit', expectedUnit);
+    if (watchedCategory === ProductCategory.FINISHED_GOOD) {
+      if (form.getValues('yield_unit') !== 'szt') {
+        form.setValue('yield_unit', 'szt');
+      }
+      return;
+    }
+
+    if (!['kg', 'szt'].includes(form.getValues('yield_unit'))) {
+      form.setValue('yield_unit', 'kg');
     }
   }, [watchedCategory, form]);
 
@@ -695,11 +717,23 @@ export function RecipeForm({
       if (ing.type === 'recipe') {
         const subRecipe = semiFinishedRecipes.find((r) => r.id === ing.reference_id);
         if (!subRecipe || !ing.quantity) return sum;
-        return sum + ing.quantity * subRecipe.cost_per_unit;
+        const normalizedQuantity = convertQuantity(
+          ing.quantity,
+          ing.unit,
+          subRecipe.yield_unit
+        );
+        if (normalizedQuantity == null) return sum;
+        return sum + normalizedQuantity * subRecipe.cost_per_unit;
       }
       const stockItem = stockItems.find((s) => s.id === ing.reference_id);
       if (!stockItem || !ing.quantity) return sum;
-      return sum + ing.quantity * stockItem.cost_per_unit;
+      const normalizedQuantity = convertQuantity(
+        ing.quantity,
+        ing.unit,
+        stockItem.unit
+      );
+      if (normalizedQuantity == null) return sum;
+      return sum + normalizedQuantity * stockItem.cost_per_unit;
     },
     0
   );
@@ -795,44 +829,58 @@ export function RecipeForm({
                 <TooltipTrigger asChild>
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
                 </TooltipTrigger>
-                <TooltipContent side="top">
-                  Wydajność receptury: szt dla produktów finalnych, kg dla półproduktów
-                </TooltipContent>
-              </Tooltip>
-            </FormLabel>
-            <div className="flex items-center gap-1.5">
-              <FormField
-                control={form.control}
-                name="yield_quantity"
-                render={({ field }) => {
-                  // eslint-disable-next-line react-hooks/rules-of-hooks
-                  const [raw, setRaw] = useState(String(field.value ?? ''));
-                  return (
-                    <FormItem>
-                      <FormControl>
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          className="w-[80px]"
-                          data-field="yield-quantity"
-                          value={raw}
-                          onChange={(e) => {
-                            const v = e.target.value.replace(',', '.');
-                            if (/^\d*\.?\d*$/.test(v)) setRaw(v);
-                          }}
-                          onBlur={() => {
-                            const n = parseFloat(raw) || 0;
-                            field.onChange(n);
-                            setRaw(n ? String(n) : '');
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
-              />
-              <span className="text-sm text-muted-foreground" data-field="yield-unit">{watchedCategory === ProductCategory.SEMI_FINISHED ? 'kg' : 'szt'}</span>
+                    <TooltipContent side="top">
+                      Wydajnosc receptury: produkty finalne sa w sztukach, polprodukty moga byc w sztukach lub kilogramach
+                    </TooltipContent>
+                  </Tooltip>
+                </FormLabel>
+                <div className="flex items-center gap-1.5">
+                  <FormField
+                    control={form.control}
+                    name="yield_quantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <DecimalInput
+                            className="w-[80px]"
+                            data-field="yield-quantity"
+                            value={field.value ?? null}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {watchedCategory === ProductCategory.SEMI_FINISHED ? (
+                    <FormField
+                      control={form.control}
+                      name="yield_unit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="w-[80px]" data-field="yield-unit">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="kg">kg</SelectItem>
+                              <SelectItem value="szt">szt</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <span className="text-sm text-muted-foreground" data-field="yield-unit">
+                      {watchedYieldUnit || 'szt'}
+                    </span>
+                  )}
             </div>
           </div>
 
@@ -873,6 +921,7 @@ export function RecipeForm({
 
         {/* Ingredients Checklist */}
         <IngredientChecklist
+          blockedRecipeIds={blockedRecipeIds}
           stockItems={stockItems}
           semiFinishedRecipes={semiFinishedRecipes}
           productCategory={watchedCategory}

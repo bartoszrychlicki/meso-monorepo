@@ -43,6 +43,7 @@ import { ImageUploader } from './image-uploader';
 import { ModifierPicker } from './modifier-picker';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
+import { DecimalInput } from '@/components/ui/decimal-input';
 
 const STEPS = [
   { label: 'Podstawowe', icon: Info },
@@ -445,13 +446,10 @@ export function ProductForm({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="price">Cena regularna (PLN) *</Label>
-                  <Input
+                  <DecimalInput
                     id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
                     value={price}
-                    onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
+                    onChange={(value) => setPrice(value ?? 0)}
                     data-field="product-price"
                   />
                 </div>
@@ -501,13 +499,10 @@ export function ProductForm({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="promo-price">Cena promocyjna (PLN)</Label>
-                      <Input
+                      <DecimalInput
                         id="promo-price"
-                        type="number"
-                        step="0.01"
-                        min="0"
                         value={promoPrice}
-                        onChange={(e) => setPromoPrice(parseFloat(e.target.value) || 0)}
+                        onChange={(value) => setPromoPrice(value ?? 0)}
                         data-field="product-promo-price"
                       />
                       {isPromotionPriceInvalid && (
@@ -609,7 +604,7 @@ export function ProductForm({
                       .filter((r) => r.is_active)
                       .map((r) => (
                         <SelectItem key={r.id} value={r.id}>
-                          {r.name} ({formatCurrency(r.cost_per_unit)}/szt)
+                          {r.name} ({formatCurrency(r.cost_per_unit)}/{r.yield_unit})
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -794,13 +789,12 @@ export function ProductForm({
                           <Label className="text-xs text-muted-foreground whitespace-nowrap">
                             Korekta (+/- PLN):
                           </Label>
-                          <Input
-                            type="number"
-                            step="0.01"
+                          <DecimalInput
+                            allowNegative
                             value={variant.price}
-                            onChange={(e) =>
+                            onChange={(value) =>
                               updateVariant(variant.id, {
-                                price: parseFloat(e.target.value) || 0,
+                                price: value ?? 0,
                               })
                             }
                             placeholder="0.00"

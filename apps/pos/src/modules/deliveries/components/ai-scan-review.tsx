@@ -24,6 +24,7 @@ import { StockItem } from '@/types/inventory';
 import { findBestMatch, findBestSupplierMatch } from '@/modules/deliveries/utils/fuzzy-match';
 import { DeliveryLineRow } from './delivery-line-table';
 import { Check, XCircle } from 'lucide-react';
+import { normalizeDeliveryValues } from '../utils/normalization';
 
 const UNMATCHED = '__unmatched__';
 
@@ -145,13 +146,29 @@ export function AIScanReview({
         const stockItem = stockItems.find(
           (si) => si.id === item.matched_stock_item_id
         );
+        const supplierUnit = item.unit ?? stockItem?.unit ?? null;
+        const normalized =
+          stockItem && item.quantity != null && supplierUnit
+            ? normalizeDeliveryValues(
+                stockItem,
+                item.quantity,
+                supplierUnit,
+                item.unit_price_net
+              )
+            : {
+                quantity_received: item.quantity,
+                price_per_kg_net: stockItem?.unit === 'kg' ? item.unit_price_net : null,
+              };
         return {
           id: generateTempId(),
           stock_item_id: item.matched_stock_item_id,
           stock_item_name: stockItem?.name ?? '',
           quantity_ordered: item.quantity,
-          quantity_received: item.quantity,
+          supplier_quantity_received: item.quantity,
+          supplier_unit: supplierUnit,
+          quantity_received: normalized.quantity_received,
           unit_price_net: item.unit_price_net,
+          price_per_kg_net: normalized.price_per_kg_net,
           vat_rate: item.vat_rate,
           expiry_date: item.expiry_date,
           notes: '',

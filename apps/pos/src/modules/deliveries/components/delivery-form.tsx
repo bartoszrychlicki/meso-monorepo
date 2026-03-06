@@ -34,6 +34,8 @@ import { AIScanReview } from './ai-scan-review';
 import { Save, CheckCircle, ScanLine, Package, FileText, Warehouse } from 'lucide-react';
 import { toast } from 'sonner';
 import { UNIT_OPTIONS } from '@/lib/constants/inventory';
+import { DecimalInput } from '@/components/ui/decimal-input';
+import { getCostLabelForUnit } from '@/lib/utils/unit-conversion';
 
 const NONE_SUPPLIER = '__none__';
 
@@ -98,7 +100,7 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
   const [quickAddSku, setQuickAddSku] = useState('');
   const [quickAddUnit, setQuickAddUnit] = useState('kg');
   const [quickAddCategory, setQuickAddCategory] = useState<ProductCategory>(ProductCategory.RAW_MATERIAL);
-  const [quickAddCost, setQuickAddCost] = useState<string>('');
+  const [quickAddCost, setQuickAddCost] = useState<number | null>(null);
   const [isQuickAddSubmitting, setIsQuickAddSubmitting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -113,7 +115,10 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
   const validItems = useMemo(
     () =>
       lineItems.filter(
-        (item) => item.stock_item_id && (item.quantity_received ?? 0) > 0
+        (item) =>
+          item.stock_item_id &&
+          (item.supplier_quantity_received ?? 0) > 0 &&
+          (item.quantity_received ?? 0) > 0
       ),
     [lineItems]
   );
@@ -123,7 +128,10 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
     () =>
       validItems.reduce((sum, item) => {
         if (item.unit_price_net != null && item.quantity_received != null) {
-          return sum + item.unit_price_net * item.quantity_received;
+          return (
+            sum +
+            item.unit_price_net * (item.supplier_quantity_received ?? item.quantity_received)
+          );
         }
         return sum;
       }, 0),
@@ -143,6 +151,16 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
   const validate = (): boolean => {
     if (!warehouseId) {
       toast.error('Wybierz magazyn');
+      return false;
+    }
+    const hasUnnormalizedItems = lineItems.some(
+      (item) =>
+        item.stock_item_id &&
+        (item.supplier_quantity_received ?? 0) > 0 &&
+        (item.quantity_received ?? 0) <= 0
+    );
+    if (hasUnnormalizedItems) {
+      toast.error('Uzupelnij jednostke dostawcy lub wage jednostki zakupu, aby przeliczyc dostawe do magazynu');
       return false;
     }
     if (validItems.length === 0) {
@@ -247,7 +265,7 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
     setQuickAddSku(generateSku(searchTerm));
     setQuickAddUnit('kg');
     setQuickAddCategory(ProductCategory.RAW_MATERIAL);
-    setQuickAddCost('');
+    setQuickAddCost(null);
     setQuickAddRowIndex(rowIndex);
     setShowQuickAdd(true);
   };
@@ -269,7 +287,8 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
         sku: quickAddSku.trim(),
         product_category: quickAddCategory,
         unit: quickAddUnit,
-        cost_per_unit: quickAddCost ? parseFloat(quickAddCost) : 0,
+        cost_per_unit: quickAddCost ?? 0,
+        purchase_unit_weight_kg: null,
         allergens: [],
         is_active: true,
         vat_rate: VatRate.PTU_B,
@@ -286,7 +305,11 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
               ...item,
               stock_item_id: newItem.id,
               stock_item_name: newItem.name,
+              supplier_unit: newItem.unit,
+              supplier_quantity_received: null,
+              quantity_received: null,
               unit_price_net: newItem.cost_per_unit || null,
+              price_per_kg_net: newItem.unit === 'kg' ? newItem.cost_per_unit : null,
             }
           : item
       );
@@ -565,15 +588,14 @@ export function DeliveryForm({ onSaveDraft, onComplete }: DeliveryFormProps) {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="qa-cost" className="text-xs font-medium">Koszt/jedn. (PLN)</Label>
-                <Input
+                <Label htmlFor="qa-cost" className="text-xs font-medium">
+                  {getCostLabelForUnit(quickAddUnit)} (PLN)
+                </Label>
+                <DecimalInput
                   id="qa-cost"
-                  type="number"
-                  min={0}
-                  step={0.01}
                   placeholder="0.00"
                   value={quickAddCost}
-                  onChange={(e) => setQuickAddCost(e.target.value)}
+                  onChange={setQuickAddCost}
                   data-field="quick-add-cost"
                 />
               </div>

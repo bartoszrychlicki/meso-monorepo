@@ -172,10 +172,7 @@ export const useRecipesStore = create<RecipesStore>((set, get) => ({
   deleteRecipe: async (id: string) => {
     set({ isLoading: true, error: null });
     try {
-      await recipesRepository.recipes.update(id, {
-        is_active: false,
-        updated_at: new Date().toISOString(),
-      });
+      await recipesRepository.deactivateRecipe(id);
       await get().loadRecipes();
     } catch (error) {
       console.error('Failed to delete recipe:', error);

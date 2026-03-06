@@ -35,6 +35,7 @@ const TABLE_MAP: Record<string, string> = {
 const NUMERIC_FIELDS = new Set([
   'price', 'original_price', 'subtotal', 'tax', 'discount', 'total',
   'quantity', 'min_quantity', 'cost_per_unit',
+  'purchase_unit_weight_kg', 'supplier_quantity_received', 'price_per_kg_net',
   'hourly_rate', 'overtime_rate',
   'yield_quantity', 'total_cost', 'food_cost_percentage',
   'discount_value', 'minimum_order_value',

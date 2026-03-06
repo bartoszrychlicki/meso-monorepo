@@ -8,6 +8,7 @@ export interface StockItem extends BaseEntity {
   inventory_category_id?: string | null;
   unit: string;
   cost_per_unit: number;
+  purchase_unit_weight_kg?: number | null;
   allergens: Allergen[];
   is_active: boolean;
   vat_rate: VatRate;
