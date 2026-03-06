@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@meso/core", "@meso/api-client", "@meso/supabase"],
@@ -19,4 +20,18 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Upload source maps for readable stack traces
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Proxy to bypass ad-blockers
+  tunnelRoute: "/monitoring",
+
+  // Silence source map upload logs
+  silent: !process.env.CI,
+
+  // Disable Telemetry
+  telemetry: false,
+});
