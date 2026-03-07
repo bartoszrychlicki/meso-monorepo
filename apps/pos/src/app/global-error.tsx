@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
 
 export default function GlobalError({
@@ -10,49 +11,31 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('[GlobalError]', error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (
     <html lang="pl">
-      <body
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          fontFamily: 'system-ui, sans-serif',
-          gap: '1rem',
-          padding: '2rem',
-          textAlign: 'center',
-        }}
-      >
-        <h2 style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-          Wystapil nieoczekiwany blad
-        </h2>
-        <p style={{ color: '#666', maxWidth: '28rem', fontSize: '0.875rem' }}>
-          Aplikacja napotkala problem. Sprobuj odswiezyc strone.
-        </p>
-        {error.digest && (
-          <p style={{ color: '#999', fontSize: '0.75rem' }}>
-            Kod bledu: {error.digest}
+      <body className="bg-background text-foreground">
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+          <h2 className="text-2xl font-semibold">Cos poszlo nie tak</h2>
+          <p className="max-w-md text-sm text-muted-foreground">
+            Wystapil krytyczny blad aplikacji. Sprobuj odswiezyc widok albo
+            ponowic akcje.
           </p>
-        )}
-        <button
-          onClick={reset}
-          style={{
-            padding: '0.5rem 1.5rem',
-            background: '#0a0a12',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '0.375rem',
-            cursor: 'pointer',
-            fontSize: '0.875rem',
-          }}
-        >
-          Sprobuj ponownie
-        </button>
+          {error.digest ? (
+            <p className="text-xs text-muted-foreground/70">
+              Kod bledu: {error.digest}
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => reset()}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Sprobuj ponownie
+          </button>
+        </div>
       </body>
     </html>
   );

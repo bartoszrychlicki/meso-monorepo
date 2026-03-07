@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
 import { LogOut, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,21 @@ export function Header() {
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  useEffect(() => {
+    Sentry.setUser(
+      currentUser
+        ? {
+            id: currentUser.id,
+            email: currentUser.email,
+            username: currentUser.username,
+          }
+        : null
+    );
+    Sentry.setTag('pos_role', currentUser?.role ?? 'anonymous');
+    Sentry.setTag('pos_location_id', currentLocation?.id ?? 'none');
+    Sentry.setTag('pos_location_name', currentLocation?.name ?? 'none');
+  }, [currentLocation?.id, currentLocation?.name, currentUser]);
 
   return (
     <header
