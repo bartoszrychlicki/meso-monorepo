@@ -361,6 +361,109 @@ describe('POST /api/loyalty/activate-coupon', () => {
 })
 
 // ===========================================================================
+// use-coupon
+// ===========================================================================
+
+describe('POST /api/loyalty/use-coupon', () => {
+  let POST: (req: NextRequest) => Promise<Response>
+
+  beforeEach(async () => {
+    const mod = await import('../use-coupon/route')
+    POST = mod.POST
+  })
+
+  it('returns 401 when not authenticated', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } })
+
+    const res = await POST(makeRequest('POST', { couponId: 'coupon-1', orderId: 'order-1' }))
+    expect(res.status).toBe(401)
+
+    const json = await res.json()
+    expect(json.error).toBeDefined()
+  })
+
+  it('returns 404 when coupon does not belong to the user', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    let callN = 0
+    mockAdminFrom.mockImplementation(() => {
+      callN++
+      if (callN === 1) {
+        return chain({ data: null, error: null })
+      }
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(makeRequest('POST', { couponId: 'coupon-1', orderId: 'order-1' }))
+    expect(res.status).toBe(404)
+
+    const json = await res.json()
+    expect(json.error).toContain('Kupon')
+  })
+
+  it('returns 409 when coupon is already inactive', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    let callN = 0
+    mockAdminFrom.mockImplementation(() => {
+      callN++
+      if (callN === 1) {
+        return chain({
+          data: {
+            id: 'coupon-1',
+            status: 'used',
+            expires_at: '2099-01-01T00:00:00.000Z',
+          },
+          error: null,
+        })
+      }
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(makeRequest('POST', { couponId: 'coupon-1', orderId: 'order-1' }))
+    expect(res.status).toBe(409)
+
+    const json = await res.json()
+    expect(json.error).toContain('aktywny')
+  })
+
+  it('returns 200 and marks the coupon as used for the current user', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    let callN = 0
+    const fromCalls: string[] = []
+    mockAdminFrom.mockImplementation((table: string) => {
+      fromCalls.push(table)
+      callN++
+      if (callN === 1) {
+        return chain({
+          data: {
+            id: 'coupon-1',
+            status: 'active',
+            expires_at: '2099-01-01T00:00:00.000Z',
+          },
+          error: null,
+        })
+      }
+      if (callN === 2) {
+        return chain({
+          data: { id: 'coupon-1' },
+          error: null,
+        })
+      }
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(makeRequest('POST', { couponId: 'coupon-1', orderId: 'order-1' }))
+    expect(res.status).toBe(200)
+
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(fromCalls).toEqual(['crm_customer_coupons', 'crm_customer_coupons'])
+  })
+})
+
+// ===========================================================================
 // active-coupon (GET)
 // ===========================================================================
 

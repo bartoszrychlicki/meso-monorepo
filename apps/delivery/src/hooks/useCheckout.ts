@@ -49,6 +49,37 @@ export function buildOrderCustomerFields(
     }
 }
 
+export async function markLoyaltyCouponAsUsed(couponId: string, orderId: string) {
+    const response = await fetch('/api/loyalty/use-coupon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ couponId, orderId }),
+    })
+
+    let payload: { error?: string } | null = null
+    try {
+        payload = await response.json()
+    } catch {
+        payload = null
+    }
+
+    if (response.ok) {
+        return
+    }
+
+    const message =
+        payload?.error || 'Nie udało się oznaczyć kuponu lojalnościowego jako użytego'
+
+    console.error('[useCheckout] Failed to mark loyalty coupon as used', {
+        couponId,
+        orderId,
+        status: response.status,
+        message,
+    })
+
+    throw new Error(message)
+}
+
 export function useCheckout() {
     const router = useRouter()
     const supabase = createClient()
@@ -162,17 +193,9 @@ export function useCheckout() {
                     .eq('id', user.id)
             }
 
-            // 3. Mark loyalty coupon as used (direct Supabase for now)
+            // 3. Mark loyalty coupon as used via server endpoint
             if (loyaltyCoupon) {
-                await supabase
-                    .from('crm_customer_coupons')
-                    .update({
-                        status: 'used',
-                        used_at: new Date().toISOString(),
-                        order_id: order.id,
-                    })
-                    .eq('id', loyaltyCoupon.id)
-                    .eq('customer_id', user.id)
+                await markLoyaltyCouponAsUsed(loyaltyCoupon.id, order.id)
             }
 
             // 4. Payment flow (unchanged)
