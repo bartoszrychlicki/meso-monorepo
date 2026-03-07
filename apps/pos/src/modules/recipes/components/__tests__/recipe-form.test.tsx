@@ -16,6 +16,7 @@ beforeAll(() => {
 // Valid v4 UUIDs (hardcoded, generated once)
 const STOCK_ID_1 = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
 const _STOCK_ID_2 = 'b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e';
+const SUB_RECIPE_ID = 'c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f';
 
 // Mock inventory repository
 vi.mock('@/modules/inventory/repository', () => ({
@@ -246,6 +247,67 @@ describe('RecipeForm', () => {
       type: 'stock_item',
       reference_id: STOCK_ID_1,
       quantity: 1,
+      unit: 'kg',
+    });
+  });
+
+  it('synchronizes stale sub-recipe units before submit', async () => {
+    const { recipesRepository } = await import('@/modules/recipes/repository');
+    vi.mocked(recipesRepository.getRecipesByCategory).mockResolvedValue([
+      {
+        id: SUB_RECIPE_ID,
+        name: 'Macerata',
+        product_category: ProductCategory.SEMI_FINISHED,
+        yield_unit: 'kg',
+        cost_per_unit: 12,
+      },
+    ] as never);
+
+    render(
+      <RecipeForm
+        defaultValues={{
+          name: 'Kurczak karaage',
+          description: 'Test',
+          product_id: 'product-karaage',
+          created_by: 'system',
+          product_category: ProductCategory.SEMI_FINISHED,
+          ingredients: [
+            {
+              type: 'recipe',
+              reference_id: SUB_RECIPE_ID,
+              reference_name: 'Macerata',
+              quantity: 0.625,
+              unit: 'szt',
+            },
+          ],
+          yield_quantity: 1,
+          yield_unit: 'kg',
+          preparation_time_minutes: 10,
+        }}
+        onSubmit={mockSubmit}
+      />
+    );
+
+    await waitFor(() => {
+      expect(recipesRepository.getRecipesByCategory).toHaveBeenCalledWith(
+        ProductCategory.SEMI_FINISHED
+      );
+    });
+
+    await act(async () => {
+      const saveButton = screen.getByRole('button', { name: /zapisz recepture/i });
+      fireEvent.click(saveButton);
+    });
+
+    await waitFor(() => {
+      expect(mockSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    const submittedData = mockSubmit.mock.calls[0][0];
+    expect(submittedData.ingredients[0]).toMatchObject({
+      type: 'recipe',
+      reference_id: SUB_RECIPE_ID,
+      quantity: 0.625,
       unit: 'kg',
     });
   });

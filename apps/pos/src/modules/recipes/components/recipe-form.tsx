@@ -18,6 +18,7 @@ import { inventoryRepository } from '@/modules/inventory/repository';
 import { StockItemForm } from '@/modules/inventory/components/stock-item-form';
 import { recipesRepository } from '../repository';
 import { getCategoryDisplayName } from '../utils/recipe-calculator';
+import { normalizeIngredientUnits } from '../utils/ingredient-units';
 import { cn } from '@/lib/utils';
 import {
   Form,
@@ -128,7 +129,7 @@ interface IngredientChecklistProps {
   blockedRecipeIds: Set<string>;
   stockItems: StockItem[];
   semiFinishedRecipes: Recipe[];
-  productCategory: RecipeProductCategory;
+  _productCategory: RecipeProductCategory;
   form: {
     setValue: (
       name: string,
@@ -153,7 +154,7 @@ function IngredientChecklist({
   blockedRecipeIds,
   stockItems,
   semiFinishedRecipes,
-  productCategory,
+  _productCategory,
   form,
   append,
   remove,
@@ -543,6 +544,15 @@ export function RecipeForm({
     [defaultValues?.ingredients]
   );
 
+  const normalizeUnitsForKnownReferences = useCallback(
+    (ingredients: RecipeIngredientField[]) =>
+      normalizeIngredientUnits(ingredients, {
+        stockItems,
+        recipes: semiFinishedRecipes,
+      }),
+    [semiFinishedRecipes, stockItems]
+  );
+
   const loadStockItems = useCallback(async () => {
     const items = await inventoryRepository.getAllStockItems();
     setStockItems(items);
@@ -662,10 +672,31 @@ export function RecipeForm({
     return () => subscription.unsubscribe();
   }, [form, saveDraft, defaultValues?.name]);
 
+  useEffect(() => {
+    const currentIngredients =
+      (form.getValues('ingredients') as RecipeIngredientField[] | undefined) ?? [];
+    if (currentIngredients.length === 0) return;
+
+    const { ingredients: normalizedIngredients, changed } =
+      normalizeUnitsForKnownReferences(currentIngredients);
+    if (!changed) return;
+
+    normalizedIngredients.forEach((ingredient, index) => {
+      if (ingredient.unit === currentIngredients[index]?.unit) return;
+      form.setValue(`ingredients.${index}.unit`, ingredient.unit, {
+        shouldDirty: false,
+        shouldValidate: false,
+      });
+    });
+  }, [form, normalizeUnitsForKnownReferences]);
+
   const handleFormSubmit = async (formData: Record<string, unknown>) => {
     const data = formData as unknown as CreateRecipeInput;
+    const { ingredients: normalizedIngredients } = normalizeUnitsForKnownReferences(
+      data.ingredients
+    );
     // Filter out empty ingredients
-    data.ingredients = data.ingredients.filter(
+    data.ingredients = normalizedIngredients.filter(
       (ing) => ing.reference_id && ing.quantity > 0
     );
     await onSubmit(data);
@@ -924,7 +955,7 @@ export function RecipeForm({
           blockedRecipeIds={blockedRecipeIds}
           stockItems={stockItems}
           semiFinishedRecipes={semiFinishedRecipes}
-          productCategory={watchedCategory}
+          _productCategory={watchedCategory}
           form={form}
           append={append}
           remove={remove}
