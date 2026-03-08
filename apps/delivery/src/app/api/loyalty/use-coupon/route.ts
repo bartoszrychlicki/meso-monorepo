@@ -32,6 +32,21 @@ export async function POST(request: NextRequest) {
     const admin = createAdminClient()
     const now = new Date().toISOString()
 
+    const { data: order, error: orderError } = await admin
+      .from('orders_orders')
+      .select('id')
+      .eq('id', orderId)
+      .eq('customer_id', user.id)
+      .maybeSingle()
+
+    if (orderError) {
+      throw orderError
+    }
+
+    if (!order) {
+      return NextResponse.json({ error: 'Zamówienie nie istnieje' }, { status: 404 })
+    }
+
     const { data: coupon, error: couponError } = await admin
       .from('crm_customer_coupons')
       .select('id, status, expires_at')

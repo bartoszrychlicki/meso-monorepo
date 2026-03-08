@@ -389,6 +389,9 @@ describe('POST /api/loyalty/use-coupon', () => {
     mockAdminFrom.mockImplementation(() => {
       callN++
       if (callN === 1) {
+        return chain({ data: { id: 'order-1' }, error: null })
+      }
+      if (callN === 2) {
         return chain({ data: null, error: null })
       }
       return chain({ data: null, error: null })
@@ -401,6 +404,18 @@ describe('POST /api/loyalty/use-coupon', () => {
     expect(json.error).toContain('Kupon')
   })
 
+  it('returns 404 when order does not belong to the user', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    mockAdminFrom.mockImplementation(() => chain({ data: null, error: null }))
+
+    const res = await POST(makeRequest('POST', { couponId: 'coupon-1', orderId: 'order-1' }))
+    expect(res.status).toBe(404)
+
+    const json = await res.json()
+    expect(json.error).toContain('Zamówienie')
+  })
+
   it('returns 409 when coupon is already inactive', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
 
@@ -408,6 +423,12 @@ describe('POST /api/loyalty/use-coupon', () => {
     mockAdminFrom.mockImplementation(() => {
       callN++
       if (callN === 1) {
+        return chain({
+          data: { id: 'order-1' },
+          error: null,
+        })
+      }
+      if (callN === 2) {
         return chain({
           data: {
             id: 'coupon-1',
@@ -437,6 +458,12 @@ describe('POST /api/loyalty/use-coupon', () => {
       callN++
       if (callN === 1) {
         return chain({
+          data: { id: 'order-1' },
+          error: null,
+        })
+      }
+      if (callN === 2) {
+        return chain({
           data: {
             id: 'coupon-1',
             status: 'active',
@@ -445,7 +472,7 @@ describe('POST /api/loyalty/use-coupon', () => {
           error: null,
         })
       }
-      if (callN === 2) {
+      if (callN === 3) {
         return chain({
           data: { id: 'coupon-1' },
           error: null,
@@ -459,7 +486,7 @@ describe('POST /api/loyalty/use-coupon', () => {
 
     const json = await res.json()
     expect(json.success).toBe(true)
-    expect(fromCalls).toEqual(['crm_customer_coupons', 'crm_customer_coupons'])
+    expect(fromCalls).toEqual(['orders_orders', 'crm_customer_coupons', 'crm_customer_coupons'])
   })
 })
 
