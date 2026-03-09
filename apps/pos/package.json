@@ -13,7 +13,12 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node scripts/e2e-pos-regression.mjs",
-    "test:e2e:headed": "node scripts/e2e-pos-regression.mjs --headed"
+    "test:e2e:headed": "node scripts/e2e-pos-regression.mjs --headed",
+    "test:e2e:regression": "node scripts/e2e-pos-regression.mjs",
+    "test:e2e:regression:headed": "node scripts/e2e-pos-regression.mjs --headed",
+    "test:e2e:remote": "node scripts/run-playwright-remote.mjs",
+    "test:e2e:remote:headed": "node scripts/run-playwright-remote.mjs --headed",
+    "test:e2e:remote:debug": "node scripts/run-playwright-remote.mjs --debug"
   },
   "dependencies": {
     "@meso/core": "workspace:*",
@@ -44,6 +49,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -51,6 +57,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
+    "dotenv": "^17.2.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "jsdom": "^27.0.1",
