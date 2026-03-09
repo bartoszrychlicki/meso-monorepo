@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
+import { PENDING_REFERRAL_INPUT_KEY } from '@/lib/referrals'
 import { useAuth } from '@/hooks/useAuth'
 
 const registerSchema = z.object({
@@ -35,7 +36,7 @@ export default function RegisterPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [showConfirmPass, setShowConfirmPass] = useState(false)
-  const [referralPhone, setReferralPhone] = useState('')
+  const [referralInput, setReferralInput] = useState('')
   const supabase = createClient()
 
   const {
@@ -85,20 +86,8 @@ export default function RegisterPage() {
         return
       }
 
-      // Apply referral if phone was provided
-      if (referralPhone.trim()) {
-        try {
-          await fetch('/api/loyalty/apply-referral', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              referral_phone: referralPhone.trim(),
-              email: data.email,
-            }),
-          })
-        } catch {
-          // Referral is optional — don't block registration on failure
-        }
+      if (typeof window !== 'undefined' && referralInput.trim()) {
+        window.localStorage.setItem(PENDING_REFERRAL_INPUT_KEY, referralInput.trim())
       }
 
       toast.success(
@@ -256,21 +245,21 @@ export default function RegisterPage() {
           </Label>
         </div>
 
-        {/* Referral phone (optional) */}
+        {/* Referral code / phone (optional) */}
         <div>
           <div className="relative">
             <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="tel"
-              value={referralPhone}
-              onChange={(e) => setReferralPhone(e.target.value)}
-              placeholder="Nr telefonu polecającego (opcjonalnie)"
+              value={referralInput}
+              onChange={(e) => setReferralInput(e.target.value)}
+              placeholder="Kod lub numer polecającego (opcjonalnie)"
               autoComplete="off"
               className={`${inputCls} pl-10 pr-4`}
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground/60">
-            Podaj numer osoby, która Cię poleciła — dostaniesz kupon powitalny na darmowe Gyoza!
+            Podaj kod lub numer osoby, która Cię poleciła. Po aktywacji konta dostaniesz kupon powitalny na darmowe Gyoza.
           </p>
         </div>
 

@@ -59,6 +59,7 @@ export const CreateOrderSchema = z.object({
   discount: z.number().min(0).default(0),
   delivery_fee: z.number().min(0).optional(),
   tip: z.number().min(0).optional(),
+  loyalty_points_used: z.number().int().min(0).optional(),
   promo_code: z.string().optional(),
   delivery_type: z.enum(['delivery', 'pickup']).optional(),
   scheduled_time: z.string().optional(),

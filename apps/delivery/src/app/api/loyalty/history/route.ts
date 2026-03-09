@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 
 /** Shape returned to the client – matches LoyaltyHistoryEntry on the page */
 type LoyaltyHistoryResponseRow = {
@@ -22,6 +23,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Musisz być zalogowany' }, { status: 401 })
     }
 
+    const customer = await fetchCustomerByAuthId<{ id: string }>(supabase, user.id, 'id')
+    if (!customer) {
+      return NextResponse.json({ error: 'Nie znaleziono klienta' }, { status: 404 })
+    }
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '0')
     const limit = 20
@@ -30,7 +36,7 @@ export async function GET(request: NextRequest) {
     const { data: history, error, count } = await supabase
       .from('crm_loyalty_transactions')
       .select('*', { count: 'exact' })
-      .eq('customer_id', user.id)
+      .eq('customer_id', customer.id)
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 
@@ -58,7 +64,7 @@ export async function GET(request: NextRequest) {
       const { data: pendingOrders } = await supabase
         .from('orders_orders')
         .select('id, status, payment_status, loyalty_points_earned, created_at, paid_at, confirmed_at')
-        .eq('customer_id', user.id)
+        .eq('customer_id', customer.id)
         .eq('payment_status', 'paid')
         .gt('loyalty_points_earned', 0)
         .order('created_at', { ascending: false })
@@ -90,7 +96,7 @@ export async function GET(request: NextRequest) {
       const { data: sumResult } = await supabase
         .from('crm_loyalty_transactions')
         .select('amount')
-        .eq('customer_id', user.id)
+        .eq('customer_id', customer.id)
 
       if (sumResult) {
         const historySum = sumResult.reduce((acc, row) => acc + (row.amount ?? 0), 0)
@@ -98,7 +104,7 @@ export async function GET(request: NextRequest) {
         const { data: customer } = await supabase
           .from('crm_customers')
           .select('loyalty_points')
-          .eq('id', user.id)
+          .eq('auth_id', user.id)
           .single()
 
         if (customer && historySum !== customer.loyalty_points) {

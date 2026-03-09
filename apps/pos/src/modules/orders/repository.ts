@@ -4,8 +4,6 @@ import { createRepository } from '@/lib/data/repository-factory';
 import { crmRepository } from '@/modules/crm/repository';
 import {
   calculatePointsFromOrder,
-  checkTierUpgrade,
-  getTierMultiplier,
 } from '@/modules/crm/utils/loyalty-calculator';
 import { BONUS_POINTS } from '@/modules/crm/utils/loyalty-calculator';
 import { sendSMS } from '@/lib/sms/sms-provider';
@@ -99,8 +97,10 @@ async function updateStatus(
 async function awardLoyaltyPoints(order: Order): Promise<number> {
   if (!order.customer_phone) return 0;
 
-  // Find customer by phone
-  const customer = await crmRepository.findCustomerByPhone(order.customer_phone);
+  // Prefer an explicit customer_id; fall back to phone for older orders.
+  const customer = order.customer_id
+    ? await crmRepository.customers.findById(order.customer_id)
+    : await crmRepository.findCustomerByPhone(order.customer_phone);
   if (!customer) {
     console.log(`No customer found for phone: ${order.customer_phone}`);
     return 0;
@@ -128,7 +128,7 @@ async function awardLoyaltyPoints(order: Order): Promise<number> {
       ? `Pierwsze zamówienie + ${basePoints} pkt za zakup (Zamówienie #${order.order_number})`
       : `Zakup na kwotę ${order.total.toFixed(2)} PLN (Zamówienie #${order.order_number})`,
     related_order_id: order.id,
-    multiplier: getTierMultiplier(customer.loyalty_tier),
+    multiplier: 1,
     created_by: null,
     updated_at: new Date().toISOString(),
   });
@@ -144,19 +144,6 @@ async function awardLoyaltyPoints(order: Order): Promise<number> {
     last_order_date: new Date().toISOString(),
     first_order_date: customer.order_history.first_order_date || new Date().toISOString(),
   });
-
-  // Check tier upgrade
-  const upgrade = checkTierUpgrade(
-    customer.loyalty_points,
-    customer.loyalty_points + totalPoints
-  );
-
-  if (upgrade?.upgraded) {
-    console.log(
-      `🎉 Customer ${customer.first_name} ${customer.last_name} upgraded from ${upgrade.oldTier} to ${upgrade.newTier}!`
-    );
-    // TODO Phase 4 (SMS): Send congratulations SMS
-  }
 
   console.log(
     `✅ Awarded ${totalPoints} loyalty points to ${customer.first_name} ${customer.last_name} (Order #${order.order_number})`

@@ -17,8 +17,10 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
 }))
 
 const mockRpc = vi.fn()
+const mockServiceFrom = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: () => ({
+    from: mockServiceFrom,
     rpc: mockRpc,
   }),
 }))
@@ -61,6 +63,16 @@ const validOrderBody = {
 
 function makeRequest(url: string, options?: RequestInit) {
   return new NextRequest(new URL(url, 'http://localhost:3000'), options as never)
+}
+
+function chain(result: { data: unknown; error: unknown }) {
+  return {
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve(result),
+      }),
+    }),
+  }
 }
 
 describe('GET /api/v1/orders', () => {
@@ -111,6 +123,19 @@ describe('POST /api/v1/orders', () => {
     mockIsApiKey.mockReturnValue(true)
     mockServerRepo.findById.mockResolvedValue(mockProduct)
     mockServerRepo.findMany.mockResolvedValue([])
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+      return chain({ data: null, error: null })
+    })
     mockRpc.mockImplementation((fn: string) => {
       if (fn === 'next_order_number') {
         return Promise.resolve({
@@ -268,7 +293,7 @@ describe('POST /api/v1/orders', () => {
     expect(body.error.details[0].message).toContain('nie jest dostępny')
   })
 
-  it('calculates gross totals and forwards them to transactional RPC payload', async () => {
+  it('calculates gross totals and forwards base loyalty points when customer_id is missing', async () => {
     const orderWithModifiers = {
       ...validOrderBody,
       items: [
@@ -305,5 +330,44 @@ describe('POST /api/v1/orders', () => {
     // Gross prices: VAT is included in subtotal and must not be added to total.
     expect(payload.tax).toBe(5.02)
     expect(payload.total).toBe(62.8)
+    expect(payload.loyalty_points_earned).toBe(62)
+  })
+
+  it('adds first-order bonus to estimated loyalty points when customer_id is present', async () => {
+    const orderWithKnownCustomer = {
+      ...validOrderBody,
+      customer_id: 'customer-1',
+      items: [
+        {
+          product_id: '550e8400-e29b-41d4-a716-446655440001',
+          product_name: 'Burger Classic',
+          quantity: 2,
+          unit_price: 29.9,
+          modifiers: [
+            {
+              modifier_id: 'mod-1',
+              name: 'Extra ser',
+              price: 4.0,
+              quantity: 1,
+              modifier_action: 'add',
+            },
+          ],
+        },
+      ],
+      discount: 5.0,
+    }
+
+    await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify(orderWithKnownCustomer),
+      })
+    )
+
+    const createCall = mockRpc.mock.calls.find((call) => call[0] === 'create_order_with_items')
+    const payload = createCall?.[1]?.p_order
+
+    expect(payload.total).toBe(62.8)
+    expect(payload.loyalty_points_earned).toBe(112)
   })
 })

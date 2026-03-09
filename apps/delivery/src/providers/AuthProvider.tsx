@@ -1,8 +1,10 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
 import { AuthChangeEvent, User, Session } from '@supabase/supabase-js'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { PENDING_REFERRAL_INPUT_KEY } from '@/lib/referrals'
 
 interface AuthContextType {
   user: User | null
@@ -20,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const processedReferralKeyRef = useRef<string | null>(null)
 
   // Use state to ensure single instance across renders
   const [supabase] = useState(() => createClient())
@@ -83,6 +86,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe()
     }
   }, [initAuth, supabase])
+
+  useEffect(() => {
+    if (!user || typeof window === 'undefined') return
+
+    const pendingReferralInput = window.localStorage.getItem(PENDING_REFERRAL_INPUT_KEY)?.trim()
+    if (!pendingReferralInput) return
+
+    const requestKey = `${user.id}:${pendingReferralInput}`
+    if (processedReferralKeyRef.current === requestKey) return
+    processedReferralKeyRef.current = requestKey
+
+    void fetch('/api/loyalty/apply-referral', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ referral_input: pendingReferralInput }),
+    })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}))
+        window.localStorage.removeItem(PENDING_REFERRAL_INPUT_KEY)
+
+        if (response.ok) {
+          toast.success(payload.message || 'Polecenie zostało zapisane')
+          return
+        }
+
+        if (response.status !== 409) {
+          toast.error(payload.error || 'Nie udało się zastosować polecenia')
+        }
+      })
+      .catch(() => {
+        window.localStorage.removeItem(PENDING_REFERRAL_INPUT_KEY)
+        toast.error('Nie udało się zastosować polecenia')
+      })
+  }, [user])
 
   return (
     <AuthContext.Provider

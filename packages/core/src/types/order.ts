@@ -69,6 +69,7 @@ export interface Order extends BaseEntity {
   scheduled_time?: string;
   delivery_type?: 'delivery' | 'pickup';
   loyalty_points_earned?: number;
+  loyalty_points_used?: number;
   // Lifecycle timestamps
   paid_at?: string;
   confirmed_at?: string;

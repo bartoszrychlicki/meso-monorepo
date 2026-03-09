@@ -37,7 +37,7 @@ export default function SettingsPage() {
             const { data, error } = await supabase
                 .from('crm_customers')
                 .select('marketing_consent')
-                .eq('id', user.id)
+                .eq('auth_id', user.id)
                 .single()
 
             if (error) {
@@ -62,7 +62,7 @@ export default function SettingsPage() {
         const { error } = await supabase
             .from('crm_customers')
             .update({ marketing_consent: checked })
-            .eq('id', user.id)
+            .eq('auth_id', user.id)
 
         if (error) {
             console.error('Error updating marketing consent:', error)

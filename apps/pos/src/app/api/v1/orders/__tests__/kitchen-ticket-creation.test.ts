@@ -17,8 +17,10 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
 }))
 
 const mockRpc = vi.fn()
+const mockServiceFrom = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: () => ({
+    from: mockServiceFrom,
     rpc: mockRpc,
   }),
 }))
@@ -68,6 +70,16 @@ function makeRequest(url: string, options?: RequestInit) {
   return new NextRequest(new URL(url, 'http://localhost:3000'), options as never)
 }
 
+function chain(result: { data: unknown; error: unknown }) {
+  return {
+    select: () => ({
+      eq: () => ({
+        maybeSingle: () => Promise.resolve(result),
+      }),
+    }),
+  }
+}
+
 describe('POST /api/v1/orders — transactional create payload', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -76,6 +88,19 @@ describe('POST /api/v1/orders — transactional create payload', () => {
     mockIsApiKey.mockReturnValue(true)
     mockServerRepo.findById.mockResolvedValue(mockProduct)
     mockServerRepo.findMany.mockResolvedValue([])
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+      return chain({ data: null, error: null })
+    })
 
     mockRpc.mockImplementation((fn: string) => {
       if (fn === 'next_order_number') {
@@ -109,6 +134,7 @@ describe('POST /api/v1/orders — transactional create payload', () => {
 
     expect(payload).toBeDefined()
     expect(payload.p_order.order_number).toBe('WEB-20260303-001')
+    expect(payload.p_order.loyalty_points_earned).toBe(136)
     expect(payload.p_order_items).toHaveLength(1)
     expect(payload.p_order_items[0]).toMatchObject({
       product_id: 'prod-1',

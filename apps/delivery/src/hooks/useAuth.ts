@@ -5,6 +5,7 @@ export { useAuth } from '@/providers/AuthProvider'
 import { useState, useEffect } from 'react'
 import { useAuth as useAuthBase } from '@/providers/AuthProvider'
 import { createClient } from '@/lib/supabase/client'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 
 interface CustomerNameRow {
   first_name: string | null
@@ -52,12 +53,11 @@ export function useUserDisplay() {
     if (!user || !isAuthenticated) return
 
     const supabase = createClient()
-    supabase
-      .from('crm_customers')
-      .select('first_name, last_name')
-      .eq('id', user.id)
-      .single()
-      .then(({ data }: { data: CustomerNameRow | null }) => {
+    fetchCustomerByAuthId<CustomerNameRow>(
+      supabase,
+      user.id,
+      'first_name, last_name'
+    ).then((data) => {
         if (data) {
           const first = typeof data.first_name === 'string' ? data.first_name.trim() : ''
           const last = typeof data.last_name === 'string' ? data.last_name.trim() : ''

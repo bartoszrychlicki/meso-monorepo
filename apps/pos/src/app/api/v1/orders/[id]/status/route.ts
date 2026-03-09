@@ -6,8 +6,9 @@ import {
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
-import { ordersRepository } from '@/modules/orders/repository';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { createServiceClient } from '@/lib/supabase/server';
+import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { UpdateOrderStatusSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
@@ -112,9 +113,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   // CRM integration: loyalty points & SMS (best-effort, uses module repo)
-  if (newStatus === OrderStatus.DELIVERED && order.customer_phone) {
+  if (newStatus === OrderStatus.DELIVERED && (updated.customer_id || updated.customer_phone)) {
     try {
-      await ordersRepository.awardLoyaltyPoints(updated);
+      await awardOrderLoyaltyPoints(createServiceClient(), updated);
     } catch {
       // Don't fail status update if CRM fails
     }

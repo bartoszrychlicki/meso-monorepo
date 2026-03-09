@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/providers/AuthProvider'
 import { createClient } from '@/lib/supabase/client'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 
 export interface LoyaltyHistoryEntry {
   id: string
@@ -32,16 +33,27 @@ export function useLoyaltyHistory(): UseLoyaltyHistoryResult {
     }
 
     const supabase = createClient()
-    supabase
-      .from('crm_loyalty_transactions')
-      .select('*')
-      .eq('customer_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(50)
-      .then(({ data, error }: { data: LoyaltyHistoryEntry[] | null; error: unknown }) => {
-        if (!error && data) {
-          setHistory(data as LoyaltyHistoryEntry[])
+    fetchCustomerByAuthId<{ id: string }>(supabase, user.id, 'id')
+      .then((customer) => {
+        if (!customer) {
+          setIsLoading(false)
+          return null
         }
+
+        return supabase
+          .from('crm_loyalty_transactions')
+          .select('*')
+          .eq('customer_id', customer.id)
+          .order('created_at', { ascending: false })
+          .limit(50)
+      })
+      .then((result) => {
+        if (result && !result.error && result.data) {
+          setHistory(result.data as LoyaltyHistoryEntry[])
+        }
+        setIsLoading(false)
+      })
+      .catch(() => {
         setIsLoading(false)
       })
   }, [user, isPermanent])

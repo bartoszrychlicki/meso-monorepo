@@ -203,7 +203,7 @@ export default function CheckoutPage() {
                 const { data: customer } = await supabase
                     .from('crm_customers')
                     .select('first_name, last_name, email, phone')
-                    .eq('id', user.id)
+                    .eq('auth_id', user.id)
                     .single()
 
                 if (customer?.phone) {

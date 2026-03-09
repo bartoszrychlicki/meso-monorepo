@@ -31,6 +31,7 @@ export interface LoyaltyCoupon {
   discount_value: number | null
   free_product_name: string | null
   expires_at: string
+  points_spent?: number
 }
 
 interface CartState {

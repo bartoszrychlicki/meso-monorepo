@@ -152,10 +152,16 @@ describe('POST /api/loyalty/activate-coupon', () => {
     mockAdminFrom.mockImplementation(() => {
       callN++
       if (callN === 1) {
+        return chain({
+          data: { id: 'customer-1', loyalty_points: 150, loyalty_tier: 'bronze' },
+          error: null,
+        })
+      }
+      if (callN === 2) {
         // expire stale -- just chain through
         return chain({ data: null, error: null })
       }
-      if (callN === 2) {
+      if (callN === 3) {
         // check active coupon -- return one
         return chain({ data: { id: 'coupon-existing' }, error: null })
       }
@@ -173,9 +179,15 @@ describe('POST /api/loyalty/activate-coupon', () => {
     let callN = 0
     mockAdminFrom.mockImplementation(() => {
       callN++
-      if (callN <= 1) return chain({ data: null, error: null }) // expire stale
-      if (callN === 2) return chain({ data: null, error: null }) // no active coupon
-      if (callN === 3) return chain({ data: null, error: { message: 'not found' } }) // reward lookup
+      if (callN === 1) {
+        return chain({
+          data: { id: 'customer-1', loyalty_points: 150, loyalty_tier: 'bronze' },
+          error: null,
+        })
+      }
+      if (callN === 2) return chain({ data: null, error: null }) // expire stale
+      if (callN === 3) return chain({ data: null, error: null }) // no active coupon
+      if (callN === 4) return chain({ data: null, error: { message: 'not found' } }) // reward lookup
       return chain({ data: null, error: null })
     })
 
@@ -190,19 +202,18 @@ describe('POST /api/loyalty/activate-coupon', () => {
     let callN = 0
     mockAdminFrom.mockImplementation(() => {
       callN++
-      if (callN <= 1) return chain({ data: null, error: null })
-      if (callN === 2) return chain({ data: null, error: null }) // no active coupon
-      if (callN === 3) {
-        // reward found
+      if (callN === 1) {
         return chain({
-          data: { id: 'r1', points_cost: 200, min_tier: 'bronze', reward_type: 'discount', discount_value: 10, name: 'Rabat 10 PLN' },
+          data: { id: 'customer-1', loyalty_points: 50, loyalty_tier: 'gold' },
           error: null,
         })
       }
+      if (callN === 2) return chain({ data: null, error: null })
+      if (callN === 3) return chain({ data: null, error: null }) // no active coupon
       if (callN === 4) {
-        // customer -- only 50 points
+        // reward found
         return chain({
-          data: { loyalty_points: 50, loyalty_tier: 'gold' },
+          data: { id: 'r1', points_cost: 200, min_tier: 'bronze', reward_type: 'discount', discount_value: 10, name: 'Rabat 10 PLN' },
           error: null,
         })
       }
@@ -224,17 +235,17 @@ describe('POST /api/loyalty/activate-coupon', () => {
     let callN = 0
     mockAdminFrom.mockImplementation(() => {
       callN++
-      if (callN <= 1) return chain({ data: null, error: null })
-      if (callN === 2) return chain({ data: null, error: null })
-      if (callN === 3) {
+      if (callN === 1) {
         return chain({
-          data: { id: 'r1', points_cost: 100, min_tier: 'gold', reward_type: 'discount', discount_value: 10, name: 'Premium reward' },
+          data: { id: 'customer-1', loyalty_points: 999, loyalty_tier: 'bronze' },
           error: null,
         })
       }
+      if (callN === 2) return chain({ data: null, error: null })
+      if (callN === 3) return chain({ data: null, error: null })
       if (callN === 4) {
         return chain({
-          data: { loyalty_points: 999, loyalty_tier: 'bronze' },
+          data: { id: 'r1', points_cost: 100, min_tier: 'gold', reward_type: 'discount', discount_value: 10, name: 'Premium reward' },
           error: null,
         })
       }
@@ -255,19 +266,18 @@ describe('POST /api/loyalty/activate-coupon', () => {
     let callN = 0
     mockAdminFrom.mockImplementation((table: string) => {
       callN++
-      if (callN <= 1) return chain({ data: null, error: null }) // expire stale
-      if (callN === 2) return chain({ data: null, error: null }) // no active coupon
-      if (callN === 3) {
-        // reward
+      if (callN === 1) {
         return chain({
-          data: { id: 'r1', points_cost: 100, min_tier: 'bronze', reward_type: 'free_product', discount_value: null, name: 'Gyoza (6 szt)' },
+          data: { id: 'customer-1', loyalty_points: 300, loyalty_tier: 'silver' },
           error: null,
         })
       }
+      if (callN === 2) return chain({ data: null, error: null }) // expire stale
+      if (callN === 3) return chain({ data: null, error: null }) // no active coupon
       if (callN === 4) {
-        // customer
+        // reward
         return chain({
-          data: { loyalty_points: 300, loyalty_tier: 'silver' },
+          data: { id: 'r1', points_cost: 100, min_tier: 'bronze', reward_type: 'free_product', discount_value: null, name: 'Gyoza (6 szt)' },
           error: null,
         })
       }
@@ -296,6 +306,7 @@ describe('POST /api/loyalty/activate-coupon', () => {
             discount_value: 22.90,
             free_product_name: 'Gyoza (6 szt)',
             expires_at: '2026-02-26T00:00:00.000Z',
+            points_spent: 100,
           },
           error: null,
         })
@@ -313,6 +324,7 @@ describe('POST /api/loyalty/activate-coupon', () => {
     expect(json.coupon.coupon_type).toBe('free_product')
     expect(json.coupon.discount_value).toBe(22.90)
     expect(json.coupon.free_product_name).toBe('Gyoza (6 szt)')
+    expect(json.coupon.points_spent).toBe(100)
   })
 
   // ---- 500 + rollback: coupon creation failure ----
@@ -323,17 +335,17 @@ describe('POST /api/loyalty/activate-coupon', () => {
     let callN = 0
     mockAdminFrom.mockImplementation((table: string) => {
       callN++
-      if (callN <= 1) return chain({ data: null, error: null }) // expire stale
-      if (callN === 2) return chain({ data: null, error: null }) // no active coupon
-      if (callN === 3) {
+      if (callN === 1) {
         return chain({
-          data: { id: 'r1', points_cost: 100, min_tier: 'bronze', reward_type: 'discount', discount_value: 10, name: '10 PLN rabat' },
+          data: { id: 'customer-1', loyalty_points: 200, loyalty_tier: 'bronze' },
           error: null,
         })
       }
+      if (callN === 2) return chain({ data: null, error: null }) // expire stale
+      if (callN === 3) return chain({ data: null, error: null }) // no active coupon
       if (callN === 4) {
         return chain({
-          data: { loyalty_points: 200, loyalty_tier: 'bronze' },
+          data: { id: 'r1', points_cost: 100, min_tier: 'bronze', reward_type: 'discount', discount_value: 10, name: '10 PLN rabat' },
           error: null,
         })
       }
@@ -389,9 +401,12 @@ describe('POST /api/loyalty/use-coupon', () => {
     mockAdminFrom.mockImplementation(() => {
       callN++
       if (callN === 1) {
-        return chain({ data: { id: 'order-1' }, error: null })
+        return chain({ data: { id: 'customer-1' }, error: null })
       }
       if (callN === 2) {
+        return chain({ data: { id: 'order-1' }, error: null })
+      }
+      if (callN === 3) {
         return chain({ data: null, error: null })
       }
       return chain({ data: null, error: null })
@@ -407,7 +422,12 @@ describe('POST /api/loyalty/use-coupon', () => {
   it('returns 404 when order does not belong to the user', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
 
-    mockAdminFrom.mockImplementation(() => chain({ data: null, error: null }))
+    let callN = 0
+    mockAdminFrom.mockImplementation(() => {
+      callN++
+      if (callN === 1) return chain({ data: { id: 'customer-1' }, error: null })
+      return chain({ data: null, error: null })
+    })
 
     const res = await POST(makeRequest('POST', { couponId: 'coupon-1', orderId: 'order-1' }))
     expect(res.status).toBe(404)
@@ -423,17 +443,22 @@ describe('POST /api/loyalty/use-coupon', () => {
     mockAdminFrom.mockImplementation(() => {
       callN++
       if (callN === 1) {
+        return chain({ data: { id: 'customer-1' }, error: null })
+      }
+      if (callN === 2) {
         return chain({
           data: { id: 'order-1' },
           error: null,
         })
       }
-      if (callN === 2) {
+      if (callN === 3) {
         return chain({
           data: {
             id: 'coupon-1',
             status: 'used',
             expires_at: '2099-01-01T00:00:00.000Z',
+            order_id: 'another-order',
+            points_spent: 100,
           },
           error: null,
         })
@@ -457,24 +482,35 @@ describe('POST /api/loyalty/use-coupon', () => {
       fromCalls.push(table)
       callN++
       if (callN === 1) {
+        return chain({ data: { id: 'customer-1' }, error: null })
+      }
+      if (callN === 2) {
         return chain({
           data: { id: 'order-1' },
           error: null,
         })
       }
-      if (callN === 2) {
+      if (callN === 3) {
         return chain({
           data: {
             id: 'coupon-1',
             status: 'active',
             expires_at: '2099-01-01T00:00:00.000Z',
+            order_id: null,
+            points_spent: 100,
           },
           error: null,
         })
       }
-      if (callN === 3) {
+      if (callN === 4) {
         return chain({
           data: { id: 'coupon-1' },
+          error: null,
+        })
+      }
+      if (callN === 5) {
+        return chain({
+          data: { id: 'order-1' },
           error: null,
         })
       }
@@ -486,7 +522,13 @@ describe('POST /api/loyalty/use-coupon', () => {
 
     const json = await res.json()
     expect(json.success).toBe(true)
-    expect(fromCalls).toEqual(['orders_orders', 'crm_customer_coupons', 'crm_customer_coupons'])
+    expect(fromCalls).toEqual([
+      'crm_customers',
+      'orders_orders',
+      'crm_customer_coupons',
+      'crm_customer_coupons',
+      'orders_orders',
+    ])
   })
 })
 
@@ -518,16 +560,17 @@ describe('GET /api/loyalty/active-coupon', () => {
     let callN = 0
     mockAdminFrom.mockImplementation((table: string) => {
       callN++
-      if (callN === 1) return chain({ data: null, error: null }) // expire stale
-      if (callN === 2) {
+      if (callN === 1) return chain({ data: { id: 'customer-1' }, error: null }) // customer lookup
+      if (callN === 2) return chain({ data: null, error: null }) // expire stale
+      if (callN === 3) {
         // Select active coupons for used-order cleanup
         return chain({ data: [{ id: 'c1', code: 'MESO-XYZ' }], error: null })
       }
-      if (callN === 3 && table === 'orders_orders') {
+      if (callN === 4 && table === 'orders_orders') {
         // Check if coupon code was used in an order — not used
         return chain({ data: null, error: null })
       }
-      if (callN === 4) {
+      if (callN === 5) {
         // Final fetch of active coupon
         return chain({
           data: {
@@ -538,6 +581,7 @@ describe('GET /api/loyalty/active-coupon', () => {
             free_product_name: null,
             expires_at: '2026-03-01T00:00:00.000Z',
             source: 'reward',
+            points_spent: 100,
           },
           error: null,
         })
@@ -559,9 +603,10 @@ describe('GET /api/loyalty/active-coupon', () => {
     let callN = 0
     mockAdminFrom.mockImplementation(() => {
       callN++
-      if (callN === 1) return chain({ data: null, error: null }) // expire stale
-      if (callN === 2) return chain({ data: null, error: null }) // select active for cleanup — none found
-      if (callN === 3) return chain({ data: null, error: null }) // final fetch — no active coupon
+      if (callN === 1) return chain({ data: { id: 'customer-1' }, error: null }) // customer lookup
+      if (callN === 2) return chain({ data: null, error: null }) // expire stale
+      if (callN === 3) return chain({ data: null, error: null }) // select active for cleanup — none found
+      if (callN === 4) return chain({ data: null, error: null }) // final fetch — no active coupon
       return chain({ data: null, error: null })
     })
 
@@ -576,19 +621,19 @@ describe('GET /api/loyalty/active-coupon', () => {
     const fromCalls: string[] = []
     mockAdminFrom.mockImplementation((table: string) => {
       fromCalls.push(table)
+      if (table === 'crm_customers') {
+        return chain({ data: { id: 'customer-1' }, error: null })
+      }
       return chain({ data: null, error: null })
     })
 
     await GET()
 
-    // Call 1: expire stale coupons (crm_customer_coupons)
-    expect(fromCalls[0]).toBe('crm_customer_coupons')
-    // Call 2: select active coupons for used-order cleanup (crm_customer_coupons)
+    expect(fromCalls[0]).toBe('crm_customers')
     expect(fromCalls[1]).toBe('crm_customer_coupons')
-    // Call 3: final fetch of active coupon (crm_customer_coupons)
     expect(fromCalls[2]).toBe('crm_customer_coupons')
-    // No active coupons found → no orders check → 3 calls total
-    expect(fromCalls.length).toBe(3)
+    expect(fromCalls[3]).toBe('crm_customer_coupons')
+    expect(fromCalls.length).toBe(4)
   })
 
   it('marks coupon as used when matching paid order found', async () => {
@@ -599,20 +644,21 @@ describe('GET /api/loyalty/active-coupon', () => {
     mockAdminFrom.mockImplementation((table: string) => {
       fromCalls.push(table)
       callN++
-      if (callN === 1) return chain({ data: null, error: null }) // expire stale
-      if (callN === 2) {
+      if (callN === 1) return chain({ data: { id: 'customer-1' }, error: null }) // customer lookup
+      if (callN === 2) return chain({ data: null, error: null }) // expire stale
+      if (callN === 3) {
         // Select active coupons — one found
         return chain({ data: [{ id: 'c1', code: 'MESO-USED1' }], error: null })
       }
-      if (callN === 3 && table === 'orders_orders') {
+      if (callN === 4 && table === 'orders_orders') {
         // Order found that used this coupon code
         return chain({ data: { id: 999 }, error: null })
       }
-      if (callN === 4 && table === 'crm_customer_coupons') {
+      if (callN === 5 && table === 'crm_customer_coupons') {
         // Update coupon to 'used'
         return chain({ data: null, error: null })
       }
-      if (callN === 5) {
+      if (callN === 6) {
         // Final fetch — no more active coupons (it was marked used)
         return chain({ data: null, error: null })
       }
@@ -624,14 +670,64 @@ describe('GET /api/loyalty/active-coupon', () => {
 
     // Coupon was used, so none returned
     expect(json.coupon).toBeNull()
-    // Verify the sequence: expire, select-active, check-orders, update-used, final-fetch
     expect(fromCalls).toEqual([
+      'crm_customers',
       'crm_customer_coupons', // expire stale
       'crm_customer_coupons', // select active for cleanup
       'orders_orders',         // check if coupon code used in order
       'crm_customer_coupons', // mark as used
       'crm_customer_coupons', // final fetch
     ])
+  })
+})
+
+// ===========================================================================
+// deactivate-coupon (POST)
+// ===========================================================================
+
+describe('POST /api/loyalty/deactivate-coupon', () => {
+  let POST: () => Promise<Response>
+
+  beforeEach(async () => {
+    const mod = await import('../deactivate-coupon/route')
+    POST = mod.POST
+  })
+
+  it('returns 404 when there is no active coupon', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    let callN = 0
+    mockAdminFrom.mockImplementation(() => {
+      callN++
+      if (callN === 1) return chain({ data: { id: 'customer-1' }, error: null })
+      if (callN === 2) return chain({ data: null, error: null })
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST()
+    expect(res.status).toBe(404)
+  })
+
+  it('marks the coupon as cancelled without refunding points', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    const fromCalls: string[] = []
+    let callN = 0
+    mockAdminFrom.mockImplementation((table: string) => {
+      fromCalls.push(table)
+      callN++
+      if (callN === 1) return chain({ data: { id: 'customer-1' }, error: null })
+      if (callN === 2) return chain({ data: { id: 'coupon-1' }, error: null })
+      if (callN === 3) return chain({ data: { id: 'coupon-1' }, error: null })
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST()
+    expect(res.status).toBe(200)
+
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(fromCalls).toEqual(['crm_customers', 'crm_customer_coupons', 'crm_customer_coupons'])
   })
 })
 
@@ -657,8 +753,10 @@ describe('GET /api/loyalty/history', () => {
   it('returns paginated history', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
 
-    // The history route uses the auth supabase client (not admin) for querying
-    mockAuthFrom.mockImplementation(() => {
+    mockAuthFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({ data: { id: 'customer-1' }, error: null })
+      }
       return chain({
         data: [
           { id: 'h1', label: 'Zamowienie #1001', amount: 42, reason: 'earned', created_at: '2026-02-20T12:00:00Z' },
@@ -683,7 +781,10 @@ describe('GET /api/loyalty/history', () => {
   it('returns empty history when no records', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
 
-    mockAuthFrom.mockImplementation(() => {
+    mockAuthFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({ data: { id: 'customer-1' }, error: null })
+      }
       return chain({
         data: [],
         error: null,
@@ -705,6 +806,9 @@ describe('GET /api/loyalty/history', () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
 
     mockAuthFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({ data: { id: 'customer-1' }, error: null })
+      }
       if (table === 'crm_loyalty_transactions') {
         return chain({
           data: [
@@ -758,6 +862,9 @@ describe('GET /api/loyalty/history', () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
 
     mockAuthFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({ data: { id: 'customer-1' }, error: null })
+      }
       if (table === 'crm_loyalty_transactions') {
         return chain({
           data: [
@@ -820,7 +927,7 @@ describe('POST /api/loyalty/apply-referral', () => {
   it('returns 401 when not authenticated', async () => {
     mockGetUser.mockResolvedValue({ data: { user: null } })
 
-    const res = await POST(makeRequest('POST', { referral_phone: '500100200' }))
+    const res = await POST(makeRequest('POST', { referral_input: '500100200' }))
     expect(res.status).toBe(401)
   })
 
@@ -831,7 +938,7 @@ describe('POST /api/loyalty/apply-referral', () => {
     expect(res.status).toBe(400)
 
     const json = await res.json()
-    expect(json.error).toContain('telefon')
+    expect(json.error).toContain('kodu lub numeru')
   })
 
   it('returns 409 when user already has a referrer', async () => {
@@ -843,15 +950,63 @@ describe('POST /api/loyalty/apply-referral', () => {
       if (callN === 1) {
         // current customer -- already has referred_by
         return chain({
-          data: { id: USER_ID, referred_by: 'someone-else', phone: '500000001' },
+          data: { id: 'customer-1', referred_by: 'someone-else', phone: '500000001', referral_code: 'MESO-ME' },
+          error: null,
+        })
+      }
+      if (callN === 2) {
+        return chain({ data: null, error: null }) // code lookup miss
+      }
+      if (callN === 3) {
+        return chain({
+          data: { id: 'referrer-1', phone: '500100200' },
           error: null,
         })
       }
       return chain({ data: null, error: null })
     })
 
-    const res = await POST(makeRequest('POST', { referral_phone: '500100200' }))
+    const res = await POST(makeRequest('POST', { referral_input: '500100200' }))
     expect(res.status).toBe(409)
+  })
+
+  it('returns 200 when the same referral is retried and welcome coupon already exists', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    let callN = 0
+    mockAdminFrom.mockImplementation(() => {
+      callN++
+      if (callN === 1) {
+        return chain({
+          data: { id: 'customer-1', referred_by: 'referrer-1', phone: '500000001', referral_code: 'MESO-ME' },
+          error: null,
+        })
+      }
+      if (callN === 2) {
+        return chain({ data: null, error: null }) // code lookup miss
+      }
+      if (callN === 3) {
+        return chain({
+          data: { id: 'referrer-1', phone: '500100200' },
+          error: null,
+        })
+      }
+      if (callN === 4) {
+        return chain({
+          data: { code: 'WELCOME-ABCDE' },
+          error: null,
+        })
+      }
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(makeRequest('POST', { referral_input: '500100200' }))
+    expect(res.status).toBe(200)
+
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(json.coupon_code).toBe('WELCOME-ABCDE')
+    expect(json.applied_via).toBe('phone')
   })
 
   it('returns 404 when referrer phone not found', async () => {
@@ -862,22 +1017,25 @@ describe('POST /api/loyalty/apply-referral', () => {
       callN++
       if (callN === 1) {
         return chain({
-          data: { id: USER_ID, referred_by: null, phone: '500000001' },
+          data: { id: 'customer-1', referred_by: null, phone: '500000001', referral_code: 'MESO-ME' },
           error: null,
         })
       }
       if (callN === 2) {
-        // referrer lookup -- not found
+        return chain({ data: null, error: null }) // code lookup
+      }
+      if (callN === 3) {
+        // referrer lookup by phone -- not found
         return chain({ data: null, error: null })
       }
       return chain({ data: null, error: null })
     })
 
-    const res = await POST(makeRequest('POST', { referral_phone: '999999999' }))
+    const res = await POST(makeRequest('POST', { referral_input: '999999999' }))
     expect(res.status).toBe(404)
 
     const json = await res.json()
-    expect(json.error).toContain('telefon')
+    expect(json.error).toContain('kodem lub numerem')
   })
 
   it('returns 400 when referrer has no delivered orders', async () => {
@@ -888,25 +1046,28 @@ describe('POST /api/loyalty/apply-referral', () => {
       callN++
       if (callN === 1) {
         return chain({
-          data: { id: USER_ID, referred_by: null, phone: '500000001' },
+          data: { id: 'customer-1', referred_by: null, phone: '500000001', referral_code: 'MESO-ME' },
           error: null,
         })
       }
       if (callN === 2) {
+        return chain({ data: null, error: null }) // code lookup miss
+      }
+      if (callN === 3) {
         // referrer found
         return chain({
           data: { id: 'referrer-1', phone: '500100200' },
           error: null,
         })
       }
-      if (callN === 3) {
+      if (callN === 4) {
         // delivered orders count = 0
         return chain({ data: null, error: null, count: 0 })
       }
       return chain({ data: null, error: null })
     })
 
-    const res = await POST(makeRequest('POST', { referral_phone: '500100200' }))
+    const res = await POST(makeRequest('POST', { referral_input: '500100200' }))
     expect(res.status).toBe(400)
 
     const json = await res.json()
@@ -921,28 +1082,31 @@ describe('POST /api/loyalty/apply-referral', () => {
       callN++
       if (callN === 1) {
         return chain({
-          data: { id: USER_ID, referred_by: null, phone: '500000001' },
+          data: { id: 'customer-1', referred_by: null, phone: '500000001', referral_code: 'MESO-ME' },
           error: null,
         })
       }
       if (callN === 2) {
+        return chain({ data: null, error: null }) // code lookup miss
+      }
+      if (callN === 3) {
         return chain({
           data: { id: 'referrer-1', phone: '500100200' },
           error: null,
         })
       }
-      if (callN === 3) {
+      if (callN === 4) {
         // 1 delivered order
         return chain({ data: null, error: null, count: 1 })
       }
-      if (callN === 4) {
+      if (callN === 5) {
         // monthly referrals = 10 (at limit)
         return chain({ data: null, error: null, count: 10 })
       }
       return chain({ data: null, error: null })
     })
 
-    const res = await POST(makeRequest('POST', { referral_phone: '500100200' }))
+    const res = await POST(makeRequest('POST', { referral_input: '500100200' }))
     expect(res.status).toBe(429)
 
     const json = await res.json()
@@ -958,7 +1122,56 @@ describe('POST /api/loyalty/apply-referral', () => {
       callN++
       if (callN === 1) {
         return chain({
-          data: { id: USER_ID, referred_by: null, phone: '500000001' },
+          data: { id: 'customer-1', referred_by: null, phone: '500000001', referral_code: 'MESO-ME' },
+          error: null,
+        })
+      }
+      if (callN === 2) {
+        return chain({ data: null, error: null }) // code lookup miss
+      }
+      if (callN === 3) {
+        return chain({
+          data: { id: 'referrer-1', phone: '500100200' },
+          error: null,
+        })
+      }
+      if (callN === 4) {
+        // delivered orders
+        return chain({ data: null, error: null, count: 3 })
+      }
+      if (callN === 5) {
+        // monthly referrals = 2 (under limit)
+        return chain({ data: null, error: null, count: 2 })
+      }
+      if (callN >= 6) {
+        insertedTables.push(table)
+      }
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(makeRequest('POST', { referral_input: '500100200' }))
+    expect(res.status).toBe(200)
+
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(json.coupon_code).toBe('WELCOME-ABCDE')
+    expect(json.message).toContain('Gyoza')
+    expect(json.applied_via).toBe('phone')
+
+    // Verify that customers table was updated and loyalty_coupons was inserted
+    expect(insertedTables).toContain('crm_customers')
+    expect(insertedTables).toContain('crm_customer_coupons')
+  })
+
+  it('returns 200 and resolves referrer by referral code', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID } } })
+
+    let callN = 0
+    mockAdminFrom.mockImplementation(() => {
+      callN++
+      if (callN === 1) {
+        return chain({
+          data: { id: 'customer-1', referred_by: null, phone: '500000001', referral_code: 'MESO-ME' },
           error: null,
         })
       }
@@ -968,32 +1181,15 @@ describe('POST /api/loyalty/apply-referral', () => {
           error: null,
         })
       }
-      if (callN === 3) {
-        // delivered orders
-        return chain({ data: null, error: null, count: 3 })
-      }
-      if (callN === 4) {
-        // monthly referrals = 2 (under limit)
-        return chain({ data: null, error: null, count: 2 })
-      }
-      // callN 5: update referred_by
-      // callN 6: insert coupon
-      if (callN >= 5) {
-        insertedTables.push(table)
-      }
+      if (callN === 3) return chain({ data: null, error: null, count: 1 })
+      if (callN === 4) return chain({ data: null, error: null, count: 0 })
       return chain({ data: null, error: null })
     })
 
-    const res = await POST(makeRequest('POST', { referral_phone: '500100200' }))
+    const res = await POST(makeRequest('POST', { referral_input: 'meso-abc12' }))
     expect(res.status).toBe(200)
 
     const json = await res.json()
-    expect(json.success).toBe(true)
-    expect(json.coupon_code).toBe('WELCOME-ABCDE')
-    expect(json.message).toContain('Gyoza')
-
-    // Verify that customers table was updated and loyalty_coupons was inserted
-    expect(insertedTables).toContain('crm_customers')
-    expect(insertedTables).toContain('crm_customer_coupons')
+    expect(json.applied_via).toBe('code')
   })
 })

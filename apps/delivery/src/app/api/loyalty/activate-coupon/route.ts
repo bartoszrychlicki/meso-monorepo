@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 import { nanoid } from 'nanoid'
 
 function generateCouponCode(): string {
@@ -24,25 +25,41 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminClient()
+    const customer = await fetchCustomerByAuthId<{
+      id: string
+      loyalty_points: number
+      loyalty_tier: string | null
+    }>(
+      admin,
+      user.id,
+      'id, loyalty_points, loyalty_tier'
+    )
+
+    if (!customer) {
+      return NextResponse.json({ error: 'Nie znaleziono klienta' }, { status: 404 })
+    }
 
     // Check for existing active coupon (expire stale ones first)
     await admin
       .from('crm_customer_coupons')
       .update({ status: 'expired' })
-      .eq('customer_id', user.id)
+      .eq('customer_id', customer.id)
       .eq('status', 'active')
       .lt('expires_at', new Date().toISOString())
 
     const { data: activeCoupon } = await admin
       .from('crm_customer_coupons')
-      .select('id')
-      .eq('customer_id', user.id)
+      .select('id, code, coupon_type, discount_value, free_product_name, expires_at, points_spent')
+      .eq('customer_id', customer.id)
       .eq('status', 'active')
       .maybeSingle()
 
     if (activeCoupon) {
       return NextResponse.json(
-        { error: 'Masz już aktywny kupon. Użyj go lub poczekaj aż wygaśnie.' },
+        {
+          error: 'Masz już aktywny kupon. Użyj go lub poczekaj aż wygaśnie.',
+          coupon: activeCoupon,
+        },
         { status: 409 }
       )
     }
@@ -57,17 +74,6 @@ export async function POST(request: NextRequest) {
 
     if (rewardError || !reward) {
       return NextResponse.json({ error: 'Nagroda nie istnieje' }, { status: 404 })
-    }
-
-    // Fetch customer
-    const { data: customer, error: customerError } = await admin
-      .from('crm_customers')
-      .select('loyalty_points, loyalty_tier')
-      .eq('id', user.id)
-      .single()
-
-    if (customerError || !customer) {
-      return NextResponse.json({ error: 'Nie znaleziono klienta' }, { status: 404 })
     }
 
     // Check points
@@ -138,7 +144,7 @@ export async function POST(request: NextRequest) {
     const { error: pointsError } = await admin
       .from('crm_customers')
       .update({ loyalty_points: customer.loyalty_points - reward.points_cost })
-      .eq('id', user.id)
+      .eq('id', customer.id)
 
     if (pointsError) {
       return NextResponse.json({ error: 'Błąd przy odejmowaniu punktów' }, { status: 500 })
@@ -148,7 +154,8 @@ export async function POST(request: NextRequest) {
     const { data: coupon, error: couponError } = await admin
       .from('crm_customer_coupons')
       .insert({
-        customer_id: user.id,
+        customer_id: customer.id,
+        promotion_id: null,
         code,
         coupon_type: reward.reward_type,
         discount_value: computedDiscountValue,
@@ -166,7 +173,7 @@ export async function POST(request: NextRequest) {
       await admin
         .from('crm_customers')
         .update({ loyalty_points: customer.loyalty_points })
-        .eq('id', user.id)
+        .eq('id', customer.id)
       return NextResponse.json({ error: 'Błąd przy tworzeniu kuponu' }, { status: 500 })
     }
 
@@ -174,7 +181,7 @@ export async function POST(request: NextRequest) {
     await admin
       .from('crm_loyalty_transactions')
       .insert({
-        customer_id: user.id,
+        customer_id: customer.id,
         description: `Kupon: ${reward.name}`,
         amount: -reward.points_cost,
         reason: 'spent',
@@ -188,6 +195,7 @@ export async function POST(request: NextRequest) {
         discount_value: coupon.discount_value,
         free_product_name: coupon.free_product_name,
         expires_at: coupon.expires_at,
+        points_spent: coupon.points_spent,
       }
     })
 

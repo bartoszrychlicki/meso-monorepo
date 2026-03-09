@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useCartStore } from '@/stores/cartStore'
 import { useAuth } from '@/hooks/useAuth'
 import { createOrderAction } from '@/app/actions/create-order'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 import type { AddressFormData, DeliveryFormData, PaymentFormData } from '@/lib/validators/checkout'
 import { OrderChannel, OrderSource, ModifierAction, PaymentMethod, PaymentStatus } from '@meso/core'
 
@@ -104,6 +105,11 @@ export function useCheckout() {
             if (!user) throw new Error('Musisz być zalogowany, aby złożyć zamówienie')
             if (items.length === 0) throw new Error('Twój koszyk jest pusty')
 
+            const customer = await fetchCustomerByAuthId<{ id: string }>(supabase, user.id, 'id')
+            if (!customer) {
+                throw new Error('Nie znaleziono profilu klienta')
+            }
+
             const isPayOnPickup = paymentData.method === 'pay_on_pickup'
             const externalOrderId = crypto.randomUUID()
 
@@ -137,7 +143,7 @@ export function useCheckout() {
                 channel: OrderChannel.DELIVERY_APP,
                 source: OrderSource.DELIVERY,
                 location_id: locations.id,
-                customer_id: user.id,
+                customer_id: customer.id,
                 customer_name: customerFields.customer_name || undefined,
                 customer_phone: customerFields.customer_phone || undefined,
                 delivery_address: {
@@ -171,6 +177,7 @@ export function useCheckout() {
                 discount: getDiscount(),
                 delivery_fee: getDeliveryFee() + getPaymentFee(),
                 tip,
+                loyalty_points_used: loyaltyCoupon?.points_spent ?? 0,
                 promo_code: promoCode || loyaltyCoupon?.code || undefined,
                 delivery_type: deliveryData.type as 'delivery' | 'pickup',
                 scheduled_time: scheduledTimestamp,
@@ -190,7 +197,7 @@ export function useCheckout() {
                 await supabase
                     .from('crm_customers')
                     .update(profileUpdate)
-                    .eq('id', user.id)
+                    .eq('auth_id', user.id)
             }
 
             // 3. Mark loyalty coupon as used via server endpoint

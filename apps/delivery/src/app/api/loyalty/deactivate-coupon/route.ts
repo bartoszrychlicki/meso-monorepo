@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 
 export async function POST() {
   try {
@@ -12,12 +13,16 @@ export async function POST() {
     }
 
     const admin = createAdminClient()
+    const customer = await fetchCustomerByAuthId<{ id: string }>(admin, user.id, 'id')
+    if (!customer) {
+      return NextResponse.json({ error: 'Nie znaleziono klienta' }, { status: 404 })
+    }
 
     // Find active coupon
     const { data: coupon } = await admin
       .from('crm_customer_coupons')
       .select('id')
-      .eq('customer_id', user.id)
+      .eq('customer_id', customer.id)
       .eq('status', 'active')
       .gt('expires_at', new Date().toISOString())
       .maybeSingle()

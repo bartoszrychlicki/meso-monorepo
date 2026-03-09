@@ -7,12 +7,12 @@
 import { LoyaltyTier } from '@/types/enums';
 
 /**
- * Tier configuration with point thresholds and multipliers
+ * Tier configuration with point thresholds.
  */
 const TIER_THRESHOLDS = {
   [LoyaltyTier.BRONZE]: { min: 0, max: 499, multiplier: 1.0 },
-  [LoyaltyTier.SILVER]: { min: 500, max: 1499, multiplier: 1.25 },
-  [LoyaltyTier.GOLD]: { min: 1500, max: Infinity, multiplier: 1.5 },
+  [LoyaltyTier.SILVER]: { min: 500, max: 1499, multiplier: 1.0 },
+  [LoyaltyTier.GOLD]: { min: 1500, max: Infinity, multiplier: 1.0 },
 } as const;
 
 /**
@@ -58,23 +58,22 @@ export function getTierMultiplier(tier: LoyaltyTier): number {
 /**
  * Calculate points earned from an order
  *
- * Formula: Points = OrderAmount × TierMultiplier (rounded down)
+ * Formula: Points = OrderAmount (rounded down)
  *
  * @param orderAmount - Order total in PLN
- * @param tier - Customer's current loyalty tier
+ * @param tier - Kept for backwards compatibility; tiers no longer multiply points
  * @returns Calculated points (integer)
  *
  * @example
  * calculatePointsFromOrder(100, LoyaltyTier.BRONZE)  // 100 points
- * calculatePointsFromOrder(100, LoyaltyTier.SILVER)  // 125 points
- * calculatePointsFromOrder(100, LoyaltyTier.GOLD)    // 150 points
+ * calculatePointsFromOrder(100, LoyaltyTier.SILVER)  // 100 points
+ * calculatePointsFromOrder(100, LoyaltyTier.GOLD)    // 100 points
  */
 export function calculatePointsFromOrder(
   orderAmount: number,
-  tier: LoyaltyTier
+  _tier?: LoyaltyTier
 ): number {
-  const multiplier = getTierMultiplier(tier);
-  return Math.floor(orderAmount * multiplier);
+  return Math.floor(orderAmount);
 }
 
 /**

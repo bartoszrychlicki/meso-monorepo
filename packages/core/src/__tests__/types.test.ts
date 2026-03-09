@@ -9,6 +9,7 @@ describe('@meso/core types', () => {
     expectTypeOf<Order>().toHaveProperty('delivery_fee');
     expectTypeOf<Order>().toHaveProperty('tip');
     expectTypeOf<Order>().toHaveProperty('promo_code');
+    expectTypeOf<Order>().toHaveProperty('loyalty_points_used');
   });
 
   it('OrderItemModifier uses ModifierAction enum', () => {

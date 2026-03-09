@@ -6,11 +6,12 @@ vi.mock('@/lib/api/auth', () => ({
   isApiKey: vi.fn(),
 }))
 
-vi.mock('@/modules/orders/repository', () => ({
-  ordersRepository: {
-    findById: vi.fn(),
-    awardLoyaltyPoints: vi.fn(),
-  },
+vi.mock('@/modules/orders/server-loyalty', () => ({
+  awardOrderLoyaltyPoints: vi.fn(),
+}))
+
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: vi.fn(() => ({ mocked: true })),
 }))
 
 const mockServerRepo = {
@@ -29,12 +30,13 @@ vi.mock('@/lib/webhooks/dispatcher', () => ({
 }))
 
 import { authorizeRequest, isApiKey } from '@/lib/api/auth'
-import { ordersRepository } from '@/modules/orders/repository'
+import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty'
 import { PATCH } from '../orders/[id]/status/route'
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>
 const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>
 const mockFindById = mockServerRepo.findById as ReturnType<typeof vi.fn>
+const mockAwardOrderLoyaltyPoints = awardOrderLoyaltyPoints as ReturnType<typeof vi.fn>
 
 const validApiKey = {
   id: 'key-1',
@@ -113,5 +115,35 @@ describe('PATCH /api/v1/orders/:id/status', () => {
         payment_status: 'paid',
       })
     )
+  })
+
+  it('awards loyalty points through the server helper when order is delivered', async () => {
+    mockFindById.mockResolvedValue({
+      ...baseOrder,
+      status: 'ready',
+      customer_id: 'customer-1',
+    })
+    mockServerRepo.update.mockResolvedValue({
+      ...baseOrder,
+      status: 'delivered',
+      customer_id: 'customer-1',
+      payment_status: 'paid',
+      status_history: [
+        ...baseOrder.status_history,
+        { status: 'delivered', timestamp: '2026-03-03T10:10:00.000Z' },
+      ],
+    })
+    mockAwardOrderLoyaltyPoints.mockResolvedValue(120)
+
+    const res = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
+        status: 'delivered',
+        payment_status: 'paid',
+      }),
+      makeParams('order-1')
+    )
+
+    expect(res.status).toBe(200)
+    expect(mockAwardOrderLoyaltyPoints).toHaveBeenCalledTimes(1)
   })
 })

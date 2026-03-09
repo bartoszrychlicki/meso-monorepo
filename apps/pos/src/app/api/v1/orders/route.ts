@@ -8,6 +8,7 @@ import {
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { createServiceClient } from '@/lib/supabase/server';
+import { estimateOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { CreateOrderSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
 import type { Product } from '@/types/menu';
@@ -268,7 +269,13 @@ export async function POST(request: NextRequest) {
   const discount = input.discount ?? 0;
   const deliveryFee = input.delivery_fee ?? 0;
   const tip = input.tip ?? 0;
+  const loyaltyPointsUsed = input.loyalty_points_used ?? 0;
   const total = roundCurrency(subtotal - discount + deliveryFee + tip);
+  const loyaltyPointsEarned = await estimateOrderLoyaltyPoints(
+    serviceClient,
+    input.customer_id,
+    total
+  );
 
   // Delivery app orders with pre-paid or pay-on-pickup status start as CONFIRMED
   const isDeliveryConfirmed =
@@ -321,6 +328,8 @@ export async function POST(request: NextRequest) {
     scheduled_time: input.scheduled_time,
     confirmed_at: isDeliveryConfirmed ? now : undefined,
     paid_at: input.payment_status === PaymentStatus.PAID ? now : undefined,
+    loyalty_points_earned: loyaltyPointsEarned,
+    loyalty_points_used: loyaltyPointsUsed,
   };
 
   // Relational rows are inserted transactionally inside RPC.

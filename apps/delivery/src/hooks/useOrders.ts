@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 import { useAuth } from './useAuth'
 import type { OrderWithItems, OrderStatus } from '@/types/order'
 
@@ -36,6 +37,12 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
 
         try {
             const supabase = createClient()
+            const customer = await fetchCustomerByAuthId<{ id: string }>(supabase, user.id, 'id')
+
+            if (!customer) {
+                setOrders([])
+                return
+            }
 
             let query = supabase
                 .from('orders_orders')
@@ -47,7 +54,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
           ),
           location:users_locations(name, address, phone)
         `)
-                .eq('customer_id', user.id)
+                .eq('customer_id', customer.id)
                 .order('created_at', { ascending: false })
                 .limit(limit)
 

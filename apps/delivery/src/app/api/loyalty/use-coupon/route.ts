@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchCustomerByAuthId } from '@/lib/customers'
 
 type UseCouponRequest = {
   couponId?: string
@@ -31,12 +32,17 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
     const now = new Date().toISOString()
+    const customer = await fetchCustomerByAuthId<{ id: string }>(admin, user.id, 'id')
+
+    if (!customer) {
+      return NextResponse.json({ error: 'Nie znaleziono klienta' }, { status: 404 })
+    }
 
     const { data: order, error: orderError } = await admin
       .from('orders_orders')
       .select('id')
       .eq('id', orderId)
-      .eq('customer_id', user.id)
+      .eq('customer_id', customer.id)
       .maybeSingle()
 
     if (orderError) {
@@ -49,9 +55,9 @@ export async function POST(request: NextRequest) {
 
     const { data: coupon, error: couponError } = await admin
       .from('crm_customer_coupons')
-      .select('id, status, expires_at')
+      .select('id, status, expires_at, order_id, points_spent')
       .eq('id', couponId)
-      .eq('customer_id', user.id)
+      .eq('customer_id', customer.id)
       .maybeSingle()
 
     if (couponError) {
@@ -60,6 +66,16 @@ export async function POST(request: NextRequest) {
 
     if (!coupon) {
       return NextResponse.json({ error: 'Kupon nie istnieje' }, { status: 404 })
+    }
+
+    if (coupon.status === 'used' && coupon.order_id === orderId) {
+      await admin
+        .from('orders_orders')
+        .update({ loyalty_points_used: coupon.points_spent ?? 0 })
+        .eq('id', orderId)
+        .eq('customer_id', customer.id)
+
+      return NextResponse.json({ success: true })
     }
 
     if (coupon.status !== 'active' || coupon.expires_at <= now) {
@@ -74,7 +90,7 @@ export async function POST(request: NextRequest) {
         order_id: orderId,
       })
       .eq('id', couponId)
-      .eq('customer_id', user.id)
+      .eq('customer_id', customer.id)
       .eq('status', 'active')
       .gt('expires_at', now)
       .select('id')
@@ -87,6 +103,12 @@ export async function POST(request: NextRequest) {
     if (!updatedCoupon) {
       return NextResponse.json({ error: 'Kupon nie jest już aktywny' }, { status: 409 })
     }
+
+    await admin
+      .from('orders_orders')
+      .update({ loyalty_points_used: coupon.points_spent ?? 0 })
+      .eq('id', orderId)
+      .eq('customer_id', customer.id)
 
     return NextResponse.json({ success: true })
   } catch {

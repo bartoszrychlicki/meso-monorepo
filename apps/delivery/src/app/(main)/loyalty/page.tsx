@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Gift, Truck, Percent, UtensilsCrossed, ArrowLeft, Loader2, CircleHelp, Lock, AlertCircle } from 'lucide-react'
+import { Gift, Truck, Percent, UtensilsCrossed, ArrowLeft, Loader2, CircleHelp, Lock, AlertCircle, Copy } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
@@ -62,7 +62,7 @@ function getTierFromLifetimePoints(
 
 export default function LoyaltyPage() {
   const { isPermanent, isLoading: authLoading } = useAuth()
-  const { points, lifetimePoints, isLoading: loyaltyLoading, refresh: refreshLoyalty } = useCustomerLoyalty()
+  const { points, lifetimePoints, referralCode, isLoading: loyaltyLoading, refresh: refreshLoyalty } = useCustomerLoyalty()
   const { rewards, isLoading: rewardsLoading } = useLoyaltyRewards()
   const { getValue, isLoading: configLoading } = useAppConfig()
   const [activeTab, setActiveTab] = useState<'rewards' | 'history'>('rewards')
@@ -192,6 +192,17 @@ export default function LoyaltyPage() {
 
   const hasActiveCoupon = !!activeCoupon
 
+  const handleCopyReferralCode = async () => {
+    if (!referralCode) return
+
+    try {
+      await navigator.clipboard.writeText(referralCode)
+      toast.success('Kod polecający skopiowany')
+    } catch {
+      toast.error('Nie udało się skopiować kodu')
+    }
+  }
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 space-y-6">
       {/* Back button */}
@@ -258,6 +269,31 @@ export default function LoyaltyPage() {
           </div>
         </div>
       </motion.div>
+
+      <div className="rounded-xl border border-border bg-card p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Twój kod polecający</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Udostępnij kod lub swój numer telefonu. Nowy klient dostanie kupon powitalny, a Ty otrzymasz 100 pkt po jego pierwszym odebranym zamówieniu.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleCopyReferralCode}
+            disabled={!referralCode}
+            className="shrink-0"
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Kopiuj
+          </Button>
+        </div>
+        <div className="mt-3 rounded-lg bg-secondary px-3 py-2 font-mono text-sm tracking-[0.2em] text-foreground">
+          {referralCode || 'Kod polecający będzie dostępny po pełnej aktywacji konta'}
+        </div>
+      </div>
 
       {/* Active Coupon Banner */}
       {activeCoupon && (

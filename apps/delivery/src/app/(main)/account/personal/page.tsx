@@ -44,7 +44,7 @@ export default function PersonalPage() {
       const { data } = await supabase
         .from('crm_customers')
         .select('first_name, last_name, email, phone, birth_date')
-        .eq('id', user!.id)
+        .eq('auth_id', user!.id)
         .single()
 
       if (data) {
@@ -86,7 +86,7 @@ export default function PersonalPage() {
         phone: form.phone || null,
         birth_date: form.birthday || null,
       })
-      .eq('id', user.id)
+      .eq('auth_id', user.id)
 
     setIsSaving(false)
     setSaved(true)
