@@ -24,6 +24,8 @@ const recipeVersionsRepo = createRepository<RecipeVersion>('recipe_versions');
 const usageLogsRepo = createRepository<IngredientUsageLog>('ingredient_usage_logs');
 const productsRepo = createRepository<Product>('products');
 
+const MAX_FOOD_COST_PERCENTAGE = 999.99;
+
 type ResolvedRecipe = {
   allergenSources: AllergenSource[];
   allergens: Allergen[];
@@ -34,6 +36,26 @@ type RecipeContext = {
   recipes: Map<string, Recipe>;
   stockItems: Map<string, StockItem>;
 };
+
+function roundFoodCostPercentage(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function calculateFoodCostPercentageFromRecipe(
+  costPerUnit: number,
+  productPrice: number
+): number | null {
+  if (!Number.isFinite(costPerUnit) || costPerUnit < 0 || productPrice <= 0) {
+    return null;
+  }
+
+  const percentage = roundFoodCostPercentage((costPerUnit / productPrice) * 100);
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > MAX_FOOD_COST_PERCENTAGE) {
+    return null;
+  }
+
+  return percentage;
+}
 
 function formatRecipeNames(recipes: Recipe[]): string {
   return recipes
@@ -285,6 +307,42 @@ async function persistResolvedRecipe(
   });
 }
 
+async function syncLinkedMenuProductFoodCosts(recipes: Recipe[]): Promise<void> {
+  const recipeMap = new Map(
+    recipes
+      .filter((recipe) => recipe.is_active)
+      .map((recipe) => [recipe.id, recipe] as const)
+  );
+
+  if (recipeMap.size === 0) {
+    return;
+  }
+
+  const activeRecipeIds = new Set(recipeMap.keys());
+  const linkedProducts = await productsRepo.findMany(
+    (product) =>
+      product.is_active &&
+      typeof product.recipe_id === 'string' &&
+      activeRecipeIds.has(product.recipe_id)
+  );
+
+  await Promise.all(
+    linkedProducts.map(async (product) => {
+      const recipe = recipeMap.get(product.recipe_id!);
+      if (!recipe) return;
+
+      const foodCostPercentage = calculateFoodCostPercentageFromRecipe(
+        recipe.cost_per_unit,
+        product.price
+      );
+
+      await productsRepo.update(product.id, {
+        food_cost_percentage: foodCostPercentage,
+      });
+    })
+  );
+}
+
 async function validateRecipeDependenciesInternal(
   recipeId: string | null,
   recipeDraft: Pick<
@@ -395,6 +453,8 @@ export const recipesRepository = {
       context.recipes.set(currentRecipeId, persisted);
       updatedRecipes.push(persisted);
     }
+
+    await syncLinkedMenuProductFoodCosts(updatedRecipes);
 
     return updatedRecipes;
   },

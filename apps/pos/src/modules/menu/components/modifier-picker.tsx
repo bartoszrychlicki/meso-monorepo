@@ -22,6 +22,10 @@ interface ModifierPickerProps {
   ) => Promise<MenuModifier>;
 }
 
+function normalizeModifierIds(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
+}
+
 export function ModifierPicker({
   allModifiers,
   selectedModifierIds,
@@ -43,11 +47,11 @@ export function ModifierPicker({
     return [...selected, ...unselected];
   }, [allModifiers, search, selectedModifierIds]);
 
-  const handleToggle = (modifierId: string) => {
-    if (selectedModifierIds.includes(modifierId)) {
-      onChange(selectedModifierIds.filter((id) => id !== modifierId));
+  const handleToggle = (modifierId: string, checked: boolean | 'indeterminate') => {
+    if (checked) {
+      onChange(normalizeModifierIds([...selectedModifierIds, modifierId]));
     } else {
-      onChange([...selectedModifierIds, modifierId]);
+      onChange(selectedModifierIds.filter((id) => id !== modifierId));
     }
   };
 
@@ -66,7 +70,7 @@ export function ModifierPicker({
   ) => {
     const newModifier = await onCreateModifier(data);
     // Auto-select the newly created modifier
-    onChange([...selectedModifierIds, newModifier.id]);
+    onChange(normalizeModifierIds([...selectedModifierIds, newModifier.id]));
   };
 
   return (
@@ -124,7 +128,7 @@ export function ModifierPicker({
                 )}
                 <Checkbox
                   checked={isSelected}
-                  onCheckedChange={() => handleToggle(modifier.id)}
+                  onCheckedChange={(checked) => handleToggle(modifier.id, checked)}
                   data-action="toggle-modifier"
                   aria-label={`Toggle ${modifier.name}`}
                 />

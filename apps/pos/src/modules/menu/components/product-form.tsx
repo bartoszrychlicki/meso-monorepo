@@ -81,6 +81,10 @@ function extractModifierIdsFromLegacyGroups(groups?: Product['modifier_groups'])
   return [...new Set(ids)];
 }
 
+function normalizeModifierIds(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
+}
+
 function buildLegacyModifierGroups(
   selectedModifierIds: string[],
   allModifiers: MenuModifier[],
@@ -287,7 +291,7 @@ export function ProductForm({
 
   const handleModifierIdsChange = (modifierIds: string[]) => {
     setModifierSelectionTouched(true);
-    setSelectedModifierIds(modifierIds);
+    setSelectedModifierIds(normalizeModifierIds(modifierIds));
   };
 
   const isPromotionPriceInvalid = isPromotionEnabled && (promoPrice <= 0 || promoPrice >= price);
@@ -310,8 +314,9 @@ export function ProductForm({
 
     const selectedCategory = categories.find((c) => c.id === categoryId);
     const existingModifierGroups = product?.modifier_groups ?? [];
+    const normalizedModifierIds = normalizeModifierIds(selectedModifierIds);
     const nextModifierGroups = buildLegacyModifierGroups(
-      selectedModifierIds,
+      normalizedModifierIds,
       allModifiers,
       existingModifierGroups
     );
@@ -354,7 +359,7 @@ export function ProductForm({
       point_ids: product?.point_ids ?? [],
       pricing: product?.pricing ?? createDefaultPricing(effectivePrice, 2),
     };
-    onSubmit(data, selectedModifierIds);
+    onSubmit(data, normalizedModifierIds);
   };
 
   const canGoNext = () => {

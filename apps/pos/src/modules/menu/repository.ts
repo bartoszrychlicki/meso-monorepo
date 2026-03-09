@@ -9,6 +9,12 @@ export const modifierGroupsRepository = createRepository<ModifierGroup>('modifie
 export const modifiersRepository = createRepository<MenuModifier>('modifiers');
 export const recipesRepository = createRepository<Recipe>('recipes');
 
+const MAX_FOOD_COST_PERCENTAGE = 999.99;
+
+function normalizeModifierIds(ids: string[]): string[] {
+  return [...new Set(ids.filter(Boolean))];
+}
+
 function roundFoodCostPercentage(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -25,7 +31,12 @@ export async function calculateProductFoodCostPercentage(
 
   if (!Number.isFinite(costPerUnit) || costPerUnit < 0) return null;
 
-  return roundFoodCostPercentage((costPerUnit / productPrice) * 100);
+  const percentage = roundFoodCostPercentage((costPerUnit / productPrice) * 100);
+  if (!Number.isFinite(percentage) || percentage < 0 || percentage > MAX_FOOD_COST_PERCENTAGE) {
+    return null;
+  }
+
+  return percentage;
 }
 
 export async function createProductWithFoodCost(
@@ -102,14 +113,15 @@ export async function getProductModifierIds(productId: string): Promise<string[]
 
 /** Set modifiers for a product (replace all) */
 export async function setProductModifiers(productId: string, modifierIds: string[]): Promise<void> {
+  const normalizedModifierIds = normalizeModifierIds(modifierIds);
   const { error: delError } = await supabase
     .from('product_modifiers')
     .delete()
     .eq('product_id', productId);
   if (delError) throw new Error(`setProductModifiers delete failed: ${delError.message}`);
 
-  if (modifierIds.length > 0) {
-    const rows = modifierIds.map((modifier_id, index) => ({
+  if (normalizedModifierIds.length > 0) {
+    const rows = normalizedModifierIds.map((modifier_id, index) => ({
       product_id: productId,
       modifier_id,
       sort_order: index,

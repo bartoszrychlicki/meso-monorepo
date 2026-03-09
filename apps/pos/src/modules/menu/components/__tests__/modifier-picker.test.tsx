@@ -225,4 +225,24 @@ describe('ModifierPicker', () => {
       screen.getByRole('button', { name: /stworz nowy modyfikator/i })
     ).toBeInTheDocument();
   });
+
+  it('does not duplicate a newly created modifier when it is already selected', async () => {
+    render(
+      <ModifierPicker
+        allModifiers={mockModifiers}
+        selectedModifierIds={['new-mod']}
+        onChange={mockOnChange}
+        recipes={mockRecipes}
+        onCreateModifier={mockOnCreateModifier}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /stworz nowy modyfikator/i }));
+    fireEvent.click(await screen.findByText('Save Mock'));
+
+    await waitFor(() => {
+      expect(mockOnCreateModifier).toHaveBeenCalled();
+      expect(mockOnChange).toHaveBeenCalledWith(['new-mod']);
+    });
+  });
 });

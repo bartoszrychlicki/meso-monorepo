@@ -161,6 +161,7 @@ describe('Nested Recipe Cost Calculation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAllStockItems.mockResolvedValue(mockStockItems);
+    mockProductsRepo.findMany.mockResolvedValue([]);
     mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
       Promise.resolve(
         [semiFinishedRecipe, finishedRecipe].filter((recipe) =>
@@ -236,6 +237,7 @@ describe('Nested Recipe Allergen Calculation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAllStockItems.mockResolvedValue(mockStockItems);
+    mockProductsRepo.findMany.mockResolvedValue([]);
     mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
       Promise.resolve(
         [semiFinishedRecipe, finishedRecipe].filter((recipe) =>
@@ -309,6 +311,7 @@ describe('Recipe dependency validation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAllStockItems.mockResolvedValue(mockStockItems);
+    mockProductsRepo.findMany.mockResolvedValue([]);
   });
 
   it('blocks indirect dependency cycles', async () => {
@@ -348,6 +351,7 @@ describe('Recipe closure recalculation', () => {
       const existing = recipes.find((recipe) => recipe.id === id);
       return Promise.resolve({ ...existing, ...data });
     });
+    mockProductsRepo.findMany.mockResolvedValue([]);
   });
 
   const baseSemiRecipe: Recipe = {
@@ -407,5 +411,71 @@ describe('Recipe closure recalculation', () => {
       'recipe-middle',
       'recipe-top',
     ]);
+  });
+
+  it('syncs menu product food cost snapshots for updated recipes', async () => {
+    const products = [
+      {
+        id: 'product-middle',
+        name: 'Patty blend portion',
+        recipe_id: 'recipe-middle',
+        price: 10,
+        is_active: true,
+      },
+      {
+        id: 'product-top',
+        name: 'Top burger menu',
+        recipe_id: 'recipe-top',
+        price: 25,
+        is_active: true,
+      },
+      {
+        id: 'product-unrelated',
+        name: 'Other item',
+        recipe_id: 'recipe-other',
+        price: 12,
+        is_active: true,
+      },
+    ];
+
+    mockGetAllStockItems.mockResolvedValue([
+      {
+        ...mockStockItems[0],
+        unit: 'kg',
+        cost_per_unit: 32,
+      },
+      mockStockItems[1],
+    ]);
+    mockRecipesRepo.findMany.mockImplementation((predicate?: (recipe: Recipe) => boolean) =>
+      Promise.resolve(
+        [baseSemiRecipe, nestedSemiRecipe, topLevelRecipe].filter((recipe) =>
+          predicate ? predicate(recipe) : true
+        )
+      )
+    );
+    mockProductsRepo.findMany.mockImplementation(
+      (predicate?: (product: (typeof products)[number]) => boolean) =>
+        Promise.resolve(products.filter((product) => (predicate ? predicate(product) : true)))
+    );
+    mockProductsRepo.update.mockImplementation(
+      (id: string, data: Record<string, unknown>) =>
+        Promise.resolve({ id, ...data })
+    );
+
+    await recipesRepository.recalculateRecipeClosure('recipe-base');
+
+    expect(mockProductsRepo.update).toHaveBeenCalledWith(
+      'product-middle',
+      expect.objectContaining({
+        food_cost_percentage: 64,
+      })
+    );
+    expect(mockProductsRepo.update).toHaveBeenCalledWith(
+      'product-top',
+      expect.objectContaining({
+        food_cost_percentage: 30.4,
+      })
+    );
+    expect(mockProductsRepo.update).toHaveBeenCalledTimes(2);
   });
 });

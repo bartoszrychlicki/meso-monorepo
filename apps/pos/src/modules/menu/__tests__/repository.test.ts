@@ -167,6 +167,25 @@ describe('food cost persistence in menu products', () => {
       })
     );
   });
+
+  it('stores null food cost when computed percentage exceeds database precision', async () => {
+    mockProductsFindById.mockResolvedValueOnce(
+      makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 38, food_cost_percentage: null })
+    );
+    mockRecipesFindById.mockResolvedValueOnce({ cost_per_unit: 6061.14 });
+    mockProductsUpdate.mockResolvedValueOnce(
+      makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 38, food_cost_percentage: null })
+    );
+
+    await updateProductWithFoodCost('product-1', {});
+
+    expect(mockProductsUpdate).toHaveBeenCalledWith(
+      'product-1',
+      expect.objectContaining({
+        food_cost_percentage: null,
+      })
+    );
+  });
 });
 
 function createMockChain() {
@@ -281,6 +300,18 @@ describe('setProductModifiers', () => {
     expect(chain.delete).toHaveBeenCalled();
     // insert should NOT be called when modifierIds is empty
     expect(chain.insert).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates modifier IDs before insert', async () => {
+    chain.eq.mockResolvedValueOnce({ error: null });
+    chain.insert.mockResolvedValueOnce({ error: null });
+
+    await setProductModifiers('product-1', ['mod-a', 'mod-b', 'mod-a', '', 'mod-b']);
+
+    expect(chain.insert).toHaveBeenCalledWith([
+      { product_id: 'product-1', modifier_id: 'mod-a', sort_order: 0 },
+      { product_id: 'product-1', modifier_id: 'mod-b', sort_order: 1 },
+    ]);
   });
 
   it('throws on delete error', async () => {
