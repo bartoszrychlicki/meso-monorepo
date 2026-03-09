@@ -10,6 +10,7 @@ import { formatPrice } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
 import { isOrderActive } from '@/lib/order-confirmation-utils'
 import { formatOrderDisplayId } from '@/lib/format-order-display-id'
+import { getLocationAddressParts } from '@/lib/location-address'
 
 export default function OrderDetailsPage() {
     const params = useParams()
@@ -55,6 +56,8 @@ export default function OrderDetailsPage() {
     }
 
     const statusMessage = getOrderStatusMessage(order.status, order.payment_status)
+    const pickupAddress = order.location ? getLocationAddressParts(order.location.address) : null
+    const pickupAddressLine = [pickupAddress?.postalCode, pickupAddress?.city].filter(Boolean).join(' ')
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-6 pb-24 space-y-6">
@@ -128,7 +131,12 @@ export default function OrderDetailsPage() {
                             <Store className="w-5 h-5 text-primary mt-0.5" />
                             <div>
                                 <p className="text-foreground font-medium">{order.location.name}</p>
-                                <p className="text-muted-foreground text-sm">{order.location.address}</p>
+                                {pickupAddress?.street && (
+                                    <p className="text-muted-foreground text-sm">{pickupAddress.street}</p>
+                                )}
+                                {pickupAddressLine && (
+                                    <p className="text-muted-foreground text-sm">{pickupAddressLine}</p>
+                                )}
                             </div>
                         </div>
                     )}

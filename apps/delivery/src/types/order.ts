@@ -6,6 +6,7 @@ import {
   type DisplayOrderStatus,
   type RawOrderStatus,
 } from '@/lib/order-status'
+import type { LocationAddressObject } from '@/lib/location-address'
 
 export type OrderStatus = CoreOrderStatus
 export type DeliveryType = 'delivery' | 'pickup'
@@ -136,7 +137,7 @@ export interface OrderWithItems extends Omit<Order, 'items'> {
   items: OrderItemWithProduct[]
   location?: {
     name: string
-    address: string
+    address: string | LocationAddressObject | null
     phone: string | null
   }
 }
