@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 
 type UseCouponRequest = {
   couponId?: string
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: order, error: orderError } = await admin
-      .from('orders_orders')
+      .from(Tables.orders)
       .select('id')
       .eq('id', orderId)
       .eq('customer_id', customer.id)
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: coupon, error: couponError } = await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .select('id, status, expires_at, order_id, points_spent')
       .eq('id', couponId)
       .eq('customer_id', customer.id)
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     if (coupon.status === 'used' && coupon.order_id === orderId) {
       await admin
-        .from('orders_orders')
+        .from(Tables.orders)
         .update({ loyalty_points_used: coupon.points_spent ?? 0 })
         .eq('id', orderId)
         .eq('customer_id', customer.id)
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: updatedCoupon, error: updateError } = await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .update({
         status: 'used',
         used_at: now,
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
     }
 
     await admin
-      .from('orders_orders')
+      .from(Tables.orders)
       .update({ loyalty_points_used: coupon.points_spent ?? 0 })
       .eq('id', orderId)
       .eq('customer_id', customer.id)

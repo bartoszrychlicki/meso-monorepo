@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 import { formatPrice } from '@/lib/formatters'
 import { getProductImageUrl, PRODUCT_BLUR_PLACEHOLDER, ProductImage } from '@/lib/product-image'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 import { ALLERGENS, type AllergenKey } from '@/types/menu'
 
 interface Variant {
@@ -85,7 +86,7 @@ export function ProductCustomization({
 
                 // Fetch product — POS stores variants and modifier_groups as JSONB
                 const { data: productData, error } = await supabase
-                    .from('menu_products')
+                    .from(Tables.products)
                     .select('*')
                     .eq('slug', productSlug)
                     .single()

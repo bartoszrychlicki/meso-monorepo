@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '@/providers/AuthProvider'
 import { createClient } from '@/lib/supabase/client'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 
 export interface LoyaltyHistoryEntry {
   id: string
@@ -41,7 +42,7 @@ export function useLoyaltyHistory(): UseLoyaltyHistoryResult {
         }
 
         return supabase
-          .from('crm_loyalty_transactions')
+          .from(Tables.loyaltyTransactions)
           .select('*')
           .eq('customer_id', customer.id)
           .order('created_at', { ascending: false })

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 
 interface LocationData {
   id: string
@@ -68,12 +69,12 @@ export default function LocationsPage() {
     const supabase = createClient()
     Promise.all([
       supabase
-        .from('users_locations')
+        .from(Tables.locations)
         .select('id, name, address, phone, type, is_active')
         .eq('is_active', true)
         .order('name'),
       supabase
-        .from('orders_delivery_config')
+        .from(Tables.deliveryConfig)
         .select('location_id, opening_time, closing_time'),
     ]).then(([locationsRes, configRes]) => {
       if (!locationsRes.error && locationsRes.data) {

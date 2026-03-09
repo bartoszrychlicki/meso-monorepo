@@ -1,11 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
+import { Tables } from '@/lib/table-mapping'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   const supabase = await createClient()
 
   const { data: categories, error: catError } = await supabase
-    .from('menu_categories')
+    .from(Tables.categories)
     .select('id, name, name_jp, slug, icon, description')
     .eq('is_active', true)
     .order('sort_order')
@@ -15,7 +16,7 @@ export async function GET() {
   }
 
   const { data: products, error: prodError } = await supabase
-    .from('menu_products')
+    .from(Tables.products)
     .select(`
       id,
       category_id,
@@ -51,7 +52,7 @@ export async function GET() {
   // POS stores location address as JSONB, not flat columns
   // Also fetch delivery config from separate table
   const { data: location, error: locError } = await supabase
-    .from('users_locations')
+    .from(Tables.locations)
     .select('*')
     .eq('is_active', true)
     .order('updated_at', { ascending: false })
@@ -65,7 +66,7 @@ export async function GET() {
 
   // Fetch delivery config for this location
   const { data: deliveryConfig } = await supabase
-    .from('orders_delivery_config')
+    .from(Tables.deliveryConfig)
     .select('*')
     .eq('location_id', location.id)
     .single()

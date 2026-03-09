@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 
 interface AppConfigMap {
   [key: string]: unknown
@@ -27,7 +28,7 @@ export function useAppConfig(): UseAppConfigResult {
   useEffect(() => {
     const supabase = createClient()
     supabase
-      .from('app_config')
+      .from(Tables.appConfig)
       .select('key, value')
       .then(({ data, error }: { data: AppConfigRow[] | null; error: unknown }) => {
         if (!error && data) {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 
 export interface LoyaltyRewardRow {
   id: string
@@ -31,7 +32,7 @@ export function useLoyaltyRewards(): UseLoyaltyRewardsResult {
   useEffect(() => {
     const supabase = createClient()
     supabase
-      .from('crm_loyalty_rewards')
+      .from(Tables.loyaltyRewards)
       .select('*')
       .eq('is_active', true)
       .order('points_cost', { ascending: true })

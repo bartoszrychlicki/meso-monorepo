@@ -1,3 +1,5 @@
+import { Tables } from '@/lib/table-mapping'
+
 type QueryError = {
   message?: string
 } | null
@@ -12,7 +14,7 @@ export async function fetchCustomerByAuthId<T>(
   columns: string
 ): Promise<T | null> {
   const { data, error } = await client
-    .from('crm_customers')
+    .from(Tables.customers)
     .select(columns)
     .eq('auth_id', authUserId)
     .maybeSingle()

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { getOrderStatusMessage, type OrderWithItems } from '@/types/order'
 import { toDisplayOrderStatus } from '@/lib/order-status'
+import { Tables } from '@/lib/table-mapping'
 
 interface UseOrderDetailsReturn {
     order: OrderWithItems | null
@@ -31,7 +32,7 @@ export function useOrderDetails(orderId: number | string): UseOrderDetailsReturn
             const supabase = createClient()
 
             const { data, error: fetchError } = await supabase
-                .from('orders_orders')
+                .from(Tables.orders)
                 .select(`
           *,
           items:orders_order_items(

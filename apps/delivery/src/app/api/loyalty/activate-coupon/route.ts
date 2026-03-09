@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 import { nanoid } from 'nanoid'
 
 function generateCouponCode(): string {
@@ -41,14 +42,14 @@ export async function POST(request: NextRequest) {
 
     // Check for existing active coupon (expire stale ones first)
     await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .update({ status: 'expired' })
       .eq('customer_id', customer.id)
       .eq('status', 'active')
       .lt('expires_at', new Date().toISOString())
 
     const { data: activeCoupon } = await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .select('id, code, coupon_type, discount_value, free_product_name, expires_at, points_spent')
       .eq('customer_id', customer.id)
       .eq('status', 'active')
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     // Fetch reward
     const { data: reward, error: rewardError } = await admin
-      .from('crm_loyalty_rewards')
+      .from(Tables.loyaltyRewards)
       .select('*')
       .eq('id', reward_id)
       .eq('is_active', true)
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
     let code = generateCouponCode()
     for (let i = 0; i < 5; i++) {
       const { data } = await admin
-        .from('crm_customer_coupons')
+        .from(Tables.customerCoupons)
         .select('id')
         .eq('code', code)
         .maybeSingle()
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
     let computedDiscountValue = reward.discount_value
     if (reward.reward_type === 'free_product' && !reward.discount_value) {
       const rewardNameLower = (reward.name as string).toLowerCase()
-      const { data: categories } = await admin.from('menu_categories').select('id, slug')
+      const { data: categories } = await admin.from(Tables.categories).select('id, slug')
 
       let categoryId: string | null = null
       if (categories) {
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
 
       if (categoryId) {
         const { data: cheapest } = await admin
-          .from('menu_products')
+          .from(Tables.products)
           .select('price')
           .eq('category_id', categoryId)
           .order('price', { ascending: true })
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     // Deduct points
     const { error: pointsError } = await admin
-      .from('crm_customers')
+      .from(Tables.customers)
       .update({ loyalty_points: customer.loyalty_points - reward.points_cost })
       .eq('id', customer.id)
 
@@ -152,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     // Create coupon (promotion_id FK references crm_promotions, not rewards — leave null for reward-based coupons)
     const { data: coupon, error: couponError } = await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .insert({
         customer_id: customer.id,
         promotion_id: null,
@@ -171,7 +172,7 @@ export async function POST(request: NextRequest) {
     if (couponError) {
       // Rollback points
       await admin
-        .from('crm_customers')
+        .from(Tables.customers)
         .update({ loyalty_points: customer.loyalty_points })
         .eq('id', customer.id)
       return NextResponse.json({ error: 'Błąd przy tworzeniu kuponu' }, { status: 500 })
@@ -179,7 +180,7 @@ export async function POST(request: NextRequest) {
 
     // Log to crm_loyalty_transactions (formerly loyalty_history)
     await admin
-      .from('crm_loyalty_transactions')
+      .from(Tables.loyaltyTransactions)
       .insert({
         customer_id: customer.id,
         description: `Kupon: ${reward.name}`,

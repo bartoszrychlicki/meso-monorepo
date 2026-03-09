@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { Tables } from '@/lib/table-mapping'
 import { notFound } from 'next/navigation'
 import { ProductDetailClient } from './ProductDetailClient'
 
@@ -14,7 +15,7 @@ export default async function ProductPage({ params }: PageProps) {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
   const { data: product } = await supabase
-    .from('menu_products')
+    .from(Tables.products)
     .select(`
       *,
       category:menu_categories(id, name, slug, icon)

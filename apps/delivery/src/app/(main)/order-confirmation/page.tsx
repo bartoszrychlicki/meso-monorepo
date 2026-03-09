@@ -8,6 +8,7 @@ import { CheckCircle2, ChefHat, Package, MapPin, Navigation, Loader2, XCircle, C
 import { useOrderConfirmationStore } from '@/stores/orderConfirmationStore'
 import { formatPriceExact } from '@/lib/formatters'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 import { toast } from 'sonner'
 import type { OrderConfirmation } from '@/stores/orderConfirmationStore'
 import { PAYMENT_TIMEOUT_MS, getPickupStepIndex, isPaymentPending } from '@/lib/order-confirmation-utils'
@@ -89,7 +90,7 @@ function OrderConfirmationContent() {
                 const supabase = createClient()
 
                 const orderRes = await supabase
-                    .from('orders_orders')
+                    .from(Tables.orders)
                     .select(`
                         *,
                         location:users_locations(name, address, phone),
@@ -108,7 +109,7 @@ function OrderConfirmationContent() {
                 let deliveryConfig: { pickup_time_min?: number | null; estimated_delivery_minutes?: number | null } | null = null
                 if (orderRes.data.location_id) {
                     const configRes = await supabase
-                        .from('orders_delivery_config')
+                        .from(Tables.deliveryConfig)
                         .select('pickup_time_min, estimated_delivery_minutes')
                         .eq('location_id', orderRes.data.location_id)
                         .maybeSingle()
@@ -188,7 +189,7 @@ function OrderConfirmationContent() {
         // Safety-net polling: re-fetch order every 10s until terminal status
         const pollId = setInterval(async () => {
             const { data } = await supabase
-                .from('orders_orders')
+                .from(Tables.orders)
                 .select('status, payment_status')
                 .eq('id', orderId)
                 .single()

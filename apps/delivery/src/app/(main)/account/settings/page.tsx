@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 import { toast } from 'sonner'
 import {
     AlertDialog,
@@ -35,7 +36,7 @@ export default function SettingsPage() {
 
             const supabase = createClient()
             const { data, error } = await supabase
-                .from('crm_customers')
+                .from(Tables.customers)
                 .select('marketing_consent')
                 .eq('auth_id', user.id)
                 .single()
@@ -60,7 +61,7 @@ export default function SettingsPage() {
 
         const supabase = createClient()
         const { error } = await supabase
-            .from('crm_customers')
+            .from(Tables.customers)
             .update({ marketing_consent: checked })
             .eq('auth_id', user.id)
 

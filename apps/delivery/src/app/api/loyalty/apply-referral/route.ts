@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { nanoid } from 'nanoid'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 
 function normalizeReferralInput(input: string): string {
   return input.trim()
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: referrerByCode } = await admin
-      .from('crm_customers')
+      .from(Tables.customers)
       .select('id, phone')
       .eq('referral_code', normalizedCode)
       .neq('id', currentCustomer.id)
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
       }
 
       const { data: referrerByPhone } = await admin
-        .from('crm_customers')
+        .from(Tables.customers)
         .select('id, phone')
         .or(`phone.eq.${normalizedPhone},phone.eq.+48${normalizedPhone},phone.eq.48${normalizedPhone}`)
         .neq('id', currentCustomer.id)
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
 
     if (isExistingReferral) {
       const { data: existingWelcomeCoupon } = await admin
-        .from('crm_customer_coupons')
+        .from(Tables.customerCoupons)
         .select('code')
         .eq('customer_id', currentCustomer.id)
         .eq('source', 'referral_welcome')
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest) {
     if (!isExistingReferral) {
       // Check referrer has at least 1 delivered order
       const { count: referrerOrders } = await admin
-        .from('orders_orders')
+        .from(Tables.orders)
         .select('*', { count: 'exact', head: true })
         .eq('customer_id', referrer.id)
         .eq('status', 'delivered')
@@ -165,7 +166,7 @@ export async function POST(request: NextRequest) {
       startOfMonth.setHours(0, 0, 0, 0)
 
       const { count: monthlyReferrals } = await admin
-        .from('crm_customers')
+        .from(Tables.customers)
         .select('*', { count: 'exact', head: true })
         .eq('referred_by', referrer.id)
         .gte('created_at', startOfMonth.toISOString())
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest) {
     // Set referrer
     if (!isExistingReferral) {
       await admin
-        .from('crm_customers')
+        .from(Tables.customers)
         .update({ referred_by: referrer.id })
         .eq('id', currentCustomer.id)
     }
@@ -191,7 +192,7 @@ export async function POST(request: NextRequest) {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
     await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .insert({
         customer_id: currentCustomer.id,
         promotion_id: null,

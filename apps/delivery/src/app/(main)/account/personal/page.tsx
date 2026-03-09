@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, Check } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { useAuth } from '@/hooks/useAuth'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 import { Button } from '@/components/ui/button'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { LoginPrompt } from '@/components/auth'
@@ -42,7 +43,7 @@ export default function PersonalPage() {
     async function loadData() {
       const supabase = createClient()
       const { data } = await supabase
-        .from('crm_customers')
+        .from(Tables.customers)
         .select('first_name, last_name, email, phone, birth_date')
         .eq('auth_id', user!.id)
         .single()
@@ -79,7 +80,7 @@ export default function PersonalPage() {
 
     const supabase = createClient()
     await supabase
-      .from('crm_customers')
+      .from(Tables.customers)
       .update({
         first_name: form.firstName || null,
         last_name: form.lastName || null,

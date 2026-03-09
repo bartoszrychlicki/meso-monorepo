@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { P24, P24Notification } from '@/lib/p24'
 import { sendOrderConfirmationEmail, type OrderEmailData } from '@/lib/email'
 import { getPosApi } from '@/lib/pos-api'
+import { Tables } from '@/lib/table-mapping'
 import type { OrderStatus, PaymentStatus } from '@meso/core'
 
 interface DeliveryAddressJson {
@@ -83,7 +84,7 @@ export async function POST(request: Request) {
         )
 
         const { data: fullOrder } = await supabaseAdmin
-            .from('orders_orders')
+            .from(Tables.orders)
             .select(`
                 *,
                 order_items:orders_order_items (

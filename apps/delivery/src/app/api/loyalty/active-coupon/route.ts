@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 
 export async function GET() {
   try {
@@ -21,7 +22,7 @@ export async function GET() {
 
     // Expire stale coupons first (lazy cleanup)
     await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .update({ status: 'expired' })
       .eq('customer_id', customer.id)
       .eq('status', 'active')
@@ -30,7 +31,7 @@ export async function GET() {
     // Mark used coupons (lazy cleanup for checkout RLS failures)
     // If a coupon code appears on a paid order, it was used even if status wasn't updated
     const { data: activeCoupons } = await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .select('id, code')
       .eq('customer_id', customer.id)
       .eq('status', 'active')
@@ -39,7 +40,7 @@ export async function GET() {
     if (activeCoupons && activeCoupons.length > 0) {
       for (const c of activeCoupons) {
         const { data: usedOrder } = await admin
-          .from('orders_orders')
+          .from(Tables.orders)
           .select('id')
           .eq('customer_id', customer.id)
           .eq('promo_code', c.code)
@@ -49,7 +50,7 @@ export async function GET() {
 
         if (usedOrder) {
           await admin
-            .from('crm_customer_coupons')
+            .from(Tables.customerCoupons)
             .update({ status: 'used', used_at: new Date().toISOString(), order_id: usedOrder.id })
             .eq('id', c.id)
         }
@@ -58,7 +59,7 @@ export async function GET() {
 
     // Fetch active coupon (after cleanup)
     const { data: coupon } = await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .select('id, code, coupon_type, discount_value, free_product_name, expires_at, source, points_spent')
       .eq('customer_id', customer.id)
       .eq('status', 'active')

@@ -8,6 +8,7 @@ import { useCartStore } from '@/stores/cartStore'
 import { useAuth } from '@/hooks/useAuth'
 import { createOrderAction } from '@/app/actions/create-order'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 import type { AddressFormData, DeliveryFormData, PaymentFormData } from '@/lib/validators/checkout'
 import { OrderChannel, OrderSource, ModifierAction, PaymentMethod, PaymentStatus } from '@meso/core'
 
@@ -115,7 +116,7 @@ export function useCheckout() {
 
             // Get active location (read from Supabase — allowed)
             const { data: locations, error: locationError } = await supabase
-                .from('users_locations')
+                .from(Tables.locations)
                 .select('id')
                 .eq('is_active', true)
                 .order('updated_at', { ascending: false })
@@ -195,7 +196,7 @@ export function useCheckout() {
             const profileUpdate = buildCheckoutProfileUpdate(addressData, savePhoneToProfile)
             if (Object.keys(profileUpdate).length > 0) {
                 await supabase
-                    .from('crm_customers')
+                    .from(Tables.customers)
                     .update(profileUpdate)
                     .eq('auth_id', user.id)
             }

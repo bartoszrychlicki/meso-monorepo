@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { Tables } from '@/lib/table-mapping'
 import { notFound } from 'next/navigation'
 import { ProductDetails } from './ProductDetails'
 
@@ -11,7 +12,7 @@ async function getProduct(slug: string) {
 
   // POS stores variants and modifier_groups (addons) as JSONB on the product
   const { data: product, error: productError } = await supabase
-    .from('menu_products')
+    .from(Tables.products)
     .select(`
       *,
       category:menu_categories(id, name, name_jp, slug)

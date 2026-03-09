@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { Tables } from '@/lib/table-mapping'
 import { MenuClient } from './MenuClient'
 
 export const revalidate = 60
@@ -8,12 +9,12 @@ async function getMenuData() {
 
   const [categoriesResult, productsResult, locationResult, bannersResult] = await Promise.all([
     supabase
-      .from('menu_categories')
+      .from(Tables.categories)
       .select('id, name, name_jp, slug, icon, description')
       .eq('is_active', true)
       .order('sort_order'),
     supabase
-      .from('menu_products')
+      .from(Tables.products)
       .select(`
         id,
         category_id,
@@ -42,7 +43,7 @@ async function getMenuData() {
       .eq('is_available', true)
       .order('sort_order'),
     supabase
-      .from('users_locations')
+      .from(Tables.locations)
       .select('*')
       .eq('is_active', true)
       .order('updated_at', { ascending: false })
@@ -50,7 +51,7 @@ async function getMenuData() {
       .limit(1)
       .single(),
     supabase
-      .from('promo_banners')
+      .from(Tables.promoBanners)
       .select('id, image_url, title, subtitle, href')
       .eq('is_active', true)
       .order('sort_order'),
@@ -59,7 +60,7 @@ async function getMenuData() {
   let locationWithConfig = locationResult.data
   if (locationResult.data?.id) {
     const { data: deliveryConfig } = await supabase
-      .from('orders_delivery_config')
+      .from(Tables.deliveryConfig)
       .select('*')
       .eq('location_id', locationResult.data.id)
       .maybeSingle()

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 
 /** Shape returned to the client – matches LoyaltyHistoryEntry on the page */
 type LoyaltyHistoryResponseRow = {
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     const offset = page * limit
 
     const { data: history, error, count } = await supabase
-      .from('crm_loyalty_transactions')
+      .from(Tables.loyaltyTransactions)
       .select('*', { count: 'exact' })
       .eq('customer_id', customer.id)
       .order('created_at', { ascending: false })
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
     // the order-confirmation screen while points are still awarded on delivery.
     if (page === 0) {
       const { data: pendingOrders } = await supabase
-        .from('orders_orders')
+        .from(Tables.orders)
         .select('id, status, payment_status, loyalty_points_earned, created_at, paid_at, confirmed_at')
         .eq('customer_id', customer.id)
         .eq('payment_status', 'paid')
@@ -94,7 +95,7 @@ export async function GET(request: NextRequest) {
     let balanceMismatch = false
     if (page === 0) {
       const { data: sumResult } = await supabase
-        .from('crm_loyalty_transactions')
+        .from(Tables.loyaltyTransactions)
         .select('amount')
         .eq('customer_id', customer.id)
 
@@ -102,7 +103,7 @@ export async function GET(request: NextRequest) {
         const historySum = sumResult.reduce((acc, row) => acc + (row.amount ?? 0), 0)
 
         const { data: customer } = await supabase
-          .from('crm_customers')
+          .from(Tables.customers)
           .select('loyalty_points')
           .eq('auth_id', user.id)
           .single()

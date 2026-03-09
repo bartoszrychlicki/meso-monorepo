@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { fetchCustomerByAuthId } from '@/lib/customers'
+import { Tables } from '@/lib/table-mapping'
 
 export async function POST() {
   try {
@@ -20,7 +21,7 @@ export async function POST() {
 
     // Find active coupon
     const { data: coupon } = await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .select('id')
       .eq('customer_id', customer.id)
       .eq('status', 'active')
@@ -33,7 +34,7 @@ export async function POST() {
 
     // Mark as cancelled (points are NOT refunded)
     await admin
-      .from('crm_customer_coupons')
+      .from(Tables.customerCoupons)
       .update({ status: 'cancelled', used_at: new Date().toISOString() })
       .eq('id', coupon.id)
 

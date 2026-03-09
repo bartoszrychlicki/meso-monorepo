@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { Tables } from '@/lib/table-mapping'
 
 interface ValidatePromoBody {
   code: string
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
 
   // Look up the promo code (case-insensitive)
   const { data: promo, error } = await supabase
-    .from('crm_promotions')
+    .from(Tables.promotions)
     .select('*')
     .ilike('code', code.trim())
     .single()
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
 
     // Check if the user has any previous completed orders
     const { count } = await supabase
-      .from('orders_orders')
+      .from(Tables.orders)
       .select('id', { count: 'exact', head: true })
       .eq('customer_id', user.id)
       .neq('status', 'cancelled')

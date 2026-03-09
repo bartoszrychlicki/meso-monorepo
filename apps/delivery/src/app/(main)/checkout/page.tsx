@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Loader2, Store, User, Check, Clock, Star, CircleHelp } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { Tables } from '@/lib/table-mapping'
 import { useCartStore } from '@/stores/cartStore'
 import { useAuth } from '@/hooks/useAuth'
 import { useCheckout } from '@/hooks/useCheckout'
@@ -122,7 +123,7 @@ export default function CheckoutPage() {
         const fetchLocationConfig = async () => {
             const supabase = createClient()
             const { data: locationData } = await supabase
-                .from('users_locations')
+                .from(Tables.locations)
                 .select('id, name, address, phone, is_active')
                 .eq('is_active', true)
                 .order('updated_at', { ascending: false })
@@ -132,7 +133,7 @@ export default function CheckoutPage() {
 
             if (locationData) {
                 const { data: deliveryConfig } = await supabase
-                    .from('orders_delivery_config')
+                    .from(Tables.deliveryConfig)
                     .select(
                         'opening_time, closing_time, pickup_time_min, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order'
                     )
@@ -201,7 +202,7 @@ export default function CheckoutPage() {
                 const supabase = createClient()
 
                 const { data: customer } = await supabase
-                    .from('crm_customers')
+                    .from(Tables.customers)
                     .select('first_name, last_name, email, phone')
                     .eq('auth_id', user.id)
                     .single()

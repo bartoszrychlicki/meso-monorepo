@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { fetchCustomerByAuthId } from '@/lib/customers'
 import { useAuth } from './useAuth'
+import { Tables } from '@/lib/table-mapping'
 import type { OrderWithItems, OrderStatus } from '@/types/order'
 
 interface UseOrdersOptions {
@@ -45,7 +46,7 @@ export function useOrders(options: UseOrdersOptions = {}): UseOrdersReturn {
             }
 
             let query = supabase
-                .from('orders_orders')
+                .from(Tables.orders)
                 .select(`
           *,
           items:orders_order_items(

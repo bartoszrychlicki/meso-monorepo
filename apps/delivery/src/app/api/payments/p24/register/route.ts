@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { P24 } from '@/lib/p24'
+import { Tables } from '@/lib/table-mapping'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
 
         const supabaseAdmin = createAdminClient()
         const { data: order, error: orderError } = await supabaseAdmin
-            .from('orders_orders')
+            .from(Tables.orders)
             .select('*')
             .eq('id', orderId)
             .single()
