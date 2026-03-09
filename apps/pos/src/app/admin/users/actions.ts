@@ -3,6 +3,63 @@
 import { revalidatePath } from 'next/cache';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 
+const STAFF_USERS_PATH = '/admin/users';
+const STAFF_USER_EXISTS_ERROR =
+  'Nie mozna dodac uzytkownika. Konto pracownika z tym adresem email juz istnieje.';
+const SHARED_EMAIL_ACCOUNT_ERROR =
+  'Nie mozna dodac uzytkownika do POS. Ten adres email jest juz przypisany do konta klienta. Uzyj innego adresu email.';
+
+function normalizeEmail(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function buildStaffDirectoryUser(params: {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}) {
+  const usernameBase = params.email
+    .split('@')[0]
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '') || 'staff';
+
+  return {
+    id: params.id,
+    email: params.email,
+    name: params.name,
+    username: `${usernameBase}-${params.id.slice(0, 8)}`,
+    role: params.role,
+    is_active: true,
+  };
+}
+
+async function findAuthUserByEmail(serviceClient: ReturnType<typeof createServiceClient>, email: string) {
+  let page = 1;
+  const perPage = 200;
+
+  while (true) {
+    const { data, error } = await serviceClient.auth.admin.listUsers({ page, perPage });
+
+    if (error) {
+      return { user: null, error };
+    }
+
+    const matchingUser =
+      data.users.find((candidate) => normalizeEmail(candidate.email ?? '') === email) ?? null;
+
+    if (matchingUser) {
+      return { user: matchingUser, error: null };
+    }
+
+    if (!data.nextPage || data.nextPage <= page) {
+      return { user: null, error: null };
+    }
+
+    page = data.nextPage;
+  }
+}
+
 export async function getStaffUsers() {
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -16,12 +73,28 @@ export async function getStaffUsers() {
 }
 
 export async function createStaffUser(formData: FormData) {
-  const name = formData.get('name') as string;
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
+  const name = String(formData.get('name') ?? '').trim();
+  const email = normalizeEmail(String(formData.get('email') ?? ''));
+  const password = String(formData.get('password') ?? '');
   const isAdmin = formData.get('is_admin') === 'true';
+  const role = isAdmin ? 'admin' : 'cashier';
 
   const serviceClient = createServiceClient();
+
+  const { data: existingStaffUser, error: existingStaffUserError } = await serviceClient
+    .from('users_users')
+    .select('id')
+    .ilike('email', email)
+    .maybeSingle();
+
+  if (existingStaffUserError && existingStaffUserError.code !== 'PGRST116') {
+    return { error: `Nie udalo sie sprawdzic istniejacego uzytkownika: ${existingStaffUserError.message}` };
+  }
+
+  if (existingStaffUser) {
+    return { error: STAFF_USER_EXISTS_ERROR };
+  }
+
   const { error } = await serviceClient.auth.admin.createUser({
     email,
     password,
@@ -29,18 +102,84 @@ export async function createStaffUser(formData: FormData) {
     user_metadata: {
       app_role: 'staff',
       name,
-      role: isAdmin ? 'admin' : 'cashier',
+      role,
     },
   });
 
   if (error) {
     if (error.message.includes('already')) {
-      return { error: 'Uzytkownik z tym adresem email juz istnieje. User already exists.' };
+      const { user: existingAuthUser, error: lookupError } = await findAuthUserByEmail(
+        serviceClient,
+        email
+      );
+
+      if (lookupError) {
+        return { error: `Nie udalo sie sprawdzic istniejacego konta: ${lookupError.message}` };
+      }
+
+      if (!existingAuthUser) {
+        return { error: STAFF_USER_EXISTS_ERROR };
+      }
+
+      if (existingAuthUser.user_metadata?.app_role && existingAuthUser.user_metadata.app_role !== 'staff') {
+        return { error: SHARED_EMAIL_ACCOUNT_ERROR };
+      }
+
+      const { data: existingStaffRecord, error: existingStaffRecordError } = await serviceClient
+        .from('users_users')
+        .select('id')
+        .eq('id', existingAuthUser.id)
+        .maybeSingle();
+
+      if (existingStaffRecordError && existingStaffRecordError.code !== 'PGRST116') {
+        return {
+          error: `Nie udalo sie sprawdzic powiazanego konta pracownika: ${existingStaffRecordError.message}`,
+        };
+      }
+
+      if (existingStaffRecord) {
+        return { error: STAFF_USER_EXISTS_ERROR };
+      }
+
+      const { error: updateAuthError } = await serviceClient.auth.admin.updateUserById(
+        existingAuthUser.id,
+        {
+          password,
+          email_confirm: true,
+          user_metadata: {
+            ...existingAuthUser.user_metadata,
+            app_role: 'staff',
+            name,
+            role,
+          },
+        }
+      );
+
+      if (updateAuthError) {
+        return { error: `Nie udalo sie odzyskac istniejacego konta: ${updateAuthError.message}` };
+      }
+
+      const { error: syncStaffError } = await serviceClient
+        .from('users_users')
+        .upsert(buildStaffDirectoryUser({
+          id: existingAuthUser.id,
+          email,
+          name,
+          role,
+        }), { onConflict: 'id' });
+
+      if (syncStaffError) {
+        return { error: `Nie udalo sie zsynchronizowac konta pracownika: ${syncStaffError.message}` };
+      }
+
+      revalidatePath(STAFF_USERS_PATH);
+      return { success: true };
     }
+
     return { error: `Nie udalo sie utworzyc uzytkownika: ${error.message}` };
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath(STAFF_USERS_PATH);
   return { success: true };
 }
 
@@ -83,7 +222,7 @@ export async function toggleStaffAdmin(userId: string, makeAdmin: boolean) {
     return { error: `Nie udalo sie zaktualizowac roli w bazie: ${dbError.message}` };
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath(STAFF_USERS_PATH);
   return { success: true };
 }
 
@@ -105,7 +244,7 @@ export async function deleteStaffUser(userId: string) {
     return { error: `Nie udalo sie usunac uzytkownika z bazy: ${dbError.message}` };
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath(STAFF_USERS_PATH);
   return { success: true };
 }
 
@@ -120,6 +259,6 @@ export async function toggleStaffActive(userId: string, isActive: boolean) {
     return { error: 'Nie udalo sie zmienic statusu uzytkownika.' };
   }
 
-  revalidatePath('/admin/users');
+  revalidatePath(STAFF_USERS_PATH);
   return { success: true };
 }
