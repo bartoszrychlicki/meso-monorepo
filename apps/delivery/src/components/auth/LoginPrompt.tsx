@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { type ReactNode } from 'react'
 
@@ -11,6 +12,9 @@ interface LoginPromptProps {
 }
 
 export function LoginPrompt({ icon, title, description }: LoginPromptProps) {
+  const pathname = usePathname()
+  const loginHref = pathname ? `/login?redirect=${encodeURIComponent(pathname)}` : '/login'
+
   return (
     <div className="max-w-2xl mx-auto flex flex-col items-center justify-center px-4 py-20 text-center min-h-[60vh]">
       <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-card/50 border border-primary/30 flex items-center justify-center text-5xl shadow-[0_0_30px_rgba(236,72,153,0.3)]">
@@ -22,12 +26,18 @@ export function LoginPrompt({ icon, title, description }: LoginPromptProps) {
       <p className="text-sm text-muted-foreground mb-8 max-w-sm">
         {description}
       </p>
-      <Link href="/login">
+      <Link href={loginHref}>
         <button className="flex items-center gap-2 bg-accent text-accent-foreground font-display font-bold uppercase tracking-wider px-8 py-3 rounded-xl">
           <ArrowRight className="h-5 w-5" />
           ZALOGUJ SIĘ
         </button>
       </Link>
+      <p className="mt-4 text-sm text-muted-foreground">
+        Nie masz konta?{' '}
+        <Link href="/register" className="text-primary hover:underline">
+          Zarejestruj się
+        </Link>
+      </p>
     </div>
   )
 }
