@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { createClient } from '@/lib/supabase/client'
 import { CustomerAddress } from '@/types'
 import { cn } from '@/lib/utils'
+import { Tables } from '@/lib/table-mapping'
 import { toast } from 'sonner'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -55,7 +56,7 @@ export default function AddressesPage() {
 
         const supabase = createClient()
         const { data, error } = await supabase
-            .from('customer_addresses')
+            .from(Tables.customerAddresses)
             .select('*')
             .eq('customer_id', user.id)
             .order('is_default', { ascending: false })
@@ -120,7 +121,7 @@ export default function AddressesPage() {
         const supabase = createClient()
 
         const { error } = await supabase
-            .from('customer_addresses')
+            .from(Tables.customerAddresses)
             .delete()
             .eq('id', id)
 
@@ -139,13 +140,13 @@ export default function AddressesPage() {
 
         // First, unset all defaults
         await supabase
-            .from('customer_addresses')
+            .from(Tables.customerAddresses)
             .update({ is_default: false })
             .eq('customer_id', user?.id)
 
         // Then set the new default
         const { error } = await supabase
-            .from('customer_addresses')
+            .from(Tables.customerAddresses)
             .update({ is_default: true })
             .eq('id', id)
 
@@ -167,7 +168,7 @@ export default function AddressesPage() {
         // If setting as default, unset other defaults first
         if (data.is_default) {
             await supabase
-                .from('customer_addresses')
+                .from(Tables.customerAddresses)
                 .update({ is_default: false })
                 .eq('customer_id', user.id)
         }
@@ -175,7 +176,7 @@ export default function AddressesPage() {
         if (editingAddress) {
             // Update existing address
             const { error } = await supabase
-                .from('customer_addresses')
+                .from(Tables.customerAddresses)
                 .update({
                     ...data,
                     apartment_number: data.apartment_number || null,
@@ -195,7 +196,7 @@ export default function AddressesPage() {
         } else {
             // Create new address
             const { error } = await supabase
-                .from('customer_addresses')
+                .from(Tables.customerAddresses)
                 .insert({
                     customer_id: user.id,
                     ...data,
