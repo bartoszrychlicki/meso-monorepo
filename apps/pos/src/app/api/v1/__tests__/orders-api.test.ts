@@ -16,11 +16,19 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
   createServerRepository: () => mockServerRepo,
 }))
 
-const { mockEnsureCustomerForOrderDraft, mockSubmitPosbistroOrder } = vi.hoisted(() => ({
+const {
+  mockBuildPosbistroConfirmBaseUrl,
+  mockEnsureCustomerForOrderDraft,
+  mockSubmitPosbistroOrder,
+} = vi.hoisted(() => ({
+  mockBuildPosbistroConfirmBaseUrl: vi.fn((origin?: string) =>
+    `${origin || 'http://localhost:3000'}/api/integrations/posbistro/confirm`
+  ),
   mockEnsureCustomerForOrderDraft: vi.fn(),
   mockSubmitPosbistroOrder: vi.fn(),
 }))
 vi.mock('@/lib/integrations/posbistro/service', () => ({
+  buildPosbistroConfirmBaseUrl: mockBuildPosbistroConfirmBaseUrl,
   ensureCustomerForOrderDraft: mockEnsureCustomerForOrderDraft,
   submitPosbistroOrder: mockSubmitPosbistroOrder,
 }))
@@ -190,6 +198,52 @@ describe('POST /api/v1/orders', () => {
       })
     )
     expect(mockSubmitPosbistroOrder).not.toHaveBeenCalled()
+  })
+
+  it('awaits POSBistro submit for delivery_app orders already confirmed on create', async () => {
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === 'next_order_number') {
+        return Promise.resolve({
+          data: 'WEB-20260310-100',
+          error: null,
+        })
+      }
+      if (fn === 'create_order_with_items') {
+        return Promise.resolve({
+          data: {
+            id: 'new-order-id',
+            order_number: 'WEB-20260310-100',
+            status: 'confirmed',
+          },
+          error: null,
+        })
+      }
+      return Promise.resolve({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('https://preview.example.com/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validOrderBody,
+          channel: 'delivery_app',
+          payment_status: 'paid',
+          delivery_type: 'delivery',
+        }),
+      })
+    )
+
+    expect(res.status).toBe(201)
+    expect(mockSubmitPosbistroOrder).toHaveBeenCalledTimes(1)
+    expect(mockSubmitPosbistroOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'new-order-id',
+        status: 'confirmed',
+      }),
+      expect.objectContaining({
+        confirmBaseUrl: 'https://preview.example.com/api/integrations/posbistro/confirm',
+      })
+    )
   })
 
   it('returns existing order for duplicate external_order_id (idempotency fast path)', async () => {
@@ -431,6 +485,9 @@ describe('POST /api/v1/orders', () => {
         id: 'new-order-id',
         status: 'confirmed',
         customer_id: 'customer-1',
+      }),
+      expect.objectContaining({
+        confirmBaseUrl: 'http://localhost:3000/api/integrations/posbistro/confirm',
       })
     )
   })

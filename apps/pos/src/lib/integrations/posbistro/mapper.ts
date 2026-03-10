@@ -1,22 +1,62 @@
-import { PaymentStatus } from '@/types/enums';
+import { PaymentMethod, PaymentStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
 import type { PosbistroCartPayload } from './types';
 
-function normalizeName(order: Pick<Order, 'customer_name' | 'delivery_address'>): string {
-  if (order.customer_name?.trim()) return order.customer_name.trim();
+function splitName(order: Pick<Order, 'customer_name' | 'delivery_address'>): {
+  firstName: string;
+  lastName: string;
+} {
+  const fullName =
+    order.customer_name?.trim() ||
+    [order.delivery_address?.firstName?.trim(), order.delivery_address?.lastName?.trim()]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
 
-  const firstName = order.delivery_address?.firstName?.trim();
-  const lastName = order.delivery_address?.lastName?.trim();
-  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+  if (!fullName) {
+    return {
+      firstName: 'Klient',
+      lastName: 'MESO',
+    };
+  }
 
-  return fullName || 'Klient MESO';
+  const [firstName, ...rest] = fullName.split(/\s+/);
+  return {
+    firstName: firstName || 'Klient',
+    lastName: rest.join(' ') || 'MESO',
+  };
 }
 
-function buildStreet(order: Pick<Order, 'delivery_address'>): string | undefined {
-  const street = order.delivery_address?.street?.trim();
-  const houseNumber = order.delivery_address?.houseNumber?.trim();
-  const parts = [street, houseNumber].filter(Boolean);
-  return parts.length > 0 ? parts.join(' ') : undefined;
+function resolveEmail(order: Pick<Order, 'id' | 'delivery_address'>): string {
+  return order.delivery_address?.email?.trim() || `order-${order.id}@no-email.mesofood.pl`;
+}
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function resolvePaymentType(
+  order: Pick<Order, 'payment_method' | 'payment_status'>
+): 'CASH' | 'CARD' | 'ONLINE' {
+  if (order.payment_method === PaymentMethod.CARD) return 'CARD';
+  if (
+    order.payment_method === PaymentMethod.ONLINE ||
+    order.payment_method === PaymentMethod.BLIK
+  ) {
+    return 'ONLINE';
+  }
+  return 'CASH';
+}
+
+function resolvePaymentProvider(order: Pick<Order, 'payment_method'>): string | undefined {
+  if (
+    order.payment_method === PaymentMethod.ONLINE ||
+    order.payment_method === PaymentMethod.BLIK
+  ) {
+    return 'PRZELEWY24';
+  }
+
+  return undefined;
 }
 
 export function mapOrderToPosbistroPayload(
@@ -25,10 +65,15 @@ export function mapOrderToPosbistroPayload(
     | 'id'
     | 'order_number'
     | 'delivery_type'
+    | 'scheduled_time'
     | 'payment_status'
+    | 'payment_method'
     | 'total'
+    | 'discount'
+    | 'tip'
     | 'notes'
     | 'customer_name'
+    | 'customer_id'
     | 'customer_phone'
     | 'delivery_address'
     | 'items'
@@ -42,42 +87,93 @@ export function mapOrderToPosbistroPayload(
   const confirmUrl =
     `${confirmBaseUrl}?token=${encodeURIComponent(options.callbackToken)}`;
 
-  const street = buildStreet(order);
-  const email = order.delivery_address?.email?.trim();
+  const confirmUrlOrigin = new URL(confirmBaseUrl).origin;
+  const { firstName, lastName } = splitName(order);
+  const products = order.items.map((item) => {
+    const itemPrice = roundCurrency(item.subtotal);
+    const originalUnitPrice = item.original_unit_price ?? item.unit_price;
+    const modifiersOriginalTotal = (item.modifiers || []).reduce(
+      (sum, modifier) => sum + modifier.price * modifier.quantity,
+      0
+    );
+    const originalPrice = roundCurrency(
+      item.quantity * (originalUnitPrice + modifiersOriginalTotal)
+    );
 
-  return {
-    orderId: order.id,
-    orderNumber: order.order_number,
-    fulfillmentType: order.delivery_type === 'pickup' ? 'pickup' : 'delivery',
-    paid: order.payment_status === PaymentStatus.PAID,
-    total: order.total,
-    notes: order.notes?.trim() || undefined,
-    confirmUrl,
-    customer: {
-      name: normalizeName(order),
-      phone: order.customer_phone?.trim() || undefined,
-      email: email || undefined,
-    },
-    address: street
-      ? {
-          street,
-          city: order.delivery_address?.city?.trim() || undefined,
-          postalCode: order.delivery_address?.postal_code?.trim() || undefined,
-          country: order.delivery_address?.country?.trim() || undefined,
-        }
-      : undefined,
-    items: order.items.map((item) => ({
-      id: item.product_id,
+    return {
+      id: item.id,
+      productType: 'SIMPLE' as const,
+      variationId: item.variant_id || item.product_id,
+      variationName: item.variant_name,
       name: item.product_name,
       quantity: item.quantity,
-      price: item.unit_price,
-      notes: item.notes?.trim() || undefined,
-      modifiers: (item.modifiers || []).map((modifier) => ({
+      price: itemPrice,
+      originalPrice,
+      promotionName:
+        item.promotion_label || (itemPrice !== originalPrice ? 'MESO promotion' : undefined),
+      comment: item.notes?.trim() || undefined,
+      keepIncludedAddons: false,
+      addons: (item.modifiers || []).map((modifier) => ({
         id: modifier.modifier_id,
+        addonType: modifier.price > 0 ? 'ADDED' as const : 'INCLUDED' as const,
+        addonId: modifier.modifier_id,
         name: modifier.name,
-        price: modifier.price,
         quantity: modifier.quantity,
+        price: modifier.price,
+        originalPrice: modifier.price,
       })),
-    })),
+    };
+  });
+
+  const originalPrice = roundCurrency(
+    products.reduce((sum, item) => sum + item.originalPrice, 0)
+  );
+  const currentPrice = roundCurrency(
+    products.reduce((sum, item) => sum + item.price, 0)
+  );
+  const orderPrice = roundCurrency(order.total || currentPrice);
+  const promotionName =
+    orderPrice !== originalPrice || order.discount > 0 ? 'MESO discount' : undefined;
+
+  return {
+    id: order.id,
+    orderType: 'ORDER',
+    source: 'DELIVERY',
+    paymentInfo: {
+      paymentType: resolvePaymentType(order),
+      paid: order.payment_status === PaymentStatus.PAID,
+      provider: resolvePaymentProvider(order),
+      tip: typeof order.tip === 'number' && order.tip > 0 ? order.tip : undefined,
+    },
+    deliveryType: order.delivery_type === 'pickup' ? 'TAKEAWAY' : 'DELIVERY',
+    requestedDate: order.scheduled_time || null,
+    price: orderPrice,
+    originalPrice,
+    promotionName,
+    siteUrl: `${confirmUrlOrigin}/api/v1/orders/${order.id}`,
+    confirmUrl,
+    comment: order.notes?.trim() || undefined,
+    client: {
+      clientId: order.customer_id || undefined,
+      firstName,
+      lastName,
+      phone: order.customer_phone?.trim() || order.delivery_address?.phone?.trim() || '',
+      email: resolveEmail(order),
+    },
+    deliveryAddress: order.delivery_type === 'pickup'
+      ? undefined
+      : order.delivery_address?.street?.trim()
+      ? {
+          street: order.delivery_address?.street?.trim() || '',
+          streetNumber: order.delivery_address?.houseNumber?.trim() || undefined,
+          apartmentNumber: undefined,
+          floorNumber: undefined,
+          city: order.delivery_address?.city?.trim() || undefined,
+          postCode: order.delivery_address?.postal_code?.trim() || undefined,
+          latitude: order.delivery_address?.lat,
+          longitude: order.delivery_address?.lng,
+        }
+      : undefined,
+    products,
   };
 }

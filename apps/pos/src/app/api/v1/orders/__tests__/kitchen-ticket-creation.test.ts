@@ -16,11 +16,19 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
   createServerRepository: () => mockServerRepo,
 }))
 
-const { mockEnsureCustomerForOrderDraft, mockSubmitPosbistroOrder } = vi.hoisted(() => ({
+const {
+  mockBuildPosbistroConfirmBaseUrl,
+  mockEnsureCustomerForOrderDraft,
+  mockSubmitPosbistroOrder,
+} = vi.hoisted(() => ({
+  mockBuildPosbistroConfirmBaseUrl: vi.fn((origin?: string) =>
+    `${origin || 'http://localhost:3000'}/api/integrations/posbistro/confirm`
+  ),
   mockEnsureCustomerForOrderDraft: vi.fn(),
   mockSubmitPosbistroOrder: vi.fn(),
 }))
 vi.mock('@/lib/integrations/posbistro/service', () => ({
+  buildPosbistroConfirmBaseUrl: mockBuildPosbistroConfirmBaseUrl,
   ensureCustomerForOrderDraft: mockEnsureCustomerForOrderDraft,
   submitPosbistroOrder: mockSubmitPosbistroOrder,
 }))

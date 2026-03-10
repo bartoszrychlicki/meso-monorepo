@@ -1,6 +1,9 @@
 import { NextRequest } from 'next/server';
 import { apiError, apiSuccess } from '@/lib/api/response';
-import { retryPendingPosbistroExports } from '@/lib/integrations/posbistro/service';
+import {
+  buildPosbistroConfirmBaseUrl,
+  retryPendingPosbistroExports,
+} from '@/lib/integrations/posbistro/service';
 
 export async function POST(request: NextRequest) {
   const expectedSecret = process.env.POSBISTRO_CRON_SECRET?.trim();
@@ -10,6 +13,8 @@ export async function POST(request: NextRequest) {
     return apiError('UNAUTHORIZED', 'Brak autoryzacji dla retry POSBistro', 401);
   }
 
-  const result = await retryPendingPosbistroExports();
+  const result = await retryPendingPosbistroExports({
+    confirmBaseUrl: buildPosbistroConfirmBaseUrl(request.nextUrl.origin),
+  });
   return apiSuccess(result);
 }

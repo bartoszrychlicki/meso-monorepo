@@ -8,6 +8,7 @@ import {
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
 import {
+  buildPosbistroConfirmBaseUrl,
   ensureCustomerForOrderDraft,
   submitPosbistroOrder,
 } from '@/lib/integrations/posbistro/service';
@@ -410,9 +411,13 @@ export async function POST(request: NextRequest) {
         items,
       } as Order;
 
-      submitPosbistroOrder(orderForExport).catch((error) => {
+      try {
+        await submitPosbistroOrder(orderForExport, {
+          confirmBaseUrl: buildPosbistroConfirmBaseUrl(request.nextUrl.origin),
+        });
+      } catch (error) {
         console.error('[POSBistro] submit on create failed:', error);
-      });
+      }
     }
 
     return apiCreated(order);

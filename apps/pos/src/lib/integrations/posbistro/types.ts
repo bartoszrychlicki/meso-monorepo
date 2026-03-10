@@ -8,49 +8,85 @@ export type PosbistroOrderIntegrationStatus =
   | 'rejected'
   | 'failed';
 
-export interface PosbistroItemModifierPayload {
+export interface PosbistroPaymentInfoPayload {
+  paymentType: 'CASH' | 'CARD' | 'ONLINE';
+  paid: boolean;
+  provider?: string;
+  transactionId?: string;
+  tip?: number;
+}
+
+export interface PosbistroProductAddonPayload {
   id: string;
-  name: string;
-  price: number;
+  addonType: 'ADDED' | 'INCLUDED';
+  addonId?: string;
+  addonSku?: number;
+  name?: string;
   quantity: number;
+  price: number;
+  originalPrice: number;
 }
 
-export interface PosbistroItemPayload {
+export interface PosbistroProductPayload {
   id: string;
-  name: string;
+  productType: 'SIMPLE' | 'DELIVERY' | 'PACKAGE' | 'SET' | 'PIZZA';
+  variationId?: string;
+  variationSku?: number;
+  variationName?: string;
+  name?: string;
   quantity: number;
   price: number;
-  notes?: string;
-  modifiers: PosbistroItemModifierPayload[];
+  originalPrice: number;
+  promotionName?: string;
+  comment?: string;
+  keepIncludedAddons?: boolean;
+  addons?: PosbistroProductAddonPayload[];
 }
 
-export interface PosbistroCustomerPayload {
-  name: string;
-  phone?: string;
-  email?: string;
+export interface PosbistroClientPayload {
+  clientId?: string;
+  firstName?: string;
+  lastName?: string;
+  email: string;
+  phone: string;
+  taxNumber?: string;
 }
 
-export interface PosbistroAddressPayload {
+export interface PosbistroDeliveryAddressPayload {
   street: string;
+  streetNumber?: string;
+  apartmentNumber?: string;
+  floorNumber?: string;
+  postCode?: string;
   city?: string;
-  postalCode?: string;
-  country?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface PosbistroCartPayload {
-  orderId: string;
-  orderNumber: string;
-  fulfillmentType: 'delivery' | 'pickup';
-  paid: boolean;
-  total: number;
-  notes?: string;
+  id: string;
+  orderType: 'ORDER' | 'RESERVATION';
+  source: 'DELIVERY';
+  paymentInfo: PosbistroPaymentInfoPayload;
+  deliveryType: 'DELIVERY' | 'TAKEAWAY' | 'PREORDER' | 'RESERVATION';
+  requestedDate: string | null;
+  price: number;
+  originalPrice: number;
+  promotionName?: string;
+  siteUrl?: string;
   confirmUrl: string;
-  customer: PosbistroCustomerPayload;
-  address?: PosbistroAddressPayload;
-  items: PosbistroItemPayload[];
+  comment?: string;
+  numberOfPeople?: number;
+  client: PosbistroClientPayload;
+  deliveryAddress?: PosbistroDeliveryAddressPayload;
+  products: PosbistroProductPayload[];
 }
 
 export interface PosbistroSubmitResponse {
+  status?: boolean;
+  code?: string;
+  message?: string | string[];
+  data?: Record<string, unknown>;
   orderId?: string;
   id?: string;
   accepted?: boolean;
@@ -58,10 +94,12 @@ export interface PosbistroSubmitResponse {
 }
 
 export interface PosbistroConfirmationPayload {
-  status: 'accepted' | 'rejected';
+  status: 'accepted' | 'rejected' | 'ACCEPTED' | 'REJECTED';
   orderId?: string;
   reason?: string;
   message?: string;
+  comment?: string;
+  deliveryTime?: string | number | null;
   [key: string]: unknown;
 }
 

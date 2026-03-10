@@ -28,6 +28,28 @@ async function parseResponseBody(response: Response): Promise<unknown> {
   }
 }
 
+function toErrorMessage(responseBody: unknown): string {
+  if (!responseBody || typeof responseBody !== 'object') {
+    return 'POSBistro order submit rejected';
+  }
+
+  const body = responseBody as {
+    code?: unknown;
+    message?: unknown;
+  };
+  const code = typeof body.code === 'string' ? body.code : null;
+  const message = Array.isArray(body.message)
+    ? body.message.join('; ')
+    : typeof body.message === 'string'
+      ? body.message
+      : null;
+
+  if (code && message) return `POSBistro order submit rejected: ${code} - ${message}`;
+  if (code) return `POSBistro order submit rejected: ${code}`;
+  if (message) return `POSBistro order submit rejected: ${message}`;
+  return 'POSBistro order submit rejected';
+}
+
 export class PosbistroClient {
   constructor(
     private readonly config: {
@@ -55,6 +77,17 @@ export class PosbistroClient {
 
     if (!response.ok) {
       throw new PosbistroSubmitError('POSBistro order submit failed', {
+        status: response.status,
+        responseBody,
+      });
+    }
+
+    const responseRecord =
+      responseBody && typeof responseBody === 'object'
+        ? (responseBody as Record<string, unknown>)
+        : null;
+    if (responseRecord?.status === false) {
+      throw new PosbistroSubmitError(toErrorMessage(responseBody), {
         status: response.status,
         responseBody,
       });

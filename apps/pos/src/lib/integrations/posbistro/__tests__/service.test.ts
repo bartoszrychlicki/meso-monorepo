@@ -106,8 +106,10 @@ describe('submitPosbistroOrder', () => {
         })
       );
     client.submitOrder.mockResolvedValue({
-      orderId: 'pb-100',
-      accepted: true,
+      status: true,
+      data: {
+        orderId: 'pb-100',
+      },
     });
 
     const result = await submitPosbistroOrder(createOrder(), {
@@ -166,6 +168,51 @@ describe('submitPosbistroOrder', () => {
 
     expect(result.status).toBe('failed');
     expect(result.next_retry_at).toBe('2026-03-10T10:00:30.000Z');
+  });
+
+  it('stores POSBistro validation error details when API rejects payload logically', async () => {
+    integrationRepo.findMany.mockResolvedValue([]);
+    integrationRepo.create.mockResolvedValue(createIntegration());
+    integrationRepo.update
+      .mockResolvedValueOnce(createIntegration({ status: 'sending', attempts: 1 }))
+      .mockResolvedValueOnce(
+        createIntegration({
+          status: 'failed',
+          attempts: 1,
+          last_error: 'POSBistro order submit rejected: invalid_cart_param - Missing products',
+          response_payload: {
+            code: 'invalid_cart_param',
+            message: ['Missing products'],
+            status: false,
+          },
+          next_retry_at: '2026-03-10T10:00:30.000Z',
+        })
+      );
+    client.submitOrder.mockRejectedValue(
+      Object.assign(new Error('POSBistro order submit rejected: invalid_cart_param - Missing products'), {
+        responseBody: {
+          status: false,
+          code: 'invalid_cart_param',
+          message: ['Missing products'],
+        },
+      })
+    );
+
+    const result = await submitPosbistroOrder(createOrder(), {
+      integrationRepo: integrationRepo as never,
+      client: client as never,
+      confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
+      now: () => new Date('2026-03-10T10:00:00.000Z'),
+      randomUUID: () => 'token-1',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.response_payload).toEqual(
+      expect.objectContaining({
+        code: 'invalid_cart_param',
+        status: false,
+      })
+    );
   });
 });
 

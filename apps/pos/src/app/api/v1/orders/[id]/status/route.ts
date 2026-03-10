@@ -15,6 +15,7 @@ import type { Order } from '@/types/order';
 import { dispatchWebhook } from '@/lib/webhooks/dispatcher';
 import { OrderStatusChangedData } from '@/lib/webhooks/types';
 import {
+  buildPosbistroConfirmBaseUrl,
   ensureCustomerForOrder,
   submitPosbistroOrder,
 } from '@/lib/integrations/posbistro/service';
@@ -150,7 +151,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   if (newStatus === OrderStatus.CONFIRMED) {
     try {
       const orderWithCustomer = await ensureCustomerForOrder(updated);
-      await submitPosbistroOrder(orderWithCustomer);
+      await submitPosbistroOrder(orderWithCustomer, {
+        confirmBaseUrl: buildPosbistroConfirmBaseUrl(request.nextUrl.origin),
+      });
     } catch (error) {
       console.error('[POSBistro] submit on confirm failed:', error);
     }

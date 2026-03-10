@@ -26,9 +26,13 @@ const baseOrder: Order = {
     {
       id: 'item-1',
       product_id: 'product-1',
+      variant_id: 'variant-1',
+      variant_name: 'Duzy',
       product_name: 'Ramen',
       quantity: 2,
       unit_price: 32,
+      original_unit_price: 35,
+      promotion_label: 'Lunch promo',
       modifiers: [
         {
           modifier_id: 'mod-1',
@@ -55,40 +59,79 @@ const baseOrder: Order = {
 };
 
 describe('mapOrderToPosbistroPayload', () => {
-  it('maps delivery orders with confirmUrl and flattened address', () => {
+  it('maps delivery orders to POSBistro cart schema', () => {
     const payload = mapOrderToPosbistroPayload(baseOrder, {
       callbackToken: 'callback-token-1',
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
     });
 
+    expect(payload.id).toBe('order-1');
+    expect(payload.orderType).toBe('ORDER');
+    expect(payload.source).toBe('DELIVERY');
+    expect(payload.deliveryType).toBe('DELIVERY');
+    expect(payload.price).toBe(72);
+    expect(payload.originalPrice).toBe(78);
     expect(payload.confirmUrl).toBe(
       'https://pos.mesofood.pl/api/integrations/posbistro/confirm?token=callback-token-1'
     );
-    expect(payload.orderId).toBe('order-1');
-    expect(payload.orderNumber).toBe('WEB-20260310-001');
-    expect(payload.fulfillmentType).toBe('delivery');
-    expect(payload.customer).toEqual(
+    expect(payload.paymentInfo).toEqual(
       expect.objectContaining({
-        name: 'Jan Kowalski',
+        paymentType: 'ONLINE',
+        paid: true,
+        provider: 'PRZELEWY24',
+      })
+    );
+    expect(payload.client).toEqual(
+      expect.objectContaining({
+        firstName: 'Jan',
+        lastName: 'Kowalski',
         phone: '+48123456789',
         email: 'jan@example.com',
       })
     );
-    expect(payload.address).toEqual(
+    expect(payload.deliveryAddress).toEqual(
       expect.objectContaining({
-        street: 'Prosta 1A',
+        street: 'Prosta',
+        streetNumber: '1A',
         city: 'Warszawa',
-        postalCode: '00-001',
+        postCode: '00-001',
       })
     );
+    expect(payload.products[0]).toEqual(
+      expect.objectContaining({
+        id: 'item-1',
+        productType: 'SIMPLE',
+        variationId: 'variant-1',
+        variationName: 'Duzy',
+        name: 'Ramen',
+        quantity: 2,
+        price: 72,
+        originalPrice: 78,
+        promotionName: 'Lunch promo',
+        comment: 'Mniej ostre',
+        keepIncludedAddons: false,
+      })
+    );
+    expect(payload.products[0]?.addons).toEqual([
+      expect.objectContaining({
+        id: 'mod-1',
+        addonType: 'ADDED',
+        addonId: 'mod-1',
+        name: 'Extra jajko',
+        quantity: 1,
+        price: 4,
+        originalPrice: 4,
+      }),
+    ]);
   });
 
-  it('maps pickup orders without delivery address and keeps item notes/modifiers', () => {
+  it('maps pickup orders without delivery address and with requestedDate when scheduled', () => {
     const payload = mapOrderToPosbistroPayload(
       {
         ...baseOrder,
         id: 'order-2',
         delivery_type: 'pickup',
+        scheduled_time: '2026-03-10T12:30:00.000Z',
         delivery_address: undefined,
       },
       {
@@ -97,15 +140,16 @@ describe('mapOrderToPosbistroPayload', () => {
       }
     );
 
-    expect(payload.fulfillmentType).toBe('pickup');
-    expect(payload.address).toBeUndefined();
-    expect(payload.items[0]).toEqual(
+    expect(payload.deliveryType).toBe('TAKEAWAY');
+    expect(payload.deliveryAddress).toBeUndefined();
+    expect(payload.requestedDate).toBe('2026-03-10T12:30:00.000Z');
+    expect(payload.products[0]).toEqual(
       expect.objectContaining({
-        id: 'product-1',
+        id: 'item-1',
         name: 'Ramen',
         quantity: 2,
-        notes: 'Mniej ostre',
-        modifiers: [
+        comment: 'Mniej ostre',
+        addons: [
           expect.objectContaining({
             id: 'mod-1',
             name: 'Extra jajko',

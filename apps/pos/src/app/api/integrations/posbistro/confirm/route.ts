@@ -19,8 +19,10 @@ export async function POST(request: NextRequest) {
     body && typeof body === 'object' && 'status' in body
       ? (body as { status?: unknown }).status
       : undefined;
+  const normalizedStatus =
+    typeof status === 'string' ? status.toLowerCase() : undefined;
 
-  if (status !== 'accepted' && status !== 'rejected') {
+  if (normalizedStatus !== 'accepted' && normalizedStatus !== 'rejected') {
     return apiValidationError([
       {
         field: 'status',
@@ -31,11 +33,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await handlePosbistroConfirmation(
-      body as {
+      {
+        ...(body as Record<string, unknown>),
+        status: normalizedStatus,
+      } as {
         status: 'accepted' | 'rejected';
         orderId?: string;
         reason?: string;
         message?: string;
+        comment?: string;
       },
       { token }
     );

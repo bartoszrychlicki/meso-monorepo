@@ -45,6 +45,32 @@ describe('POST /api/integrations/posbistro/confirm', () => {
     expect(body.data.status).toBe('accepted');
   });
 
+  it('accepts uppercase vendor callback payloads', async () => {
+    mockHandleConfirmation.mockResolvedValue({
+      integration: { status: 'rejected' },
+      order: { status: 'cancelled' },
+    });
+
+    const res = await POST(
+      makeRequest(
+        {
+          status: 'REJECTED',
+          comment: 'Lokal zamknięty',
+        },
+        'token-1'
+      )
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockHandleConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'rejected',
+        comment: 'Lokal zamknięty',
+      }),
+      { token: 'token-1' }
+    );
+  });
+
   it('returns 400 when token is missing', async () => {
     const res = await POST(
       makeRequest({

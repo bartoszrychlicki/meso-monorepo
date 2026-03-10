@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { mockRetryPending } = vi.hoisted(() => ({
+const { mockBuildPosbistroConfirmBaseUrl, mockRetryPending } = vi.hoisted(() => ({
+  mockBuildPosbistroConfirmBaseUrl: vi.fn((origin?: string) =>
+    `${origin || 'http://localhost:3000'}/api/integrations/posbistro/confirm`
+  ),
   mockRetryPending: vi.fn(),
 }));
 
 vi.mock('@/lib/integrations/posbistro/service', () => ({
+  buildPosbistroConfirmBaseUrl: mockBuildPosbistroConfirmBaseUrl,
   retryPendingPosbistroExports: mockRetryPending,
 }));
 

@@ -4,7 +4,7 @@ import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { OrderChannel, OrderStatus, CustomerSource } from '@/types/enums';
 import type { Customer } from '@/types/crm';
 import type { Order } from '@/types/order';
-import { createPosbistroClient } from './client';
+import { createPosbistroClient, PosbistroSubmitError } from './client';
 import { mapOrderToPosbistroPayload } from './mapper';
 import type {
   PosbistroConfirmationPayload,
@@ -299,7 +299,11 @@ function isPosbistroEligibleOrder(order: Pick<Order, 'channel' | 'status'>): boo
 }
 
 function extractPosbistroOrderId(response: PosbistroSubmitResponse): string | null {
-  const directValue = response.orderId ?? response.id;
+  const nestedData =
+    response.data && typeof response.data === 'object'
+      ? (response.data as Record<string, unknown>)
+      : null;
+  const directValue = response.orderId ?? response.id ?? nestedData?.orderId ?? nestedData?.id;
   return typeof directValue === 'string' && directValue.length > 0 ? directValue : null;
 }
 
@@ -311,6 +315,16 @@ function toRecord(value: unknown): Record<string, unknown> | null {
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   return 'Unknown POSBistro submit error';
+}
+
+function getErrorPayload(error: unknown): Record<string, unknown> | null {
+  if (error instanceof PosbistroSubmitError) {
+    return toRecord(error.responseBody) ?? {
+      message: error.message,
+    };
+  }
+
+  return toRecord(error instanceof Error ? { message: error.message } : error);
 }
 
 async function findIntegrationByOrderId(
@@ -338,6 +352,46 @@ export function getNextRetryAt(baseDate: Date, attempts: number): Date {
   return new Date(baseDate.getTime() + RETRY_DELAYS_MS[index]);
 }
 
+export function buildPosbistroConfirmBaseUrl(origin?: string): string {
+  const normalizedOrigin = origin?.trim().replace(/\/$/, '');
+  if (normalizedOrigin) {
+    if (normalizedOrigin.includes('/api/integrations/posbistro/confirm')) {
+      return normalizedOrigin;
+    }
+    return `${normalizedOrigin}/api/integrations/posbistro/confirm`;
+  }
+
+  const explicitUrl = process.env.POSBISTRO_CONFIRM_BASE_URL?.trim();
+  if (explicitUrl) {
+    return explicitUrl.replace(/\/$/, '');
+  }
+
+  const vercelHost =
+    process.env.VERCEL_BRANCH_URL?.trim() || process.env.VERCEL_URL?.trim();
+  if (vercelHost) {
+    return `https://${vercelHost.replace(/\/$/, '')}/api/integrations/posbistro/confirm`;
+  }
+
+  return 'http://localhost:3000/api/integrations/posbistro/confirm';
+}
+
+function normalizeConfirmationStatus(
+  status: PosbistroConfirmationPayload['status']
+): 'accepted' | 'rejected' {
+  return String(status).toLowerCase() === 'accepted' ? 'accepted' : 'rejected';
+}
+
+function extractConfirmationOrderId(
+  integration: PosbistroOrderIntegration,
+  payload: PosbistroConfirmationPayload
+): string | null {
+  if (!payload.orderId || payload.orderId === integration.order_id) {
+    return integration.posbistro_order_id;
+  }
+
+  return payload.orderId;
+}
+
 export async function submitPosbistroOrder(
   order: Order,
   deps?: {
@@ -354,10 +408,7 @@ export async function submitPosbistroOrder(
   const client = deps?.client ?? createPosbistroClient();
   const now = deps?.now ?? (() => new Date());
   const randomUUID = deps?.randomUUID ?? (() => crypto.randomUUID());
-  const confirmBaseUrl =
-    deps?.confirmBaseUrl?.trim() ||
-    process.env.POSBISTRO_CONFIRM_BASE_URL?.trim() ||
-    'http://localhost:3000/api/integrations/posbistro/confirm';
+  const confirmBaseUrl = buildPosbistroConfirmBaseUrl(deps?.confirmBaseUrl);
 
   let integration = await findIntegrationByOrderId(integrationRepo, order.id);
   if (integration && (integration.status === 'submitted' || integration.status === 'accepted')) {
@@ -412,7 +463,7 @@ export async function submitPosbistroOrder(
     return integrationRepo.update(integration.id, {
       status: 'failed',
       last_error: getErrorMessage(error),
-      response_payload: toRecord(error instanceof Error ? { message: error.message } : error),
+      response_payload: getErrorPayload(error),
       next_retry_at: nextRetryAt,
     });
   }
@@ -437,8 +488,9 @@ export async function handlePosbistroConfirmation(
   }
 
   const order = await orderRepo.findById(integration.order_id);
+  const normalizedStatus = normalizeConfirmationStatus(payload.status);
 
-  if (payload.status === 'accepted') {
+  if (normalizedStatus === 'accepted') {
     if (integration.status === 'accepted') {
       return { integration, order };
     }
@@ -446,7 +498,7 @@ export async function handlePosbistroConfirmation(
     const updated = await integrationRepo.update(integration.id, {
       status: 'accepted',
       confirmed_at: nowIso,
-      posbistro_order_id: payload.orderId ?? integration.posbistro_order_id,
+      posbistro_order_id: extractConfirmationOrderId(integration, payload),
       response_payload: payload as unknown as Record<string, unknown>,
       rejection_reason: null,
     });
@@ -458,13 +510,14 @@ export async function handlePosbistroConfirmation(
     return { integration, order };
   }
 
-  const reason = payload.reason || payload.message || 'Order rejected by POSBistro';
+  const reason =
+    payload.reason || payload.comment || payload.message || 'Order rejected by POSBistro';
   const updatedIntegration = await integrationRepo.update(integration.id, {
     status: 'rejected',
     rejected_at: nowIso,
     rejection_reason: reason,
     response_payload: payload as unknown as Record<string, unknown>,
-    posbistro_order_id: payload.orderId ?? integration.posbistro_order_id,
+    posbistro_order_id: extractConfirmationOrderId(integration, payload),
   });
 
   if (!order || order.status === OrderStatus.CANCELLED) {

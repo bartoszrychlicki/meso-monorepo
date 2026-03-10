@@ -29,11 +29,19 @@ vi.mock('@/lib/webhooks/dispatcher', () => ({
   dispatchWebhook: mockDispatchWebhook,
 }))
 
-const { mockEnsureCustomerForOrder, mockSubmitPosbistroOrder } = vi.hoisted(() => ({
+const {
+  mockBuildPosbistroConfirmBaseUrl,
+  mockEnsureCustomerForOrder,
+  mockSubmitPosbistroOrder,
+} = vi.hoisted(() => ({
+  mockBuildPosbistroConfirmBaseUrl: vi.fn((origin?: string) =>
+    `${origin || 'http://localhost:3000'}/api/integrations/posbistro/confirm`
+  ),
   mockEnsureCustomerForOrder: vi.fn(),
   mockSubmitPosbistroOrder: vi.fn(),
 }))
 vi.mock('@/lib/integrations/posbistro/service', () => ({
+  buildPosbistroConfirmBaseUrl: mockBuildPosbistroConfirmBaseUrl,
   ensureCustomerForOrder: mockEnsureCustomerForOrder,
   submitPosbistroOrder: mockSubmitPosbistroOrder,
 }))
@@ -192,6 +200,9 @@ describe('PATCH /api/v1/orders/:id/status', () => {
       expect.objectContaining({
         customer_id: 'customer-1',
         status: 'confirmed',
+      }),
+      expect.objectContaining({
+        confirmBaseUrl: 'http://localhost:3000/api/integrations/posbistro/confirm',
       })
     )
   })
