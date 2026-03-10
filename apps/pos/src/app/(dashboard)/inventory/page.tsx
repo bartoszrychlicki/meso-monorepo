@@ -10,6 +10,7 @@ import { WarehouseManager } from '@/modules/inventory/components/warehouse-manag
 import { InventoryCategoryManager } from '@/modules/inventory/components/inventory-category-manager';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
@@ -33,6 +34,7 @@ export default function InventoryPage() {
     warehouses,
     warehouseStockItems,
     isLoading,
+    loadError,
     loadAll,
     adjustStock,
     createStockItem,
@@ -58,7 +60,7 @@ export default function InventoryPage() {
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
 
   useEffect(() => {
-    loadAll();
+    void loadAll();
   }, [loadAll]);
 
   const currentItems = useMemo(() => {
@@ -165,6 +167,25 @@ export default function InventoryPage() {
           </div>
         }
       />
+
+      {loadError ? (
+        <Alert variant="destructive" data-status="inventory-load-warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Niepelne dane magazynu</AlertTitle>
+          <AlertDescription>
+            <p>{loadError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => void loadAll()}
+              data-action="retry-inventory-load"
+            >
+              Sprobuj ponownie
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard

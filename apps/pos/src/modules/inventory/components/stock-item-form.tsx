@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -145,6 +145,14 @@ export function StockItemForm({
   const [quantity, setQuantity] = useState<number | null>(null);
   const [minQuantity, setMinQuantity] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open || warehouseId || warehouses.length === 0) return;
+    const nextWarehouseId = warehouses.find((w) => w.is_default)?.id ?? warehouses[0]?.id ?? '';
+    if (nextWarehouseId) {
+      setWarehouseId(nextWarehouseId);
+    }
+  }, [open, warehouseId, warehouses]);
 
   const resetForm = () => {
     setName('');

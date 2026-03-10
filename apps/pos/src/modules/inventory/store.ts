@@ -18,6 +18,7 @@ interface InventoryStore {
   warehouseStockItems: WarehouseStockItem[];
   selectedWarehouseId: string | null;
   isLoading: boolean;
+  loadError: string | null;
 
   // Detail view state
   currentStockItem: StockItem | null;
@@ -67,6 +68,7 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   warehouseStockItems: [],
   selectedWarehouseId: null,
   isLoading: false,
+  loadError: null,
 
   // Detail view state
   currentStockItem: null,
@@ -75,15 +77,48 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   isDetailLoading: false,
 
   loadAll: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, loadError: null });
     try {
-      const [stockItems, inventoryCategories, warehouses, warehouseStockItems] = await Promise.all([
-        inventoryRepository.getAllStockItems(),
-        inventoryRepository.getAllInventoryCategories(),
-        inventoryRepository.getAllWarehouses(),
-        inventoryRepository.getAllWarehouseStockItems(),
-      ]);
-      set({ stockItems, inventoryCategories, warehouses, warehouseStockItems });
+      const [stockItemsResult, inventoryCategoriesResult, warehousesResult, warehouseStockItemsResult] =
+        await Promise.allSettled([
+          inventoryRepository.getAllStockItems(),
+          inventoryRepository.getAllInventoryCategories(),
+          inventoryRepository.getAllWarehouses(),
+          inventoryRepository.getAllWarehouseStockItems(),
+        ]);
+
+      const nextState: Partial<InventoryStore> = {};
+      const failedSections: string[] = [];
+
+      if (stockItemsResult.status === 'fulfilled') {
+        nextState.stockItems = stockItemsResult.value;
+      } else {
+        failedSections.push('pozycji magazynowych');
+      }
+
+      if (inventoryCategoriesResult.status === 'fulfilled') {
+        nextState.inventoryCategories = inventoryCategoriesResult.value;
+      } else {
+        failedSections.push('kategorii');
+      }
+
+      if (warehousesResult.status === 'fulfilled') {
+        nextState.warehouses = warehousesResult.value;
+      } else {
+        failedSections.push('magazynow');
+      }
+
+      if (warehouseStockItemsResult.status === 'fulfilled') {
+        nextState.warehouseStockItems = warehouseStockItemsResult.value;
+      } else {
+        failedSections.push('stanow magazynowych');
+      }
+
+      nextState.loadError = failedSections.length > 0
+        ? `Nie udalo sie zaladowac wszystkich danych (${failedSections.join(', ')}). Sprobuj ponownie.`
+        : null;
+
+      set(nextState);
     } finally {
       set({ isLoading: false });
     }

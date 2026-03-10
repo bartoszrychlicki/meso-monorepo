@@ -123,6 +123,7 @@ describe('useInventoryStore', () => {
       warehouseStockItems: [],
       selectedWarehouseId: null,
       isLoading: false,
+      loadError: null,
       currentStockItem: null,
       currentComponents: [],
       currentUsage: null,
@@ -149,6 +150,7 @@ describe('useInventoryStore', () => {
       expect(useInventoryStore.getState().warehouses).toEqual(warehouses);
       expect(useInventoryStore.getState().warehouseStockItems).toEqual(whItems);
       expect(useInventoryStore.getState().isLoading).toBe(false);
+      expect(useInventoryStore.getState().loadError).toBeNull();
     });
 
     it('sets isLoading during fetch', async () => {
@@ -169,19 +171,37 @@ describe('useInventoryStore', () => {
       expect(useInventoryStore.getState().isLoading).toBe(false);
     });
 
-    it('resets isLoading on error', async () => {
-      mockGetAllStockItems.mockRejectedValue(new Error('Network error'));
+    it('keeps successful data and exposes loadError when one request fails', async () => {
+      const items = [makeStockItem({ id: '1' })];
+      const categories = [{ id: 'cat-1', name: 'Warzywa', description: null, sort_order: 1, is_active: true }];
+      const warehouses = [makeWarehouse({ id: 'wh-1' })];
+
+      mockGetAllStockItems.mockResolvedValue(items);
+      mockGetAllInventoryCategories.mockResolvedValue(categories);
+      mockGetAllWarehouses.mockResolvedValue(warehouses);
+      mockGetAllWarehouseStockItems.mockRejectedValue(new Error('Network error'));
+
+      await useInventoryStore.getState().loadAll();
+
+      expect(useInventoryStore.getState().stockItems).toEqual(items);
+      expect(useInventoryStore.getState().inventoryCategories).toEqual(categories);
+      expect(useInventoryStore.getState().warehouses).toEqual(warehouses);
+      expect(useInventoryStore.getState().warehouseStockItems).toEqual([]);
+      expect(useInventoryStore.getState().isLoading).toBe(false);
+      expect(useInventoryStore.getState().loadError).toContain('stanow magazynowych');
+    });
+
+    it('clears previous loadError after a successful retry', async () => {
+      useInventoryStore.setState({ loadError: 'old error' });
+
+      mockGetAllStockItems.mockResolvedValue([]);
       mockGetAllInventoryCategories.mockResolvedValue([]);
       mockGetAllWarehouses.mockResolvedValue([]);
       mockGetAllWarehouseStockItems.mockResolvedValue([]);
 
-      try {
-        await useInventoryStore.getState().loadAll();
-      } catch {
-        // expected
-      }
+      await useInventoryStore.getState().loadAll();
 
-      expect(useInventoryStore.getState().isLoading).toBe(false);
+      expect(useInventoryStore.getState().loadError).toBeNull();
     });
   });
 
