@@ -16,6 +16,15 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
   createServerRepository: () => mockServerRepo,
 }))
 
+const { mockEnsureCustomerForOrderDraft, mockSubmitPosbistroOrder } = vi.hoisted(() => ({
+  mockEnsureCustomerForOrderDraft: vi.fn(),
+  mockSubmitPosbistroOrder: vi.fn(),
+}))
+vi.mock('@/lib/integrations/posbistro/service', () => ({
+  ensureCustomerForOrderDraft: mockEnsureCustomerForOrderDraft,
+  submitPosbistroOrder: mockSubmitPosbistroOrder,
+}))
+
 const mockRpc = vi.fn()
 const mockServiceFrom = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({
@@ -86,6 +95,8 @@ describe('POST /api/v1/orders — transactional create payload', () => {
 
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
+    mockEnsureCustomerForOrderDraft.mockImplementation(async (input) => input)
+    mockSubmitPosbistroOrder.mockResolvedValue(null)
     mockServerRepo.findById.mockResolvedValue(mockProduct)
     mockServerRepo.findMany.mockResolvedValue([])
     mockServiceFrom.mockImplementation((table: string) => {

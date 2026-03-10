@@ -14,6 +14,10 @@ import { OrderChannel, OrderStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
 import { dispatchWebhook } from '@/lib/webhooks/dispatcher';
 import { OrderStatusChangedData } from '@/lib/webhooks/types';
+import {
+  ensureCustomerForOrder,
+  submitPosbistroOrder,
+} from '@/lib/integrations/posbistro/service';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -141,6 +145,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     dispatchWebhook(event, webhookData as unknown as Record<string, unknown>).catch(
       (err) => console.error('Webhook dispatch failed:', err)
     );
+  }
+
+  if (newStatus === OrderStatus.CONFIRMED) {
+    try {
+      const orderWithCustomer = await ensureCustomerForOrder(updated);
+      await submitPosbistroOrder(orderWithCustomer);
+    } catch (error) {
+      console.error('[POSBistro] submit on confirm failed:', error);
+    }
   }
 
   return apiSuccess(updated);

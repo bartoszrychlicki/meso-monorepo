@@ -29,6 +29,15 @@ vi.mock('@/lib/webhooks/dispatcher', () => ({
   dispatchWebhook: mockDispatchWebhook,
 }))
 
+const { mockEnsureCustomerForOrder, mockSubmitPosbistroOrder } = vi.hoisted(() => ({
+  mockEnsureCustomerForOrder: vi.fn(),
+  mockSubmitPosbistroOrder: vi.fn(),
+}))
+vi.mock('@/lib/integrations/posbistro/service', () => ({
+  ensureCustomerForOrder: mockEnsureCustomerForOrder,
+  submitPosbistroOrder: mockSubmitPosbistroOrder,
+}))
+
 import { authorizeRequest, isApiKey } from '@/lib/api/auth'
 import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty'
 import { PATCH } from '../orders/[id]/status/route'
@@ -70,6 +79,8 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
     mockDispatchWebhook.mockResolvedValue([])
+    mockEnsureCustomerForOrder.mockImplementation(async (order) => order)
+    mockSubmitPosbistroOrder.mockResolvedValue(null)
   })
 
   it('returns 200 without writes when status is repeated (idempotent no-op)', async () => {
@@ -145,5 +156,43 @@ describe('PATCH /api/v1/orders/:id/status', () => {
 
     expect(res.status).toBe(200)
     expect(mockAwardOrderLoyaltyPoints).toHaveBeenCalledTimes(1)
+  })
+
+  it('ensures customer and submits to POSBistro when order becomes confirmed', async () => {
+    mockFindById.mockResolvedValue({
+      ...baseOrder,
+      status: 'pending',
+    })
+    mockServerRepo.update.mockResolvedValue({
+      ...baseOrder,
+      status: 'confirmed',
+      customer_id: 'customer-1',
+      status_history: [
+        { status: 'pending', timestamp: '2026-03-03T09:55:00.000Z' },
+        { status: 'confirmed', timestamp: '2026-03-03T10:00:00.000Z' },
+      ],
+    })
+    mockEnsureCustomerForOrder.mockResolvedValue({
+      ...baseOrder,
+      status: 'confirmed',
+      customer_id: 'customer-1',
+    })
+
+    const res = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
+        status: 'confirmed',
+      }),
+      makeParams('order-1')
+    )
+
+    expect(res.status).toBe(200)
+    expect(mockEnsureCustomerForOrder).toHaveBeenCalledTimes(1)
+    expect(mockSubmitPosbistroOrder).toHaveBeenCalledTimes(1)
+    expect(mockSubmitPosbistroOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer_id: 'customer-1',
+        status: 'confirmed',
+      })
+    )
   })
 })

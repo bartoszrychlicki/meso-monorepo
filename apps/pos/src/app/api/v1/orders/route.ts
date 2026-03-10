@@ -7,6 +7,10 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import {
+  ensureCustomerForOrderDraft,
+  submitPosbistroOrder,
+} from '@/lib/integrations/posbistro/service';
 import { createServiceClient } from '@/lib/supabase/server';
 import { estimateOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { CreateOrderSchema } from '@/schemas/order';
@@ -173,7 +177,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const input = validation.data;
+  const input = await ensureCustomerForOrderDraft(validation.data);
   const now = new Date().toISOString();
   const serviceClient = createServiceClient();
 
@@ -395,6 +399,20 @@ export async function POST(request: NextRequest) {
         'Nie udało się utworzyć zamówienia',
         500
       );
+    }
+
+    if (initialStatus === OrderStatus.CONFIRMED) {
+      const orderForExport = {
+        ...orderPayload,
+        ...order,
+        id: order.id,
+        status: initialStatus,
+        items,
+      } as Order;
+
+      submitPosbistroOrder(orderForExport).catch((error) => {
+        console.error('[POSBistro] submit on create failed:', error);
+      });
     }
 
     return apiCreated(order);

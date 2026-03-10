@@ -29,6 +29,7 @@ const TABLE_MAP: Record<string, string> = {
   work_times: 'employees_work_times',
   api_keys: 'integrations_api_keys',
   webhook_subscriptions: 'integrations_webhook_subscriptions',
+  posbistro_orders: 'integrations_posbistro_orders',
 };
 
 // Fields that Postgres returns as strings (NUMERIC type) but TS expects as numbers

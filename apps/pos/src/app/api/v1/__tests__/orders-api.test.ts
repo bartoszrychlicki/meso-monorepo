@@ -16,6 +16,15 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
   createServerRepository: () => mockServerRepo,
 }))
 
+const { mockEnsureCustomerForOrderDraft, mockSubmitPosbistroOrder } = vi.hoisted(() => ({
+  mockEnsureCustomerForOrderDraft: vi.fn(),
+  mockSubmitPosbistroOrder: vi.fn(),
+}))
+vi.mock('@/lib/integrations/posbistro/service', () => ({
+  ensureCustomerForOrderDraft: mockEnsureCustomerForOrderDraft,
+  submitPosbistroOrder: mockSubmitPosbistroOrder,
+}))
+
 const mockRpc = vi.fn()
 const mockServiceFrom = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({
@@ -121,6 +130,8 @@ describe('POST /api/v1/orders', () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
+    mockEnsureCustomerForOrderDraft.mockImplementation(async (input) => input)
+    mockSubmitPosbistroOrder.mockResolvedValue(null)
     mockServerRepo.findById.mockResolvedValue(mockProduct)
     mockServerRepo.findMany.mockResolvedValue([])
     mockServiceFrom.mockImplementation((table: string) => {
@@ -178,6 +189,7 @@ describe('POST /api/v1/orders', () => {
         p_kitchen_ticket: expect.any(Object),
       })
     )
+    expect(mockSubmitPosbistroOrder).not.toHaveBeenCalled()
   })
 
   it('returns existing order for duplicate external_order_id (idempotency fast path)', async () => {
@@ -369,5 +381,57 @@ describe('POST /api/v1/orders', () => {
 
     expect(payload.total).toBe(62.8)
     expect(payload.loyalty_points_earned).toBe(112)
+  })
+
+  it('ensures customer and schedules POSBistro submit for confirmed delivery_app orders', async () => {
+    mockEnsureCustomerForOrderDraft.mockResolvedValue({
+      ...validOrderBody,
+      channel: 'delivery_app',
+      customer_id: 'customer-1',
+      payment_status: 'paid',
+    })
+    mockRpc.mockImplementation((fn: string) => {
+      if (fn === 'next_order_number') {
+        return Promise.resolve({
+          data: 'WEB-20260310-001',
+          error: null,
+        })
+      }
+      if (fn === 'create_order_with_items') {
+        return Promise.resolve({
+          data: {
+            id: 'new-order-id',
+            order_number: 'WEB-20260310-001',
+            status: 'confirmed',
+            channel: 'delivery_app',
+            customer_id: 'customer-1',
+          },
+          error: null,
+        })
+      }
+      return Promise.resolve({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validOrderBody,
+          channel: 'delivery_app',
+          payment_status: 'paid',
+        }),
+      })
+    )
+
+    expect(res.status).toBe(201)
+    expect(mockEnsureCustomerForOrderDraft).toHaveBeenCalledTimes(1)
+    expect(mockSubmitPosbistroOrder).toHaveBeenCalledTimes(1)
+    expect(mockSubmitPosbistroOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'new-order-id',
+        status: 'confirmed',
+        customer_id: 'customer-1',
+      })
+    )
   })
 })
