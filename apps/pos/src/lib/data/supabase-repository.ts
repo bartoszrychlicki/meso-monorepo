@@ -44,6 +44,9 @@ const NUMERIC_FIELDS = new Set([
   'default_min_quantity', 'shelf_life_days',
 ]);
 
+const READ_RETRY_ATTEMPTS = 2;
+const READ_RETRY_DELAY_MS = 120;
+
 export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> {
   private collectionName: string;
   private client: SupabaseClient;
@@ -77,6 +80,43 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
     return transformed as T;
   }
 
+  private isRetryableReadError(message: string): boolean {
+    const normalized = message.toLowerCase();
+    return normalized.includes('load failed') ||
+      normalized.includes('failed to fetch') ||
+      normalized.includes('networkerror') ||
+      normalized.includes('network request failed') ||
+      normalized.includes('fetch failed');
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async executeReadQuery<R>(
+    operation: string,
+    table: string,
+    run: () => Promise<{ data: R; error: { message: string } | null }>
+  ): Promise<R> {
+    let lastErrorMessage = 'Unknown error';
+
+    for (let attempt = 1; attempt <= READ_RETRY_ATTEMPTS; attempt++) {
+      const { data, error } = await run();
+
+      if (!error) {
+        return data;
+      }
+
+      lastErrorMessage = error.message;
+      const shouldRetry = this.isRetryableReadError(error.message) && attempt < READ_RETRY_ATTEMPTS;
+      if (!shouldRetry) break;
+
+      await this.sleep(READ_RETRY_DELAY_MS * attempt);
+    }
+
+    throw new Error(`[${table}] ${operation} failed: ${lastErrorMessage}`);
+  }
+
   async findAll(options?: QueryOptions): Promise<PaginatedResult<T>> {
     const table = this.getTableName();
     const page = options?.page ?? 1;
@@ -84,35 +124,31 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
     const from = (page - 1) * perPage;
     const to = from + perPage - 1;
 
-    let query = this.client.from(table).select('*', { count: 'exact' });
+    const { data, count } = await this.executeReadQuery('findAll', table, async () => {
+      let query = this.client.from(table).select('*', { count: 'exact' });
 
-    // Apply filters
-    if (options?.filters) {
-      for (const [key, value] of Object.entries(options.filters)) {
-        if (value === undefined || value === null) continue;
-        if (typeof value === 'string') {
-          query = query.ilike(key, `%${value}%`);
-        } else {
-          query = query.eq(key, value);
+      // Apply filters
+      if (options?.filters) {
+        for (const [key, value] of Object.entries(options.filters)) {
+          if (value === undefined || value === null) continue;
+          if (typeof value === 'string') {
+            query = query.ilike(key, `%${value}%`);
+          } else {
+            query = query.eq(key, value);
+          }
         }
       }
-    }
 
-    // Apply sorting
-    if (options?.sort_by) {
-      query = query.order(options.sort_by, {
-        ascending: options.sort_order !== 'desc',
-      });
-    }
+      // Apply sorting
+      if (options?.sort_by) {
+        query = query.order(options.sort_by, {
+          ascending: options.sort_order !== 'desc',
+        });
+      }
 
-    // Apply pagination
-    query = query.range(from, to);
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      throw new Error(`[${table}] findAll failed: ${error.message}`);
-    }
+      // Apply pagination
+      return query.range(from, to);
+    });
 
     const rows = (data ?? []).map((row: Record<string, unknown>) =>
       this.transformRow(row)
@@ -132,15 +168,13 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async findById(id: string): Promise<T | null> {
     const table = this.getTableName();
 
-    const { data, error } = await this.client
-      .from(table)
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) {
-      throw new Error(`[${table}] findById failed: ${error.message}`);
-    }
+    const data = await this.executeReadQuery('findById', table, async () => {
+      return this.client
+        .from(table)
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+    });
 
     if (!data) return null;
     return this.transformRow(data as Record<string, unknown>);
@@ -151,11 +185,9 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
 
     if (typeof filter === 'function') {
       // Function filter: fetch all rows, then filter in JS
-      const { data, error } = await this.client.from(table).select('*');
-
-      if (error) {
-        throw new Error(`[${table}] findMany failed: ${error.message}`);
-      }
+      const data = await this.executeReadQuery('findMany', table, async () => {
+        return this.client.from(table).select('*');
+      });
 
       const rows = (data ?? []).map((row: Record<string, unknown>) =>
         this.transformRow(row)
@@ -164,18 +196,16 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
     }
 
     // Object filter: build .eq() chains
-    let query = this.client.from(table).select('*');
+    const data = await this.executeReadQuery('findMany', table, async () => {
+      let query = this.client.from(table).select('*');
 
-    for (const [key, value] of Object.entries(filter)) {
-      if (value === undefined || value === null) continue;
-      query = query.eq(key, value);
-    }
+      for (const [key, value] of Object.entries(filter)) {
+        if (value === undefined || value === null) continue;
+        query = query.eq(key, value);
+      }
 
-    const { data, error } = await query;
-
-    if (error) {
-      throw new Error(`[${table}] findMany failed: ${error.message}`);
-    }
+      return query;
+    });
 
     return (data ?? []).map((row: Record<string, unknown>) =>
       this.transformRow(row)
