@@ -40,7 +40,7 @@ import {
 import { Plus, Search, ChefHat, LayoutGrid, Rows3, CircleHelp } from 'lucide-react';
 import { RECIPE_PRODUCT_CATEGORIES, RecipeProductCategory } from '@/types/recipe';
 import {
-  formatFoodCostPercentage,
+  formatRecipeFoodCostDisplay,
   getCategoryDisplayName,
 } from '@/modules/recipes/utils/recipe-calculator';
 import { formatCurrency } from '@/lib/utils';
@@ -74,10 +74,11 @@ export default function RecipesPage() {
     green: 'text-green-600',
     yellow: 'text-yellow-600',
     red: 'text-red-600',
+    muted: 'text-muted-foreground',
   };
 
   const foodCostTooltip =
-    'FC (Food Cost) = (koszt jednostkowy receptury / cena sprzedazy produktu) x 100. N/A oznacza brak dostepnej ceny sprzedazy do wyliczenia.';
+    'FC (Food Cost) = (koszt jednostkowy receptury / cena sprzedazy produktu) x 100. Dla polproduktow zobaczysz "Nie dotyczy", a dla receptur bez ceny sprzedazy "Brak ceny".';
 
   return (
     <TooltipProvider>
@@ -228,8 +229,9 @@ export default function RecipesPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredRecipes.map((recipe) => {
-                    const foodCost = formatFoodCostPercentage(
-                      recipe.food_cost_percentage
+                    const foodCost = formatRecipeFoodCostDisplay(
+                      recipe.food_cost_percentage,
+                      recipe.product_category
                     );
 
                     return (

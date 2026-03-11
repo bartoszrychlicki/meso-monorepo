@@ -2,15 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Recipe, RecipeVersion, RecipeIngredient } from '@/types/recipe';
-import { StockItem } from '@/types/inventory';
+import { Recipe, RecipeVersion, RecipeIngredient, RecipeCostBreakdown } from '@/types/recipe';
 import { recipesRepository } from '@/modules/recipes/repository';
-import { inventoryRepository } from '@/modules/inventory/repository';
 import { PageHeader } from '@/components/layout/page-header';
 import { AllergenBadges } from '@/modules/recipes/components/allergen-badges';
 import {
   getCategoryDisplayName,
-  formatFoodCostPercentage,
+  formatRecipeFoodCostDisplay,
 } from '@/modules/recipes/utils/recipe-calculator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,21 +32,26 @@ export default function RecipeDetailPage() {
   const router = useRouter();
   const [recipe, setRecipe] = useState<Recipe | null>(null);
   useBreadcrumbLabel(params.id as string, recipe?.name);
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [costBreakdown, setCostBreakdown] = useState<RecipeCostBreakdown | null>(null);
   const [versions, setVersions] = useState<RecipeVersion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [recipeData, items, versionsData] = await Promise.all([
+        const [recipeData, versionsData] = await Promise.all([
           recipesRepository.recipes.findById(params.id as string),
-          inventoryRepository.getAllStockItems(),
           recipesRepository.getRecipeVersions(params.id as string),
         ]);
         setRecipe(recipeData ?? null);
-        setStockItems(items);
         setVersions(versionsData);
+
+        if (recipeData) {
+          const breakdown = await recipesRepository.calculateRecipeCost(recipeData);
+          setCostBreakdown(breakdown);
+        } else {
+          setCostBreakdown(null);
+        }
       } catch {
         // ignore
       } finally {
@@ -58,21 +61,36 @@ export default function RecipeDetailPage() {
     load();
   }, [params.id]);
 
-  const getIngredientName = (ing: RecipeIngredient) => {
+  const getIngredientName = (ing: RecipeIngredient, index: number) => {
+    const breakdownIngredient = costBreakdown?.ingredients[index];
+
     if (ing.reference_name) return ing.reference_name;
-    if (ing.type === 'stock_item') {
-      return stockItems.find((s) => s.id === ing.reference_id)?.name ?? ing.reference_id;
+    if (
+      breakdownIngredient &&
+      breakdownIngredient.type === ing.type &&
+      breakdownIngredient.reference_id === ing.reference_id &&
+      breakdownIngredient.reference_name
+    ) {
+      return breakdownIngredient.reference_name;
     }
     return ing.reference_id;
   };
 
-  const getIngredientCost = (ing: RecipeIngredient) => {
-    if (ing.type === 'recipe') {
-      return ing.cost_per_unit ? ing.quantity * ing.cost_per_unit : 0;
+  const getIngredientCost = (ing: RecipeIngredient, index: number) => {
+    const breakdownIngredient = costBreakdown?.ingredients[index];
+    if (
+      breakdownIngredient &&
+      breakdownIngredient.type === ing.type &&
+      breakdownIngredient.reference_id === ing.reference_id
+    ) {
+      return breakdownIngredient.total_cost;
     }
-    const item = stockItems.find((s) => s.id === ing.reference_id);
-    return item ? ing.quantity * item.cost_per_unit : 0;
+
+    return 0;
   };
+
+  const getIngredientHref = (ing: RecipeIngredient) =>
+    ing.type === 'recipe' ? `/recipes/${ing.reference_id}` : `/inventory/${ing.reference_id}`;
 
   const handleDelete = async () => {
     if (!recipe) return;
@@ -107,7 +125,10 @@ export default function RecipeDetailPage() {
     );
   }
 
-  const foodCost = formatFoodCostPercentage(recipe.food_cost_percentage);
+  const foodCost = formatRecipeFoodCostDisplay(
+    recipe.food_cost_percentage,
+    recipe.product_category
+  );
 
   const categoryColors: Record<string, string> = {
     raw_material: 'bg-blue-100 text-blue-700',
@@ -119,6 +140,7 @@ export default function RecipeDetailPage() {
     green: 'text-green-600',
     yellow: 'text-yellow-600',
     red: 'text-red-600',
+    muted: 'text-muted-foreground',
   };
 
   return (
@@ -179,7 +201,7 @@ export default function RecipeDetailPage() {
               <DollarSign className="h-3 w-3" /> Koszt / {recipe.yield_unit}
             </div>
             <div className="text-2xl font-bold mt-1">
-              {recipe.cost_per_unit.toFixed(2)} zl
+              {(costBreakdown?.cost_per_unit ?? recipe.cost_per_unit).toFixed(2)} zl
             </div>
           </CardContent>
         </Card>
@@ -210,7 +232,7 @@ export default function RecipeDetailPage() {
               <div className="col-span-3 text-right">Koszt</div>
             </div>
             {recipe.ingredients.map((ing, i) => {
-              const cost = getIngredientCost(ing);
+              const cost = getIngredientCost(ing, i);
               return (
                 <div
                   key={ing.id || i}
@@ -218,7 +240,12 @@ export default function RecipeDetailPage() {
                   data-ingredient={ing.reference_id}
                 >
                   <div className="col-span-5 font-medium">
-                    {getIngredientName(ing)}
+                    <Link
+                      href={getIngredientHref(ing)}
+                      className="inline-flex items-center gap-1 underline decoration-muted-foreground/40 underline-offset-4 transition-colors hover:text-primary"
+                    >
+                      {getIngredientName(ing, i)}
+                    </Link>
                     {ing.type === 'recipe' && (
                       <Badge variant="outline" className="ml-1 text-[10px]">polprodukt</Badge>
                     )}
@@ -242,7 +269,7 @@ export default function RecipeDetailPage() {
             <div className="grid grid-cols-12 gap-2 font-bold">
               <div className="col-span-9">Koszt calkowity</div>
               <div className="col-span-3 text-right">
-                {recipe.total_cost.toFixed(2)} zl
+                {(costBreakdown?.total_cost ?? recipe.total_cost).toFixed(2)} zl
               </div>
             </div>
             <div className="grid grid-cols-12 gap-2 text-sm text-muted-foreground">
@@ -250,7 +277,7 @@ export default function RecipeDetailPage() {
                 Wydajnosc: {recipe.yield_quantity} {recipe.yield_unit}
               </div>
               <div className="col-span-3 text-right">
-                {recipe.cost_per_unit.toFixed(2)} zl / {recipe.yield_unit}
+                {(costBreakdown?.cost_per_unit ?? recipe.cost_per_unit).toFixed(2)} zl / {recipe.yield_unit}
               </div>
             </div>
           </div>

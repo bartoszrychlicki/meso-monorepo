@@ -15,7 +15,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { AllergenBadges } from './allergen-badges';
-import { getCategoryDisplayName, formatFoodCostPercentage } from '../utils/recipe-calculator';
+import {
+  getCategoryDisplayName,
+  formatRecipeFoodCostDisplay,
+} from '../utils/recipe-calculator';
 import { Clock, DollarSign, Package, CircleHelp } from 'lucide-react';
 
 interface RecipeCardProps {
@@ -23,9 +26,10 @@ interface RecipeCardProps {
 }
 
 export function RecipeCard({ recipe }: RecipeCardProps) {
-  const foodCost = formatFoodCostPercentage(recipe.food_cost_percentage);
-  const foodCostTooltip =
-    'FC (Food Cost) = (koszt jednostkowy receptury / cena sprzedazy produktu) x 100. N/A oznacza brak dostepnej ceny sprzedazy do wyliczenia.';
+  const foodCost = formatRecipeFoodCostDisplay(
+    recipe.food_cost_percentage,
+    recipe.product_category
+  );
 
   const categoryColors = {
     raw_material: 'bg-blue-100 text-blue-700 border-blue-200',
@@ -37,6 +41,7 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
     green: 'text-green-600',
     yellow: 'text-yellow-600',
     red: 'text-red-600',
+    muted: 'text-muted-foreground',
   };
 
   return (
@@ -92,7 +97,7 @@ export function RecipeCard({ recipe }: RecipeCardProps) {
                     <CircleHelp className="h-3.5 w-3.5 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent side="top" className="max-w-xs">
-                    {foodCostTooltip}
+                    {foodCost.tooltip}
                   </TooltipContent>
                 </Tooltip>
               </div>

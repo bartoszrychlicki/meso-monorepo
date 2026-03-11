@@ -208,6 +208,40 @@ export function formatFoodCostPercentage(percentage: number | null): {
   }
 }
 
+export function formatRecipeFoodCostDisplay(
+  percentage: number | null,
+  category: ProductCategory
+): {
+  text: string;
+  color: 'green' | 'yellow' | 'red' | 'muted';
+  tooltip: string;
+} {
+  const formulaTooltip =
+    'FC (Food Cost) = (koszt jednostkowy receptury / cena sprzedazy produktu) x 100.';
+
+  if (percentage === null && category === ProductCategory.SEMI_FINISHED) {
+    return {
+      text: 'Nie dotyczy',
+      color: 'muted',
+      tooltip: `${formulaTooltip} Dla polproduktow FC nie jest liczone, bo nie sa pozycja sprzedazowa.`,
+    };
+  }
+
+  if (percentage === null) {
+    return {
+      text: 'Brak ceny',
+      color: 'yellow',
+      tooltip: `${formulaTooltip} Brak ceny sprzedazy powiazanego produktu, wiec nie da sie wyliczyc FC.`,
+    };
+  }
+
+  const formatted = formatFoodCostPercentage(percentage);
+  return {
+    ...formatted,
+    tooltip: formulaTooltip,
+  };
+}
+
 /**
  * Calculate ingredient cost contribution
  *
