@@ -11,17 +11,12 @@ import {
   revokeApiKey,
   deleteApiKey,
 } from '@/lib/api-keys';
-import { ApiKeyPermission } from '@/types/api-key';
+import { ApiKeyPermission, ALL_API_KEY_PERMISSIONS } from '@/types/api-key';
 import { z } from 'zod';
 
-const ApiKeyPermissionSchema = z.enum([
-  'menu:read',
-  'menu:write',
-  'orders:read',
-  'orders:write',
-  'orders:status',
-  'webhooks:manage',
-]);
+const ApiKeyPermissionSchema = z.enum(
+  ALL_API_KEY_PERMISSIONS as [ApiKeyPermission, ...ApiKeyPermission[]]
+);
 
 const CreateApiKeySchema = z.object({
   name: z.string().min(1, 'Nazwa klucza jest wymagana').max(100),
