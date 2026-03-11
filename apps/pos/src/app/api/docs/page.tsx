@@ -166,6 +166,13 @@ export default function ApiDocsPage() {
               <li><a href="#crm-customers" className="hover:text-blue-600">CRUD klientów</a></li>
             </ul>
           </li>
+          <li>
+            <a href="#locations" className="text-blue-600 hover:underline">Lokalizacje</a>
+            <ul className="ml-4 mt-1 space-y-1 text-gray-500">
+              <li><a href="#locations-list" className="hover:text-blue-600">Lista lokalizacji</a></li>
+              <li><a href="#locations-detail" className="hover:text-blue-600">Szczegóły lokalizacji</a></li>
+            </ul>
+          </li>
           <li><a href="#enumy" className="text-blue-600 hover:underline">Wartości enum</a></li>
         </ul>
       </nav>
@@ -223,6 +230,10 @@ export default function ApiDocsPage() {
               <tr className="border-t border-gray-100">
                 <td className="py-1.5 pr-4 font-mono text-xs">crm:write</td>
                 <td className="py-1.5 text-gray-600">Tworzenie, edycja i usuwanie klientów</td>
+              </tr>
+              <tr className="border-t border-gray-100">
+                <td className="py-1.5 pr-4 font-mono text-xs">settings:read</td>
+                <td className="py-1.5 text-gray-600">Odczyt lokalizacji i ich konfiguracji</td>
               </tr>
             </tbody>
           </table>
@@ -909,6 +920,130 @@ export default function ApiDocsPage() {
         </div>
       </section>
 
+      {/* ──────────── LOCATIONS ──────────── */}
+      <section className="mb-12" id="locations">
+        <h2 className="mb-6 text-2xl font-bold text-gray-900">Lokalizacje</h2>
+
+        <div className="mb-8" id="locations-list">
+          <h3 className="mb-4 text-xl font-semibold text-gray-800">Lista lokalizacji</h3>
+          <div className="space-y-4">
+            <Endpoint
+              method="GET"
+              path="/api/v1/locations"
+              description="Pobierz listę lokalizacji (punktów sprzedaży, kuchni centralnych) z opcjonalnym filtrowaniem."
+              permission="settings:read"
+              queryParams={[
+                { name: 'page', type: 'number', desc: 'Numer strony (domyślnie: 1)' },
+                { name: 'per_page', type: 'number', desc: 'Wyników na stronę (domyślnie: 50, maks: 100)' },
+                { name: 'active', type: 'boolean', desc: 'Filtruj po statusie aktywności (true/false)' },
+              ]}
+              response={`{
+  "success": true,
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Kuchnia Centralna",
+      "type": "central_kitchen",
+      "address": {
+        "street": "ul. Przemysłowa 12",
+        "city": "Warszawa",
+        "postal_code": "02-232",
+        "country": "PL",
+        "lat": null,
+        "lng": null
+      },
+      "phone": "+48123456789",
+      "is_active": true,
+      "created_at": "2026-01-01T00:00:00.000Z",
+      "updated_at": "2026-01-01T00:00:00.000Z"
+    }
+  ],
+  "meta": { "total": 3, "page": 1, "per_page": 50, "timestamp": "..." }
+}`}
+            />
+          </div>
+        </div>
+
+        <div id="locations-detail">
+          <h3 className="mb-4 text-xl font-semibold text-gray-800">Szczegóły lokalizacji</h3>
+          <div className="space-y-4">
+            <Endpoint
+              method="GET"
+              path="/api/v1/locations/:id"
+              description="Pobierz szczegóły lokalizacji wraz z pełną konfiguracją: delivery, paragon, KDS."
+              permission="settings:read"
+              params={[{ name: ':id', type: 'UUID', desc: 'ID lokalizacji' }]}
+              response={`{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "name": "Kuchnia Centralna",
+    "type": "central_kitchen",
+    "address": {
+      "street": "ul. Przemysłowa 12",
+      "city": "Warszawa",
+      "postal_code": "02-232",
+      "country": "PL"
+    },
+    "phone": "+48123456789",
+    "is_active": true,
+    "delivery_config": {
+      "id": "uuid",
+      "location_id": "uuid",
+      "is_delivery_active": true,
+      "delivery_radius_km": 5,
+      "delivery_fee": 10.00,
+      "min_order_amount": 30.00,
+      "estimated_delivery_minutes": 45,
+      "opening_time": "11:00",
+      "closing_time": "21:00",
+      "pickup_time_min": 15,
+      "pickup_time_max": 30,
+      "pickup_buffer_after_open": 30,
+      "pickup_buffer_before_close": 30,
+      "pay_on_pickup_enabled": false,
+      "pay_on_pickup_fee": 0,
+      "pay_on_pickup_max_order": 0
+    },
+    "receipt_config": {
+      "id": "uuid",
+      "location_id": "uuid",
+      "receipt_header": "MESO - Japanese Comfort Food",
+      "receipt_footer": "Dziękujemy za wizytę!",
+      "print_automatically": true,
+      "show_logo": true
+    },
+    "kds_config": {
+      "id": "uuid",
+      "location_id": "uuid",
+      "alert_time_minutes": 5,
+      "auto_accept_orders": false,
+      "sound_enabled": true,
+      "display_priority": true
+    }
+  },
+  "meta": { "timestamp": "..." }
+}`}
+            />
+
+            <div className="rounded-lg border border-gray-200 bg-white p-6">
+              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wide text-gray-500">
+                Uwagi
+              </h4>
+              <ul className="space-y-2 text-sm text-gray-600">
+                <li>
+                  Pola <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">delivery_config</code>,{' '}
+                  <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">receipt_config</code> i{' '}
+                  <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">kds_config</code> mogą być{' '}
+                  <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">null</code> jeśli konfiguracja
+                  nie została jeszcze utworzona dla danej lokalizacji.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ──────────── ENUMS ──────────── */}
       <section className="mb-12" id="enumy">
         <h2 className="mb-4 text-2xl font-bold text-gray-900">Wartości enum</h2>
@@ -969,6 +1104,11 @@ export default function ApiDocsPage() {
             <code className="text-xs text-gray-600">
               gluten | crustaceans | eggs | fish | peanuts | soybeans | milk | nuts | celery | mustard | sesame | sulphites | lupin | molluscs
             </code>
+          </div>
+
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <h3 className="mb-2 text-sm font-semibold text-gray-700">LocationType</h3>
+            <code className="text-xs text-gray-600">central_kitchen | food_truck | kiosk | restaurant</code>
           </div>
 
           <div className="rounded-lg border border-gray-200 bg-white p-4">

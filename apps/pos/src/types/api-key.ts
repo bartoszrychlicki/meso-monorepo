@@ -19,7 +19,8 @@ export type ApiKeyPermission =
   | 'orders:status'
   | 'crm:read'
   | 'crm:write'
-  | 'webhooks:manage';
+  | 'webhooks:manage'
+  | 'settings:read';
 
 export const ALL_API_KEY_PERMISSIONS: ApiKeyPermission[] = [
   'menu:read',
@@ -30,6 +31,7 @@ export const ALL_API_KEY_PERMISSIONS: ApiKeyPermission[] = [
   'crm:read',
   'crm:write',
   'webhooks:manage',
+  'settings:read',
 ];
 
 export const API_KEY_PERMISSION_LABELS: Record<ApiKeyPermission, string> = {
@@ -41,4 +43,5 @@ export const API_KEY_PERMISSION_LABELS: Record<ApiKeyPermission, string> = {
   'crm:read': 'Klienci - odczyt',
   'crm:write': 'Klienci - zapis',
   'webhooks:manage': 'Webhooks - zarządzanie',
+  'settings:read': 'Ustawienia - odczyt',
 };

@@ -99,6 +99,9 @@ export default function LocationEditPage() {
           </Button>
         }
       />
+      <p className="text-xs text-muted-foreground -mt-4">
+        <span className="font-mono select-all" data-field="location-id">{id}</span>
+      </p>
 
       <Tabs defaultValue="basic">
         <TabsList>
