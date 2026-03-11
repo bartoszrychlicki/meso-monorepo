@@ -45,6 +45,12 @@ export interface StockItemUsage {
     parent_sku: string;
     quantity: number;
   }[];
+  in_recipes: {
+    recipe_id: string;
+    recipe_name: string;
+    quantity: number;
+    unit: string;
+  }[];
 }
 
 export interface Warehouse extends BaseEntity {

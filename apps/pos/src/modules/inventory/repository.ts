@@ -334,11 +334,14 @@ export const inventoryRepository = {
 
   async getStockItemUsage(stockItemId: string): Promise<StockItemUsage> {
     // Find components where this item is used as a component
-    const componentUsages = await stockItemComponentRepo.findMany({
-      component_stock_item_id: stockItemId,
-    } as Partial<StockItemComponent>);
+    const [componentUsages, allItems, allRecipes] = await Promise.all([
+      stockItemComponentRepo.findMany({
+        component_stock_item_id: stockItemId,
+      } as Partial<StockItemComponent>),
+      stockItemRepo.findMany(() => true),
+      recipesRepo.findMany((r) => r.is_active),
+    ]);
 
-    const allItems = await stockItemRepo.findMany(() => true);
     const itemMap = new Map(allItems.map((item) => [item.id, item]));
 
     const in_components = componentUsages.map((comp) => {
@@ -351,6 +354,23 @@ export const inventoryRepository = {
       };
     });
 
-    return { in_components };
+    // Find recipes that use this stock item as an ingredient
+    const in_recipes = allRecipes
+      .filter((recipe) => recipeUsesStockItem(recipe.ingredients, stockItemId))
+      .map((recipe) => {
+        const ingredient = recipe.ingredients.find(
+          (ing) =>
+            (ing.type === 'stock_item' && ing.reference_id === stockItemId) ||
+            (ing as unknown as { stock_item_id?: string }).stock_item_id === stockItemId
+        );
+        return {
+          recipe_id: recipe.id,
+          recipe_name: recipe.name,
+          quantity: ingredient?.quantity ?? 0,
+          unit: ingredient?.unit ?? '',
+        };
+      });
+
+    return { in_components, in_recipes };
   },
 };
