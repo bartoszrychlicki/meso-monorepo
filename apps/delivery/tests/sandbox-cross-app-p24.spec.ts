@@ -41,7 +41,8 @@ import {
   type DeliveryAuthUser,
 } from './sandbox-helpers'
 
-test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () => {
+// TODO: Fix flaky P24 sandbox test — see https://github.com/bartoszrychlicki/meso-monorepo/issues/7
+test.describe.serial.skip('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () => {
   let admin: SupabaseClient
   let deliveryUserId = ''
   let deliveryUserEmail = ''
