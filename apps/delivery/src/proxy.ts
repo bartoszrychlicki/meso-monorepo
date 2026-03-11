@@ -6,30 +6,30 @@ const ACCESS_PASSWORD = 'TuJestMeso2026'
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Password gate: skip for gate page, webhook endpoints, auth flows, and static assets
-  const isPublicPath =
-    pathname === '/gate' ||
-    pathname === '/callback' ||
-    pathname === '/reset-password' ||
-    pathname === '/forgot-password' ||
-    pathname === '/login' ||
-    pathname === '/register' ||
-    pathname.startsWith('/api/gate') ||
-    pathname.startsWith('/api/payments/') ||
-    pathname.startsWith('/_next/') ||
-    pathname.startsWith('/favicon') ||
-    pathname.endsWith('.svg') ||
-    pathname.endsWith('.png') ||
-    pathname.endsWith('.jpg') ||
-    pathname.endsWith('.ico')
-
-  if (!isPublicPath) {
-    const accessCookie = request.cookies.get('meso_access')
-    if (accessCookie?.value !== ACCESS_PASSWORD) {
-      const gateUrl = new URL('/gate', request.url)
-      return NextResponse.redirect(gateUrl)
-    }
-  }
+  // Password gate: DISABLED for now
+  // const isPublicPath =
+  //   pathname === '/gate' ||
+  //   pathname === '/callback' ||
+  //   pathname === '/reset-password' ||
+  //   pathname === '/forgot-password' ||
+  //   pathname === '/login' ||
+  //   pathname === '/register' ||
+  //   pathname.startsWith('/api/gate') ||
+  //   pathname.startsWith('/api/payments/') ||
+  //   pathname.startsWith('/_next/') ||
+  //   pathname.startsWith('/favicon') ||
+  //   pathname.endsWith('.svg') ||
+  //   pathname.endsWith('.png') ||
+  //   pathname.endsWith('.jpg') ||
+  //   pathname.endsWith('.ico')
+  //
+  // if (!isPublicPath) {
+  //   const accessCookie = request.cookies.get('meso_access')
+  //   if (accessCookie?.value !== ACCESS_PASSWORD) {
+  //     const gateUrl = new URL('/gate', request.url)
+  //     return NextResponse.redirect(gateUrl)
+  //   }
+  // }
 
   // Original Supabase session refresh logic
   let supabaseResponse = NextResponse.next({
