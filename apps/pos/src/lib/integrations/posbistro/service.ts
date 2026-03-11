@@ -26,7 +26,10 @@ type IntegrationRepo = Pick<
   BaseRepository<PosbistroOrderIntegration>,
   'findMany' | 'findAll' | 'create' | 'update'
 >;
-type MenuMappingRepo = Pick<BaseRepository<PosbistroMenuMapping>, 'findAll'>;
+type MenuMappingRepo = Pick<
+  BaseRepository<PosbistroMenuMapping>,
+  'findAll' | 'findById' | 'create' | 'update' | 'delete'
+>;
 
 function createCustomerRepo(): CustomerRepo {
   return createServerRepository<Customer>('customers');
