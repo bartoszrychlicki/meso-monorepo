@@ -3,6 +3,20 @@ import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
 import { mapOrderToPosbistroPayload } from '../mapper';
 
+const resolvedMappings = {
+  itemMappings: {
+    'item-1': {
+      productType: 'SIMPLE' as const,
+      variationId: 'pb-variation-1',
+      modifierMappings: {
+        'mod-1': {
+          addonId: 'pb-addon-1',
+        },
+      },
+    },
+  },
+};
+
 const baseOrder: Order = {
   id: 'order-1',
   order_number: 'WEB-20260310-001',
@@ -63,6 +77,7 @@ describe('mapOrderToPosbistroPayload', () => {
     const payload = mapOrderToPosbistroPayload(baseOrder, {
       callbackToken: 'callback-token-1',
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
+      resolvedMappings,
     });
 
     expect(payload.id).toBe('order-1');
@@ -101,7 +116,7 @@ describe('mapOrderToPosbistroPayload', () => {
       expect.objectContaining({
         id: 'item-1',
         productType: 'SIMPLE',
-        variationId: 'variant-1',
+        variationId: 'pb-variation-1',
         variationName: 'Duzy',
         name: 'Ramen',
         quantity: 2,
@@ -116,7 +131,7 @@ describe('mapOrderToPosbistroPayload', () => {
       expect.objectContaining({
         id: 'mod-1',
         addonType: 'ADDED',
-        addonId: 'mod-1',
+        addonId: 'pb-addon-1',
         name: 'Extra jajko',
         quantity: 1,
         price: 4,
@@ -137,6 +152,7 @@ describe('mapOrderToPosbistroPayload', () => {
       {
         callbackToken: 'callback-token-2',
         confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
+        resolvedMappings,
       }
     );
 

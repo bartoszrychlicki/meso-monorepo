@@ -8,6 +8,9 @@ export type PosbistroOrderIntegrationStatus =
   | 'rejected'
   | 'failed';
 
+export type PosbistroMenuMappingType = 'product' | 'variant' | 'modifier';
+export type PosbistroProductType = 'SIMPLE' | 'DELIVERY' | 'PACKAGE' | 'SET' | 'PIZZA';
+
 export interface PosbistroPaymentInfoPayload {
   paymentType: 'CASH' | 'CARD' | 'ONLINE';
   paid: boolean;
@@ -116,4 +119,19 @@ export interface PosbistroOrderIntegration extends BaseEntity {
   confirmed_at: string | null;
   rejected_at: string | null;
   rejection_reason: string | null;
+}
+
+export interface PosbistroMenuMapping extends BaseEntity {
+  mapping_type: PosbistroMenuMappingType;
+  meso_product_id: string | null;
+  meso_variant_id: string | null;
+  meso_modifier_id: string | null;
+  posbistro_product_type: PosbistroProductType | null;
+  posbistro_variation_id: string | null;
+  posbistro_variation_sku: number | null;
+  posbistro_addon_id: string | null;
+  posbistro_addon_sku: number | null;
+  posbistro_name: string | null;
+  notes: string | null;
+  is_active: boolean;
 }

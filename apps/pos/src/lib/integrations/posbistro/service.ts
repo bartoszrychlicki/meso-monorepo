@@ -5,9 +5,14 @@ import { OrderChannel, OrderStatus, CustomerSource } from '@/types/enums';
 import type { Customer } from '@/types/crm';
 import type { Order } from '@/types/order';
 import { createPosbistroClient, PosbistroSubmitError } from './client';
+import {
+  PosbistroMenuMappingError,
+  resolvePosbistroMappingsForOrder,
+} from './menu-mapping';
 import { mapOrderToPosbistroPayload } from './mapper';
 import type {
   PosbistroConfirmationPayload,
+  PosbistroMenuMapping,
   PosbistroOrderIntegration,
   PosbistroSubmitResponse,
 } from './types';
@@ -21,6 +26,7 @@ type IntegrationRepo = Pick<
   BaseRepository<PosbistroOrderIntegration>,
   'findMany' | 'findAll' | 'create' | 'update'
 >;
+type MenuMappingRepo = Pick<BaseRepository<PosbistroMenuMapping>, 'findAll'>;
 
 function createCustomerRepo(): CustomerRepo {
   return createServerRepository<Customer>('customers');
@@ -32,6 +38,10 @@ function createOrderRepo(): OrderRepo {
 
 function createIntegrationRepo(): IntegrationRepo {
   return createServerRepository<PosbistroOrderIntegration>('posbistro_orders');
+}
+
+function createMenuMappingRepo(): MenuMappingRepo {
+  return createServerRepository<PosbistroMenuMapping>('posbistro_menu_mappings');
 }
 
 function isBlank(value: string | null | undefined): boolean {
@@ -318,6 +328,14 @@ function getErrorMessage(error: unknown): string {
 }
 
 function getErrorPayload(error: unknown): Record<string, unknown> | null {
+  if (error instanceof PosbistroMenuMappingError) {
+    return toRecord({
+      message: error.message,
+      details: error.details,
+      code: 'missing_posbistro_mapping',
+    });
+  }
+
   if (error instanceof PosbistroSubmitError) {
     return toRecord(error.responseBody) ?? {
       message: error.message,
@@ -396,6 +414,7 @@ export async function submitPosbistroOrder(
   order: Order,
   deps?: {
     integrationRepo?: IntegrationRepo;
+    mappingRepo?: MenuMappingRepo;
     client?: Pick<ReturnType<typeof createPosbistroClient>, 'submitOrder'>;
     confirmBaseUrl?: string;
     now?: () => Date;
@@ -405,6 +424,7 @@ export async function submitPosbistroOrder(
   if (!isPosbistroEligibleOrder(order)) return null;
 
   const integrationRepo = deps?.integrationRepo ?? createIntegrationRepo();
+  const mappingRepo = deps?.mappingRepo ?? createMenuMappingRepo();
   const client = deps?.client ?? createPosbistroClient();
   const now = deps?.now ?? (() => new Date());
   const randomUUID = deps?.randomUUID ?? (() => crypto.randomUUID());
@@ -432,21 +452,26 @@ export async function submitPosbistroOrder(
     } as Omit<PosbistroOrderIntegration, 'id' | 'created_at' | 'updated_at'>);
   }
 
-  const payload = mapOrderToPosbistroPayload(order, {
-    callbackToken: integration.callback_token,
-    confirmBaseUrl,
-  });
   const attemptNumber = integration.attempts + 1;
 
-  await integrationRepo.update(integration.id, {
-    status: 'sending',
-    attempts: attemptNumber,
-    request_payload: payload as unknown as Record<string, unknown>,
-    last_error: null,
-    next_retry_at: null,
-  });
-
   try {
+    const resolvedMappings = await resolvePosbistroMappingsForOrder(order, {
+      mappingRepo,
+    });
+    const payload = mapOrderToPosbistroPayload(order, {
+      callbackToken: integration.callback_token,
+      confirmBaseUrl,
+      resolvedMappings,
+    });
+
+    await integrationRepo.update(integration.id, {
+      status: 'sending',
+      attempts: attemptNumber,
+      request_payload: payload as unknown as Record<string, unknown>,
+      last_error: null,
+      next_retry_at: null,
+    });
+
     const response = await client.submitOrder(payload);
     return integrationRepo.update(integration.id, {
       status: 'submitted',
@@ -457,11 +482,15 @@ export async function submitPosbistroOrder(
     });
   } catch (error) {
     const currentTime = now();
-    const nextRetryAt =
-      attemptNumber >= MAX_ATTEMPTS ? null : getNextRetryAt(currentTime, attemptNumber).toISOString();
+    const nextRetryAt = error instanceof PosbistroMenuMappingError
+      ? null
+      : attemptNumber >= MAX_ATTEMPTS
+        ? null
+        : getNextRetryAt(currentTime, attemptNumber).toISOString();
 
     return integrationRepo.update(integration.id, {
       status: 'failed',
+      attempts: attemptNumber,
       last_error: getErrorMessage(error),
       response_payload: getErrorPayload(error),
       next_retry_at: nextRetryAt,
@@ -543,6 +572,7 @@ export async function handlePosbistroConfirmation(
 export async function retryPendingPosbistroExports(deps?: {
   integrationRepo?: IntegrationRepo;
   orderRepo?: OrderRepo;
+  mappingRepo?: MenuMappingRepo;
   client?: Pick<ReturnType<typeof createPosbistroClient>, 'submitOrder'>;
   confirmBaseUrl?: string;
   now?: () => Date;
@@ -561,9 +591,17 @@ export async function retryPendingPosbistroExports(deps?: {
   });
 
   const dueRecords = page.data.filter((record) => {
-    if (!(record.status === 'pending' || record.status === 'failed')) return false;
-    if (!record.next_retry_at) return true;
-    return new Date(record.next_retry_at) <= currentTime;
+    if (record.status === 'pending') {
+      if (!record.next_retry_at) return true;
+      return new Date(record.next_retry_at) <= currentTime;
+    }
+
+    if (record.status === 'failed') {
+      if (!record.next_retry_at) return false;
+      return new Date(record.next_retry_at) <= currentTime;
+    }
+
+    return false;
   });
 
   let succeeded = 0;
@@ -582,6 +620,7 @@ export async function retryPendingPosbistroExports(deps?: {
 
     const result = await submitPosbistroOrder(order, {
       integrationRepo,
+      mappingRepo: deps?.mappingRepo,
       client,
       confirmBaseUrl: deps?.confirmBaseUrl,
       now,

@@ -1,6 +1,7 @@
 import { PaymentMethod, PaymentStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
 import type { PosbistroCartPayload } from './types';
+import type { PosbistroResolvedOrderMappings } from './menu-mapping';
 
 function splitName(order: Pick<Order, 'customer_name' | 'delivery_address'>): {
   firstName: string;
@@ -81,6 +82,7 @@ export function mapOrderToPosbistroPayload(
   options: {
     callbackToken: string;
     confirmBaseUrl: string;
+    resolvedMappings: PosbistroResolvedOrderMappings;
   }
 ): PosbistroCartPayload {
   const confirmBaseUrl = options.confirmBaseUrl.replace(/\/$/, '');
@@ -90,6 +92,7 @@ export function mapOrderToPosbistroPayload(
   const confirmUrlOrigin = new URL(confirmBaseUrl).origin;
   const { firstName, lastName } = splitName(order);
   const products = order.items.map((item) => {
+    const resolvedMapping = options.resolvedMappings.itemMappings[item.id];
     const itemPrice = roundCurrency(item.subtotal);
     const originalUnitPrice = item.original_unit_price ?? item.unit_price;
     const modifiersOriginalTotal = (item.modifiers || []).reduce(
@@ -102,8 +105,9 @@ export function mapOrderToPosbistroPayload(
 
     return {
       id: item.id,
-      productType: 'SIMPLE' as const,
-      variationId: item.variant_id || item.product_id,
+      productType: resolvedMapping.productType,
+      variationId: resolvedMapping.variationId,
+      variationSku: resolvedMapping.variationSku,
       variationName: item.variant_name,
       name: item.product_name,
       quantity: item.quantity,
@@ -114,9 +118,14 @@ export function mapOrderToPosbistroPayload(
       comment: item.notes?.trim() || undefined,
       keepIncludedAddons: false,
       addons: (item.modifiers || []).map((modifier) => ({
+        ...(resolvedMapping.modifierMappings[modifier.modifier_id]?.addonId
+          ? { addonId: resolvedMapping.modifierMappings[modifier.modifier_id]?.addonId }
+          : {}),
+        ...(resolvedMapping.modifierMappings[modifier.modifier_id]?.addonSku
+          ? { addonSku: resolvedMapping.modifierMappings[modifier.modifier_id]?.addonSku }
+          : {}),
         id: modifier.modifier_id,
         addonType: modifier.price > 0 ? 'ADDED' as const : 'INCLUDED' as const,
-        addonId: modifier.modifier_id,
         name: modifier.name,
         quantity: modifier.quantity,
         price: modifier.price,

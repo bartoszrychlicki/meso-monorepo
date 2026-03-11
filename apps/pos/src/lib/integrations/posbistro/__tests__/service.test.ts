@@ -85,12 +85,40 @@ describe('submitPosbistroOrder', () => {
     update: vi.fn(),
     findAll: vi.fn(),
   };
+  const mappingRepo = {
+    findAll: vi.fn(),
+  };
   const client = {
     submitOrder: vi.fn(),
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mappingRepo.findAll.mockResolvedValue({
+      data: [
+        {
+          id: 'mapping-variant-1',
+          mapping_type: 'product',
+          meso_product_id: 'product-1',
+          meso_variant_id: null,
+          meso_modifier_id: null,
+          posbistro_product_type: 'SIMPLE',
+          posbistro_variation_id: 'pb-variation-1',
+          posbistro_variation_sku: null,
+          posbistro_addon_id: null,
+          posbistro_addon_sku: null,
+          posbistro_name: null,
+          notes: null,
+          is_active: true,
+          created_at: '2026-03-10T10:00:00.000Z',
+          updated_at: '2026-03-10T10:00:00.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 1000,
+      total_pages: 1,
+    });
   });
 
   it('creates integration record and submits order once', async () => {
@@ -114,6 +142,7 @@ describe('submitPosbistroOrder', () => {
 
     const result = await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
+      mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
@@ -133,6 +162,7 @@ describe('submitPosbistroOrder', () => {
 
     const result = await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
+      mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
@@ -160,6 +190,7 @@ describe('submitPosbistroOrder', () => {
 
     const result = await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
+      mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
@@ -200,6 +231,7 @@ describe('submitPosbistroOrder', () => {
 
     const result = await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
+      mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
@@ -213,6 +245,42 @@ describe('submitPosbistroOrder', () => {
         status: false,
       })
     );
+  });
+
+  it('fails without retry when POSBistro menu mapping is missing', async () => {
+    integrationRepo.findMany.mockResolvedValue([]);
+    integrationRepo.create.mockResolvedValue(createIntegration());
+    integrationRepo.update.mockResolvedValue(
+      createIntegration({
+        status: 'failed',
+        attempts: 1,
+        last_error: 'Missing POSBistro product mapping for "Ramen" (product-1)',
+        response_payload: {
+          code: 'missing_posbistro_mapping',
+        },
+        next_retry_at: null,
+      })
+    );
+    mappingRepo.findAll.mockResolvedValue({
+      data: [],
+      total: 0,
+      page: 1,
+      per_page: 1000,
+      total_pages: 0,
+    });
+
+    const result = await submitPosbistroOrder(createOrder({ items: [{ ...createOrder().items[0], variant_id: undefined }] }), {
+      integrationRepo: integrationRepo as never,
+      mappingRepo: mappingRepo as never,
+      client: client as never,
+      confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
+      now: () => new Date('2026-03-10T10:00:00.000Z'),
+      randomUUID: () => 'token-1',
+    });
+
+    expect(client.submitOrder).not.toHaveBeenCalled();
+    expect(result.status).toBe('failed');
+    expect(result.next_retry_at).toBeNull();
   });
 });
 
@@ -437,9 +505,37 @@ describe('retryPendingPosbistroExports', () => {
   const client = {
     submitOrder: vi.fn(),
   };
+  const mappingRepo = {
+    findAll: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mappingRepo.findAll.mockResolvedValue({
+      data: [
+        {
+          id: 'mapping-1',
+          mapping_type: 'product',
+          meso_product_id: 'product-1',
+          meso_variant_id: null,
+          meso_modifier_id: null,
+          posbistro_product_type: 'SIMPLE',
+          posbistro_variation_id: 'pb-variation-1',
+          posbistro_variation_sku: null,
+          posbistro_addon_id: null,
+          posbistro_addon_sku: null,
+          posbistro_name: null,
+          notes: null,
+          is_active: true,
+          created_at: '2026-03-10T10:00:00.000Z',
+          updated_at: '2026-03-10T10:00:00.000Z',
+        },
+      ],
+      total: 1,
+      page: 1,
+      per_page: 1000,
+      total_pages: 1,
+    });
   });
 
   it('retries only due records and updates counters', async () => {
@@ -474,6 +570,7 @@ describe('retryPendingPosbistroExports', () => {
     const result = await retryPendingPosbistroExports({
       integrationRepo: integrationRepo as never,
       orderRepo: orderRepo as never,
+      mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
