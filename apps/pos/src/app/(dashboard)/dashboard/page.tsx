@@ -1,13 +1,12 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { seedAll } from '@/seed';
 import { formatCurrency, formatTime } from '@/lib/utils';
 import { ORDER_STATUS_COLORS, ORDER_STATUS_LABELS } from '@/lib/constants';
 import {
@@ -20,75 +19,59 @@ import {
   Package,
   Star,
 } from 'lucide-react';
-import { Order } from '@/types/order';
-import { Product } from '@/types/menu';
-import { OrderStatus } from '@/types/enums';
-
-const STORAGE_PREFIX = 'mesopos_';
-
-function loadFromStorage<T>(key: string): T[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const data = localStorage.getItem(`${STORAGE_PREFIX}${key}`);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
-}
-
-interface StockItem {
-  id: string;
-  name: string;
-  current_stock: number;
-  min_stock_level: number;
-  unit: string;
-}
+import { WarehouseStockItem } from '@/types/inventory';
+import { useOrders } from '@/modules/orders/hooks';
+import { getOrderStatsForLocalDay } from '@/modules/orders/stats';
+import { inventoryRepository } from '@/modules/inventory/repository';
 
 export default function DashboardPage() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [_products, setProducts] = useState<Product[]>([]);
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const { orders, isLoading: ordersLoading } = useOrders();
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [stockItems, setStockItems] = useState<WarehouseStockItem[]>([]);
+  const [lowStockAlerts, setLowStockAlerts] = useState<WarehouseStockItem[]>([]);
 
   useEffect(() => {
-    seedAll();
-    // Load data from localStorage
-    const loadedOrders = loadFromStorage<Order>('orders');
-    const loadedProducts = loadFromStorage<Product>('products');
-    const loadedStock = loadFromStorage<StockItem>('stock_items');
-    setOrders(loadedOrders);
-    setProducts(loadedProducts);
-    setStockItems(loadedStock);
-    setIsLoading(false);
+    let cancelled = false;
+
+    async function loadInventory() {
+      setInventoryLoading(true);
+      try {
+        const [allStockItems, lowStock] = await Promise.all([
+          inventoryRepository.getAllWarehouseStockItems(),
+          inventoryRepository.getLowStockItems(),
+        ]);
+
+        if (!cancelled) {
+          setStockItems(allStockItems);
+          setLowStockAlerts(lowStock);
+        }
+      } finally {
+        if (!cancelled) {
+          setInventoryLoading(false);
+        }
+      }
+    }
+
+    loadInventory();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Compute KPI stats
   const stats = useMemo(() => {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    const todayOrders = orders.filter((o) => new Date(o.created_at) >= todayStart);
-    const deliveredToday = todayOrders.filter((o) => o.status === OrderStatus.DELIVERED);
-
-    const revenueToday = deliveredToday.reduce((sum, o) => sum + o.total, 0);
-    const orderCountToday = todayOrders.length;
-    const avgOrderValue = orderCountToday > 0 ? revenueToday / Math.max(deliveredToday.length, 1) : 0;
-
-    const activeOrders = orders.filter(
-      (o) =>
-        o.status !== OrderStatus.DELIVERED &&
-        o.status !== OrderStatus.CANCELLED
-    );
+    const orderStats = getOrderStatsForLocalDay(orders);
 
     // Average prep time from all orders (simulated)
     const avgPrepTime = orders.length > 0 ? 12 : 0;
 
     return {
-      revenueToday,
-      orderCountToday,
-      avgOrderValue,
+      revenueToday: orderStats.revenueToday,
+      orderCountToday: orderStats.orderCountToday,
+      avgOrderValue: orderStats.avgOrderValue,
       avgPrepTime,
-      activeOrderCount: activeOrders.length,
+      activeOrderCount: orderStats.activeOrderCount,
     };
   }, [orders]);
 
@@ -117,9 +100,7 @@ export default function DashboardPage() {
   }, [orders]);
 
   // Low stock alerts
-  const lowStockAlerts = useMemo(() => {
-    return stockItems.filter((item) => item.current_stock <= item.min_stock_level);
-  }, [stockItems]);
+  const isLoading = ordersLoading || inventoryLoading;
 
   if (isLoading) {
     return (
@@ -298,7 +279,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-amber-700 dark:text-amber-300">
-                      {item.current_stock} / {item.min_stock_level} {item.unit}
+                      {item.quantity} / {item.min_quantity} {item.unit}
                     </span>
                     <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-900 dark:text-amber-200">
                       Niski stan

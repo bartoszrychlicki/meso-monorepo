@@ -14,6 +14,7 @@ import { createRepository } from '@/lib/data/repository-factory';
 import { LOCATION_IDS } from '@/seed/data/locations';
 import { USER_IDS } from '@/seed/data/users';
 import { getProductPromotionPricing } from '@/modules/menu/utils/pricing';
+import { getOrderStatsForLocalDay } from './stats';
 
 export interface CartItem {
   id: string;
@@ -408,22 +409,10 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
   },
 
   todaysRevenue: () => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    return get()
-      .orders.filter(
-        (o) =>
-          o.created_at >= todayStart.toISOString() &&
-          o.status !== OrderStatus.CANCELLED
-      )
-      .reduce((sum, o) => sum + o.total, 0);
+    return getOrderStatsForLocalDay(get().orders).revenueToday;
   },
 
   todaysOrderCount: () => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    return get().orders.filter(
-      (o) => o.created_at >= todayStart.toISOString()
-    ).length;
+    return getOrderStatsForLocalDay(get().orders).orderCountToday;
   },
 }));

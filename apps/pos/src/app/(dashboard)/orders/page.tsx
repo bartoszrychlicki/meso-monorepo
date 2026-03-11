@@ -9,9 +9,11 @@ import { useOrders } from '@/modules/orders/hooks';
 import { OrderList } from '@/modules/orders/components/order-list';
 import { Plus, ShoppingCart, DollarSign, Activity } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
+import { getActiveOrderCount } from '@/modules/orders/stats';
 
 export default function OrdersPage() {
   const {
+    orders,
     isLoading,
     filterStatus,
     setFilterStatus,
@@ -20,9 +22,7 @@ export default function OrdersPage() {
     todaysOrderCount,
   } = useOrders();
 
-  const activeCount = filteredOrders.filter(
-    (o) => o.status !== 'delivered' && o.status !== 'cancelled'
-  ).length;
+  const activeCount = getActiveOrderCount(orders);
 
   return (
     <div className="space-y-6" data-page="orders">
