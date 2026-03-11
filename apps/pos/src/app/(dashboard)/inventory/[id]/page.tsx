@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { DescriptionTab } from '@/modules/inventory/components/description-tab';
 import { OptionsTab } from '@/modules/inventory/components/options-tab';
 import { ComponentsTab } from '@/modules/inventory/components/components-tab';
 import { UsageTab } from '@/modules/inventory/components/usage-tab';
-import { ArrowLeft } from 'lucide-react';
+import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
 
@@ -32,15 +33,34 @@ export default function StockItemDetailPage() {
     loadUsage,
     updateStockItem,
   } = useInventoryStore();
+  const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
 
   useBreadcrumbLabel(id, currentStockItem?.name);
 
-  useEffect(() => {
-    loadStockItemDetail(id);
-    loadInventoryCategories();
-    loadComponents(id);
-    loadUsage(id);
+  const loadDetailData = useCallback(async () => {
+    setDetailLoadError(null);
+    const results = await Promise.allSettled([
+      loadStockItemDetail(id),
+      loadInventoryCategories(),
+      loadComponents(id),
+      loadUsage(id),
+    ]);
+
+    const failed = results.filter((result) => result.status === 'rejected');
+    if (failed.length > 0) {
+      setDetailLoadError(
+        'Nie udalo sie zaladowac wszystkich danych szczegolow. Sprobuj ponownie.'
+      );
+    }
   }, [id, loadStockItemDetail, loadInventoryCategories, loadComponents, loadUsage]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      void loadDetailData();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadDetailData]);
 
   const handleTabChange = (value: string) => {
     const url = new URL(window.location.href);
@@ -48,11 +68,36 @@ export default function StockItemDetailPage() {
     router.replace(url.pathname + url.search);
   };
 
-  if (isDetailLoading || !currentStockItem) {
+  if (isDetailLoading && !currentStockItem) {
     return (
       <div className="space-y-6" data-page="stock-item-detail">
         <PageHeader title="Ladowanie..." />
         <LoadingSkeleton variant="page" />
+      </div>
+    );
+  }
+
+  if (!currentStockItem) {
+    return (
+      <div className="space-y-6" data-page="stock-item-detail">
+        <PageHeader title="Nie udalo sie zaladowac pozycji" />
+        <Alert variant="destructive" data-status="stock-item-load-error">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Brak danych pozycji magazynowej</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <p>{detailLoadError ?? 'Nie udalo sie pobrac danych pozycji. Sprobuj ponownie.'}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => void loadDetailData()} data-action="retry-stock-item-load">
+                Sprobuj ponownie
+              </Button>
+              <Link href="/inventory">
+                <Button variant="ghost" data-action="back-to-inventory">
+                  Powrot do magazynu
+                </Button>
+              </Link>
+            </div>
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
@@ -73,6 +118,25 @@ export default function StockItemDetailPage() {
           </div>
         }
       />
+
+      {detailLoadError ? (
+        <Alert variant="destructive" data-status="stock-item-partial-load-warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Niepelne dane szczegolow</AlertTitle>
+          <AlertDescription>
+            <p>{detailLoadError}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => void loadDetailData()}
+              data-action="retry-stock-item-load"
+            >
+              Sprobuj ponownie
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Tabs value={activeTab} onValueChange={handleTabChange} data-component="stock-item-tabs">
         <TabsList>
