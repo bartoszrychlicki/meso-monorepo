@@ -42,7 +42,8 @@ import {
 } from './sandbox-helpers'
 
 // TODO: Fix flaky P24 sandbox test — see https://github.com/bartoszrychlicki/meso-monorepo/issues/7
-test.describe.serial.skip('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () => {
+test.describe.serial('Sandbox Cross-App Flow: Delivery -> P24 -> POS KDS', () => {
+  test.skip(true, 'Flaky: P24 sandbox BLIK button stays disabled — see issue #7')
   let admin: SupabaseClient
   let deliveryUserId = ''
   let deliveryUserEmail = ''
