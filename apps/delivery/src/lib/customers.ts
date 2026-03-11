@@ -4,16 +4,31 @@ type QueryError = {
   message?: string
 } | null
 
+type QueryResult = Promise<{
+  data: unknown
+  error: QueryError
+}>
+
+type SingleRowQuery = {
+  eq: (column: string, value: string) => {
+    maybeSingle: () => QueryResult
+  }
+}
+
 type QueryableClient = {
-  from: (table: string) => any
+  from: (table: string) => {
+    select: (columns: string) => SingleRowQuery
+  }
 }
 
 export async function fetchCustomerByAuthId<T>(
-  client: QueryableClient,
+  client: unknown,
   authUserId: string,
   columns: string
 ): Promise<T | null> {
-  const { data, error } = await client
+  const queryClient = client as QueryableClient
+
+  const { data, error } = await queryClient
     .from(Tables.customers)
     .select(columns)
     .eq('auth_id', authUserId)
