@@ -32,7 +32,6 @@ vi.spyOn(NextResponse, 'next').mockImplementation(() => new NextResponse(null, {
 // Constants
 // ---------------------------------------------------------------------------
 
-const GATE_PASSWORD = 'TuJestMeso2026'
 const BASE = 'http://localhost:3000'
 
 // ---------------------------------------------------------------------------
@@ -67,7 +66,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('proxy – public paths bypass gate', () => {
+describe('proxy – password gate is disabled', () => {
   let proxy: (req: NextRequest) => Promise<Response>
 
   beforeEach(async () => {
@@ -75,19 +74,25 @@ describe('proxy – public paths bypass gate', () => {
     proxy = mod.proxy
   })
 
-  // ---- Auth paths should be public (no meso_access cookie needed) ----
-
-  const publicAuthPaths = [
+  const allPaths = [
+    '/menu',
+    '/account',
+    '/cart',
+    '/checkout',
+    '/order/123',
+    '/',
     '/callback',
     '/reset-password',
     '/forgot-password',
     '/login',
     '/register',
     '/gate',
+    '/api/gate',
+    '/api/payments/webhook',
   ]
 
-  for (const path of publicAuthPaths) {
-    it(`allows ${path} without meso_access cookie`, async () => {
+  for (const path of allPaths) {
+    it(`allows ${path} without meso_access cookie (gate disabled)`, async () => {
       const req = makeRequest(path)
       const res = await proxy(req)
 
@@ -95,85 +100,10 @@ describe('proxy – public paths bypass gate', () => {
     })
   }
 
-  // ---- API public paths ----
-
-  it('allows /api/gate without meso_access cookie', async () => {
-    const req = makeRequest('/api/gate')
-    const res = await proxy(req)
-
-    expect(isRedirectToGate(res)).toBe(false)
-  })
-
-  it('allows /api/payments/webhook without meso_access cookie', async () => {
-    const req = makeRequest('/api/payments/webhook')
-    const res = await proxy(req)
-
-    expect(isRedirectToGate(res)).toBe(false)
-  })
-
-  // ---- Static asset paths ----
-
-  it('allows static assets (.svg, .png, .jpg, .ico) without cookie', async () => {
-    const staticPaths = ['/logo.svg', '/hero.png', '/photo.jpg', '/favicon.ico']
-
-    for (const path of staticPaths) {
-      const req = makeRequest(path)
-      const res = await proxy(req)
-      expect(isRedirectToGate(res)).toBe(false)
-    }
-  })
-
-  it('allows /_next/ prefixed paths without cookie', async () => {
-    const req = makeRequest('/_next/static/chunks/main.js')
-    const res = await proxy(req)
-
-    expect(isRedirectToGate(res)).toBe(false)
-  })
-})
-
-describe('proxy – non-public paths require meso_access cookie', () => {
-  let proxy: (req: NextRequest) => Promise<Response>
-
-  beforeEach(async () => {
-    const mod = await import('../proxy')
-    proxy = mod.proxy
-  })
-
-  const protectedPaths = ['/menu', '/account', '/cart', '/checkout', '/order/123', '/']
-
-  for (const path of protectedPaths) {
-    it(`redirects ${path} to /gate without meso_access cookie`, async () => {
-      const req = makeRequest(path)
-      const res = await proxy(req)
-
-      expect(isRedirectToGate(res)).toBe(true)
-    })
-  }
-
-  it('redirects /menu to /gate with wrong meso_access cookie', async () => {
+  it('does not redirect even with wrong meso_access cookie', async () => {
     const req = makeRequest('/menu', { meso_access: 'wrong-password' })
     const res = await proxy(req)
 
-    expect(isRedirectToGate(res)).toBe(true)
+    expect(isRedirectToGate(res)).toBe(false)
   })
-})
-
-describe('proxy – non-public paths pass through with valid meso_access cookie', () => {
-  let proxy: (req: NextRequest) => Promise<Response>
-
-  beforeEach(async () => {
-    const mod = await import('../proxy')
-    proxy = mod.proxy
-  })
-
-  const protectedPaths = ['/menu', '/account', '/cart', '/checkout', '/']
-
-  for (const path of protectedPaths) {
-    it(`allows ${path} with valid meso_access cookie`, async () => {
-      const req = makeRequest(path, { meso_access: GATE_PASSWORD })
-      const res = await proxy(req)
-
-      expect(isRedirectToGate(res)).toBe(false)
-    })
-  }
 })
