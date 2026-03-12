@@ -1,8 +1,10 @@
 import { ApiKey, ApiKeyPermission } from '@/types/api-key';
-import { createRepository } from '@/lib/data/repository-factory';
+import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { createServiceClient } from '@/lib/supabase/server';
 
-const apiKeysRepository = createRepository<ApiKey>('api_keys');
+function getApiKeysRepository() {
+  return createServerRepository<ApiKey>('api_keys');
+}
 
 /** Generate a cryptographically random API key string */
 export function generateApiKeyString(): string {
@@ -31,6 +33,7 @@ export async function createApiKey(params: {
   created_by: string;
   expires_at?: string;
 }): Promise<{ apiKey: ApiKey; rawKey: string }> {
+  const apiKeysRepository = getApiKeysRepository();
   const rawKey = generateApiKeyString();
   const keyHash = await hashApiKey(rawKey);
   const keyPrefix = rawKey.substring(0, 12) + '...';
@@ -88,18 +91,19 @@ export function hasPermission(
 
 /** Revoke (deactivate) an API key */
 export async function revokeApiKey(id: string): Promise<void> {
+  const apiKeysRepository = getApiKeysRepository();
   await apiKeysRepository.update(id, { is_active: false } as Partial<ApiKey>);
 }
 
 /** List all API keys (without exposing hashes) */
 export async function listApiKeys(): Promise<ApiKey[]> {
+  const apiKeysRepository = getApiKeysRepository();
   const result = await apiKeysRepository.findAll({ per_page: 100 });
   return result.data;
 }
 
 /** Delete an API key permanently */
 export async function deleteApiKey(id: string): Promise<void> {
+  const apiKeysRepository = getApiKeysRepository();
   await apiKeysRepository.delete(id);
 }
-
-export { apiKeysRepository };
