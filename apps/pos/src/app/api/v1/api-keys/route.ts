@@ -14,6 +14,9 @@ import {
 import { ApiKeyPermission, ALL_API_KEY_PERMISSIONS } from '@/types/api-key';
 import { z } from 'zod';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 const ApiKeyPermissionSchema = z.enum(
   ALL_API_KEY_PERMISSIONS as [ApiKeyPermission, ...ApiKeyPermission[]]
 );
@@ -36,11 +39,19 @@ const RevokeApiKeySchema = z.object({
  * In the current prototype, this is open for the Settings UI.
  */
 export async function GET() {
-  const keys = await listApiKeys();
+  try {
+    const keys = await listApiKeys();
 
-  // Strip sensitive data
-  const safeKeys = keys.map(({ key_hash: _hash, ...rest }) => rest);
-  return apiSuccess(safeKeys);
+    // Strip sensitive data
+    const safeKeys = keys.map(({ key_hash: _hash, ...rest }) => rest);
+    return apiSuccess(safeKeys);
+  } catch (error) {
+    return apiError(
+      'API_KEYS_LIST_FAILED',
+      error instanceof Error ? error.message : 'Nie udało się pobrać kluczy API',
+      500
+    );
+  }
 }
 
 /**
@@ -48,38 +59,46 @@ export async function GET() {
  * Create a new API key. Returns the raw key ONCE.
  */
 export async function POST(request: NextRequest) {
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
-  }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
+    }
 
-  const validation = CreateApiKeySchema.safeParse(body);
-  if (!validation.success) {
-    return apiValidationError(
-      validation.error.issues.map((i) => ({
-        field: i.path.join('.'),
-        message: i.message,
-      }))
+    const validation = CreateApiKeySchema.safeParse(body);
+    if (!validation.success) {
+      return apiValidationError(
+        validation.error.issues.map((i) => ({
+          field: i.path.join('.'),
+          message: i.message,
+        }))
+      );
+    }
+
+    const { name, permissions, expires_at } = validation.data;
+
+    const { apiKey, rawKey } = await createApiKey({
+      name,
+      permissions: permissions as ApiKeyPermission[],
+      created_by: 'admin', // In production, would come from session
+      expires_at,
+    });
+
+    // Return the raw key — it can only be seen this one time
+    const { key_hash: _hash, ...safeKey } = apiKey;
+    return apiCreated({
+      ...safeKey,
+      raw_key: rawKey,
+    });
+  } catch (error) {
+    return apiError(
+      'API_KEY_CREATE_FAILED',
+      error instanceof Error ? error.message : 'Nie udało się utworzyć klucza API',
+      500
     );
   }
-
-  const { name, permissions, expires_at } = validation.data;
-
-  const { apiKey, rawKey } = await createApiKey({
-    name,
-    permissions: permissions as ApiKeyPermission[],
-    created_by: 'admin', // In production, would come from session
-    expires_at,
-  });
-
-  // Return the raw key — it can only be seen this one time
-  const { key_hash: _hash, ...safeKey } = apiKey;
-  return apiCreated({
-    ...safeKey,
-    raw_key: rawKey,
-  });
 }
 
 /**
@@ -87,31 +106,39 @@ export async function POST(request: NextRequest) {
  * Revoke or delete an API key.
  */
 export async function DELETE(request: NextRequest) {
-  let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
-  }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
+    }
 
-  const validation = RevokeApiKeySchema.safeParse(body);
-  if (!validation.success) {
-    return apiValidationError(
-      validation.error.issues.map((i) => ({
-        field: i.path.join('.'),
-        message: i.message,
-      }))
+    const validation = RevokeApiKeySchema.safeParse(body);
+    if (!validation.success) {
+      return apiValidationError(
+        validation.error.issues.map((i) => ({
+          field: i.path.join('.'),
+          message: i.message,
+        }))
+      );
+    }
+
+    const { searchParams } = new URL(request.url);
+    const permanent = searchParams.get('permanent') === 'true';
+
+    if (permanent) {
+      await deleteApiKey(validation.data.id);
+    } else {
+      await revokeApiKey(validation.data.id);
+    }
+
+    return apiSuccess({ revoked: true });
+  } catch (error) {
+    return apiError(
+      'API_KEY_DELETE_FAILED',
+      error instanceof Error ? error.message : 'Nie udało się unieważnić klucza API',
+      500
     );
   }
-
-  const { searchParams } = new URL(request.url);
-  const permanent = searchParams.get('permanent') === 'true';
-
-  if (permanent) {
-    await deleteApiKey(validation.data.id);
-  } else {
-    await revokeApiKey(validation.data.id);
-  }
-
-  return apiSuccess({ revoked: true });
 }

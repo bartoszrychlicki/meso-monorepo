@@ -62,6 +62,7 @@ interface ApiKeyDisplay {
 export function ApiKeysManager() {
   const [apiKeys, setApiKeys] = useState<ApiKeyDisplay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState('');
   const [newKeyPermissions, setNewKeyPermissions] = useState<ApiKeyPermission[]>([]);
@@ -69,14 +70,22 @@ export function ApiKeysManager() {
   const [isCreating, setIsCreating] = useState(false);
 
   const loadApiKeys = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError(null);
     try {
-      const res = await fetch('/api/v1/api-keys');
+      const res = await fetch('/api/v1/api-keys', { cache: 'no-store' });
       const json = await res.json();
-      if (json.success) {
-        setApiKeys(json.data);
+      if (!res.ok || !json.success || !Array.isArray(json.data)) {
+        throw new Error(json.error?.message || 'Nie udało się załadować kluczy API');
       }
-    } catch {
-      toast.error('Nie udało się załadować kluczy API');
+      setApiKeys(json.data);
+    } catch (error) {
+      setApiKeys([]);
+      const message = error instanceof Error
+        ? error.message
+        : 'Nie udało się załadować kluczy API';
+      setLoadError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -108,7 +117,7 @@ export function ApiKeysManager() {
       });
 
       const json = await res.json();
-      if (json.success) {
+      if (res.ok && json.success) {
         setCreatedRawKey(json.data.raw_key);
         await loadApiKeys();
         toast.success('Klucz API został utworzony');
@@ -131,9 +140,11 @@ export function ApiKeysManager() {
       });
 
       const json = await res.json();
-      if (json.success) {
+      if (res.ok && json.success) {
         await loadApiKeys();
         toast.success('Klucz API został unieważniony');
+      } else {
+        toast.error(json.error?.message || 'Nie udało się unieważnić klucza');
       }
     } catch {
       toast.error('Nie udało się unieważnić klucza');
@@ -281,6 +292,18 @@ export function ApiKeysManager() {
           {isLoading ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               Ładowanie kluczy API...
+            </div>
+          ) : loadError ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-8 text-center text-sm text-muted-foreground">
+              <p className="mb-1 font-medium text-foreground">Nie udało się załadować kluczy API</p>
+              <p>{loadError}</p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={() => void loadApiKeys()}
+              >
+                Spróbuj ponownie
+              </Button>
             </div>
           ) : apiKeys.length === 0 ? (
             <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
