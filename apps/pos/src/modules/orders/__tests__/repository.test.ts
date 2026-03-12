@@ -1,0 +1,104 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { OrderStatus } from '@/types/enums';
+
+const { mockOrderFindById, mockOrderUpdate, mockKitchenTicketsIn, mockKitchenTicketsEq, mockKitchenTicketsUpdate } = vi.hoisted(() => ({
+  mockOrderFindById: vi.fn(),
+  mockOrderUpdate: vi.fn(),
+  mockKitchenTicketsIn: vi.fn(),
+  mockKitchenTicketsEq: vi.fn(),
+  mockKitchenTicketsUpdate: vi.fn(),
+}));
+
+vi.mock('@/lib/data/repository-factory', () => ({
+  createRepository: vi.fn(() => ({
+    findById: mockOrderFindById,
+    update: mockOrderUpdate,
+    findMany: vi.fn(),
+    findAll: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+    count: vi.fn(),
+  })),
+}));
+
+vi.mock('@/modules/crm/repository', () => ({
+  crmRepository: {
+    customers: { findById: vi.fn() },
+    findCustomerByPhone: vi.fn(),
+    addLoyaltyTransaction: vi.fn(),
+    updateOrderStats: vi.fn(),
+  },
+}));
+
+vi.mock('@/modules/crm/utils/loyalty-calculator', () => ({
+  BONUS_POINTS: { FIRST_ORDER: 50 },
+  calculatePointsFromOrder: vi.fn(() => 0),
+}));
+
+vi.mock('@/lib/sms/sms-provider', () => ({
+  sendSMS: vi.fn(),
+}));
+
+vi.mock('@/lib/sms/templates', () => ({
+  getOrderStatusSMS: vi.fn(() => null),
+  isValidPhoneNumber: vi.fn(() => true),
+  formatPhoneForSMS: vi.fn((phone: string) => phone),
+}));
+
+vi.mock('@/lib/supabase/client', () => ({
+  supabase: {
+    from: vi.fn((table: string) => {
+      if (table !== 'orders_kitchen_tickets') {
+        throw new Error(`Unexpected table access in test: ${table}`);
+      }
+
+      return {
+        update: mockKitchenTicketsUpdate,
+      };
+    }),
+    rpc: vi.fn(),
+  },
+}));
+
+import { ordersRepository } from '../repository';
+
+describe('ordersRepository.updateStatus', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockKitchenTicketsUpdate.mockReturnValue({ eq: mockKitchenTicketsEq });
+    mockKitchenTicketsEq.mockReturnValue({ in: mockKitchenTicketsIn });
+    mockKitchenTicketsIn.mockResolvedValue({ error: null });
+  });
+
+  it('cancels active kitchen tickets when an order is cancelled from the UI repository path', async () => {
+    mockOrderFindById.mockResolvedValue({
+      id: 'order-1',
+      order_number: 'WEB-20260303-001',
+      status: OrderStatus.CONFIRMED,
+      status_history: [{ status: OrderStatus.CONFIRMED, timestamp: '2026-03-03T10:00:00.000Z' }],
+      customer_phone: undefined,
+    });
+    mockOrderUpdate.mockResolvedValue({
+      id: 'order-1',
+      order_number: 'WEB-20260303-001',
+      status: OrderStatus.CANCELLED,
+      status_history: [
+        { status: OrderStatus.CONFIRMED, timestamp: '2026-03-03T10:00:00.000Z' },
+        { status: OrderStatus.CANCELLED, timestamp: '2026-03-03T10:05:00.000Z', note: 'Test' },
+      ],
+      customer_phone: undefined,
+    });
+
+    await ordersRepository.updateStatus('order-1', OrderStatus.CANCELLED, 'Test');
+
+    expect(mockKitchenTicketsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: OrderStatus.CANCELLED,
+        completed_at: expect.any(String),
+        updated_at: expect.any(String),
+      })
+    );
+    expect(mockKitchenTicketsEq).toHaveBeenCalledWith('order_id', 'order-1');
+    expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready']);
+  });
+});

@@ -2,6 +2,7 @@ export interface DeliveryConfigRecord {
   opening_time?: string | null
   closing_time?: string | null
   pickup_time_min?: number | null
+  pickup_time_max?: number | null
   estimated_delivery_minutes?: number | null
   pickup_buffer_after_open?: number | null
   pickup_buffer_before_close?: number | null
@@ -19,9 +20,16 @@ export interface CheckoutRuntimeConfig {
   pickupBufferAfterOpen: number
   pickupBufferBeforeClose: number
   pickupEstimateMinutes: number
+  pickupEstimateMaxMinutes: number
   payOnPickupEnabled: boolean
   payOnPickupFee: number
   payOnPickupMaxOrder: number
+}
+
+export interface PayOnPickupConfig {
+  enabled: boolean
+  fee: number
+  maxOrder: number
 }
 
 export interface CartLocationConfig {
@@ -61,6 +69,9 @@ export function resolveCheckoutConfig(config: DeliveryConfigRecord | null | unde
   const pickupEstimateMinutes = config?.pickup_time_min != null
     ? asNumber(config.pickup_time_min, DEFAULTS.pickupEstimateMinutes)
     : asNumber(config?.estimated_delivery_minutes, DEFAULTS.pickupEstimateMinutes)
+  const pickupEstimateMaxMinutes = config?.pickup_time_max != null
+    ? asNumber(config.pickup_time_max, pickupEstimateMinutes)
+    : pickupEstimateMinutes
 
   return {
     openTime: asTime(config?.opening_time, DEFAULTS.openTime),
@@ -68,6 +79,7 @@ export function resolveCheckoutConfig(config: DeliveryConfigRecord | null | unde
     pickupBufferAfterOpen: asNumber(config?.pickup_buffer_after_open, DEFAULTS.pickupBufferAfterOpen),
     pickupBufferBeforeClose: asNumber(config?.pickup_buffer_before_close, DEFAULTS.pickupBufferBeforeClose),
     pickupEstimateMinutes,
+    pickupEstimateMaxMinutes,
     payOnPickupEnabled: typeof config?.pay_on_pickup_enabled === 'boolean'
       ? config.pay_on_pickup_enabled
       : DEFAULTS.payOnPickupEnabled,
@@ -79,6 +91,25 @@ export function resolveCheckoutConfig(config: DeliveryConfigRecord | null | unde
       DEFAULTS.payOnPickupMaxOrder
     ),
   }
+}
+
+export function resolvePayOnPickupConfig(
+  config: DeliveryConfigRecord | null | undefined
+): PayOnPickupConfig {
+  const runtimeConfig = resolveCheckoutConfig(config)
+
+  return {
+    enabled: runtimeConfig.payOnPickupEnabled,
+    fee: runtimeConfig.payOnPickupFee,
+    maxOrder: runtimeConfig.payOnPickupMaxOrder,
+  }
+}
+
+export function isPayOnPickupAvailable(
+  config: PayOnPickupConfig,
+  orderSubtotal: number
+): boolean {
+  return config.enabled && orderSubtotal <= config.maxOrder
 }
 
 export function resolveCartLocationConfig(config: DeliveryConfigRecord | null | undefined): CartLocationConfig {

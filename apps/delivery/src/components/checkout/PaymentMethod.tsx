@@ -23,7 +23,7 @@ export function PaymentMethod({
     orderSubtotal,
 }: PaymentMethodProps) {
     const exceedsLimit = orderSubtotal > payOnPickupMaxOrder
-    const payOnPickupDisabled = !payOnPickupEnabled || exceedsLimit
+    const payOnPickupDisabled = exceedsLimit
 
     return (
         <div className="space-y-3">
@@ -78,50 +78,51 @@ export function PaymentMethod({
                 </div>
             </button>
 
-            {/* Option 2: Pay on pickup */}
-            <button
-                type="button"
-                onClick={() => !payOnPickupDisabled && onChange('pay_on_pickup')}
-                disabled={payOnPickupDisabled}
-                className={cn(
-                    'w-full rounded-xl border p-4 text-left transition-all',
-                    payOnPickupDisabled && 'opacity-50 cursor-not-allowed',
-                    selected === 'pay_on_pickup'
-                        ? 'border-primary bg-primary/5 neon-border'
-                        : 'border-border bg-card hover:border-primary/30'
-                )}
-            >
-                <div className="flex items-center gap-3">
-                    <div className={cn(
-                        'flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors',
-                        selected === 'pay_on_pickup' ? 'border-primary' : 'border-muted-foreground/40'
-                    )}>
-                        {selected === 'pay_on_pickup' && (
-                            <div className="h-2.5 w-2.5 rounded-full bg-primary" />
-                        )}
-                    </div>
-                    <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                            <CreditCard className="w-4 h-4 text-accent" />
-                            <span className="text-sm font-medium">Płatność przy odbiorze</span>
-                            {payOnPickupFee > 0 && (
-                                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
-                                    +{payOnPickupFee} zł
-                                </span>
+            {payOnPickupEnabled && (
+                <button
+                    type="button"
+                    onClick={() => !payOnPickupDisabled && onChange('pay_on_pickup')}
+                    disabled={payOnPickupDisabled}
+                    className={cn(
+                        'w-full rounded-xl border p-4 text-left transition-all',
+                        payOnPickupDisabled && 'opacity-50 cursor-not-allowed',
+                        selected === 'pay_on_pickup'
+                            ? 'border-primary bg-primary/5 neon-border'
+                            : 'border-border bg-card hover:border-primary/30'
+                    )}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className={cn(
+                            'flex h-5 w-5 items-center justify-center rounded-full border-2 transition-colors',
+                            selected === 'pay_on_pickup' ? 'border-primary' : 'border-muted-foreground/40'
+                        )}>
+                            {selected === 'pay_on_pickup' && (
+                                <div className="h-2.5 w-2.5 rounded-full bg-primary" />
                             )}
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Karta lub BLIK przy odbiorze · do {payOnPickupMaxOrder} zł
-                        </p>
+                        <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                                <CreditCard className="w-4 h-4 text-accent" />
+                                <span className="text-sm font-medium">Płatność przy odbiorze</span>
+                                {payOnPickupFee > 0 && (
+                                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-semibold text-accent">
+                                        +{payOnPickupFee} zł
+                                    </span>
+                                )}
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                Karta lub BLIK przy odbiorze · do {payOnPickupMaxOrder} zł
+                            </p>
+                        </div>
                     </div>
-                </div>
-            </button>
+                </button>
+            )}
 
             {/* Limit warning */}
             {!payOnPickupEnabled && (
                 <p className="flex items-center gap-2 text-xs text-amber-400">
                     <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
-                    Płatność przy odbiorze jest obecnie niedostępna dla tej lokalizacji.
+                    Płatność przy odbiorze jest wyłączona dla tej lokalizacji.
                 </p>
             )}
 

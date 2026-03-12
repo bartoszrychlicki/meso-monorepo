@@ -12,7 +12,11 @@ import { useCartStore } from '@/stores/cartStore'
 import { useAuth } from '@/hooks/useAuth'
 import { useCheckout } from '@/hooks/useCheckout'
 import { formatPriceExact } from '@/lib/formatters'
-import { resolveCheckoutConfig } from '@/lib/location-config'
+import {
+    isPayOnPickupAvailable,
+    resolveCheckoutConfig,
+    resolvePayOnPickupConfig,
+} from '@/lib/location-config'
 
 // Components
 import { DeliveryForm } from '@/components/checkout/DeliveryForm'
@@ -112,6 +116,12 @@ export default function CheckoutPage() {
         address: string
         city: string
     } | null>(null)
+    const subtotal = getSubtotal()
+    const deliveryFee = getDeliveryFee()
+    const paymentFee = getPaymentFee()
+    const discount = getDiscount()
+    const total = getTotal()
+    const loyaltyPointsToEarn = Math.max(0, Math.floor(total))
 
     // Sync delivery type to cart store on mount and changes
     useEffect(() => {
@@ -135,12 +145,13 @@ export default function CheckoutPage() {
                 const { data: deliveryConfig } = await supabase
                     .from(Tables.deliveryConfig)
                     .select(
-                        'opening_time, closing_time, pickup_time_min, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order'
+                        'opening_time, closing_time, pickup_time_min, pickup_time_max, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order'
                     )
                     .eq('location_id', locationData.id)
                     .maybeSingle()
 
                 const runtimeConfig = resolveCheckoutConfig(deliveryConfig)
+                const payOnPickupRuntimeConfig = resolvePayOnPickupConfig(deliveryConfig)
 
                 // POS stores address as JSONB; extract city/street from it
                 const addr = typeof locationData.address === 'object' && locationData.address
@@ -163,16 +174,18 @@ export default function CheckoutPage() {
                     before_close: runtimeConfig.pickupBufferBeforeClose,
                 })
 
-                setPickupEstimate(`~${runtimeConfig.pickupEstimateMinutes}`)
+                setPickupEstimate(
+                    runtimeConfig.pickupEstimateMaxMinutes > runtimeConfig.pickupEstimateMinutes
+                        ? `~${runtimeConfig.pickupEstimateMinutes}-${runtimeConfig.pickupEstimateMaxMinutes}`
+                        : `~${runtimeConfig.pickupEstimateMinutes}`
+                )
 
                 setPayOnPickupConfig({
-                    // Checkout currently supports pickup flow only. Keep pay-on-pickup
-                    // available for pickup even if location config is stale/misaligned.
-                    enabled: deliveryData.type === 'pickup' ? true : runtimeConfig.payOnPickupEnabled,
-                    fee: runtimeConfig.payOnPickupFee,
-                    maxOrder: runtimeConfig.payOnPickupMaxOrder,
+                    enabled: payOnPickupRuntimeConfig.enabled,
+                    fee: payOnPickupRuntimeConfig.fee,
+                    maxOrder: payOnPickupRuntimeConfig.maxOrder,
                 })
-                setPayOnPickupFee(runtimeConfig.payOnPickupFee)
+                setPayOnPickupFee(payOnPickupRuntimeConfig.fee)
             }
         }
 
@@ -181,10 +194,10 @@ export default function CheckoutPage() {
     }, [])
 
     useEffect(() => {
-        if (!payOnPickupConfig.enabled && paymentType === 'pay_on_pickup') {
+        if (!isPayOnPickupAvailable(payOnPickupConfig, subtotal) && paymentType === 'pay_on_pickup') {
             setPaymentType('online')
         }
-    }, [payOnPickupConfig.enabled, paymentType, setPaymentType])
+    }, [payOnPickupConfig, paymentType, setPaymentType, subtotal])
 
     // Redirect if not logged in (anonymous users cannot checkout)
     useEffect(() => {
@@ -314,13 +327,6 @@ export default function CheckoutPage() {
 
         await submitOrder(finalDeliveryData, addressData, paymentData, savePhoneToProfile)
     }
-
-    const subtotal = getSubtotal()
-    const deliveryFee = getDeliveryFee()
-    const paymentFee = getPaymentFee()
-    const discount = getDiscount()
-    const total = getTotal()
-    const loyaltyPointsToEarn = Math.max(0, Math.floor(total))
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-4 pb-8">
