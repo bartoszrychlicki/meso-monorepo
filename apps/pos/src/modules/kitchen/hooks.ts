@@ -5,6 +5,8 @@ import { KitchenTicket } from '@/types/kitchen';
 import { OrderStatus } from '@/types/enums';
 import { useKitchenStore } from './store';
 import { kitchenRepository } from './repository';
+import { useLocationSettingsStore } from '@/modules/settings/store';
+import { useUserStore } from '@/modules/users/store';
 
 export function useKitchen() {
   const tickets = useKitchenStore((s) => s.tickets);
@@ -140,6 +142,33 @@ export function useKitchenPolling(intervalMs: number = 5000) {
 
     return () => clearInterval(id);
   }, [intervalMs, refreshTickets]);
+}
+
+export function useKdsSoundEnabled() {
+  const currentLocation = useUserStore((state) => state.currentLocation);
+  const loadUser = useUserStore((state) => state.loadUser);
+  const kdsConfig = useLocationSettingsStore((state) => state.kdsConfig);
+  const kdsDefaults = useLocationSettingsStore((state) => state.kdsDefaults);
+  const loadLocationWithConfigs = useLocationSettingsStore((state) => state.loadLocationWithConfigs);
+  const loadGlobalDefaults = useLocationSettingsStore((state) => state.loadGlobalDefaults);
+
+  useEffect(() => {
+    void loadUser();
+  }, [loadUser]);
+
+  useEffect(() => {
+    void loadGlobalDefaults();
+  }, [loadGlobalDefaults]);
+
+  useEffect(() => {
+    if (!currentLocation?.id) {
+      return;
+    }
+
+    void loadLocationWithConfigs(currentLocation.id);
+  }, [currentLocation?.id, loadLocationWithConfigs]);
+
+  return kdsConfig?.sound_enabled ?? kdsDefaults?.sound_enabled ?? true;
 }
 
 export function useKitchenStats() {
