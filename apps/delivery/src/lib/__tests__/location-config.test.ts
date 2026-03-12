@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { resolveCartLocationConfig, resolveCheckoutConfig } from '@/lib/location-config'
+import {
+  isPayOnPickupAvailable,
+  resolveCartLocationConfig,
+  resolveCheckoutConfig,
+  resolvePayOnPickupConfig,
+} from '@/lib/location-config'
 
 describe('resolveCheckoutConfig', () => {
   it('maps values from orders_delivery_config', () => {
@@ -7,6 +12,7 @@ describe('resolveCheckoutConfig', () => {
       opening_time: '09:00:00',
       closing_time: '21:30:00',
       pickup_time_min: 25,
+      pickup_time_max: 35,
       pickup_buffer_after_open: 10,
       pickup_buffer_before_close: 5,
       pay_on_pickup_enabled: false,
@@ -20,6 +26,7 @@ describe('resolveCheckoutConfig', () => {
       pickupBufferAfterOpen: 10,
       pickupBufferBeforeClose: 5,
       pickupEstimateMinutes: 25,
+      pickupEstimateMaxMinutes: 35,
       payOnPickupEnabled: false,
       payOnPickupFee: 3.5,
       payOnPickupMaxOrder: 150,
@@ -32,6 +39,7 @@ describe('resolveCheckoutConfig', () => {
     })
 
     expect(result.pickupEstimateMinutes).toBe(35)
+    expect(result.pickupEstimateMaxMinutes).toBe(35)
   })
 
   it('returns defaults when config is missing', () => {
@@ -43,6 +51,7 @@ describe('resolveCheckoutConfig', () => {
       pickupBufferAfterOpen: 30,
       pickupBufferBeforeClose: 30,
       pickupEstimateMinutes: 20,
+      pickupEstimateMaxMinutes: 20,
       payOnPickupEnabled: true,
       payOnPickupFee: 2,
       payOnPickupMaxOrder: 100,
@@ -56,6 +65,40 @@ describe('resolveCheckoutConfig', () => {
     })
 
     expect(result.payOnPickupMaxOrder).toBe(100)
+  })
+})
+
+describe('resolvePayOnPickupConfig', () => {
+  it('preserves disabled state from location config', () => {
+    const result = resolvePayOnPickupConfig({
+      pay_on_pickup_enabled: false,
+      pay_on_pickup_fee: 4,
+      pay_on_pickup_max_order: 80,
+    })
+
+    expect(result).toEqual({
+      enabled: false,
+      fee: 4,
+      maxOrder: 80,
+    })
+  })
+})
+
+describe('isPayOnPickupAvailable', () => {
+  it('returns false when the method is disabled in location config', () => {
+    expect(isPayOnPickupAvailable({
+      enabled: false,
+      fee: 2,
+      maxOrder: 100,
+    }, 40)).toBe(false)
+  })
+
+  it('returns false when subtotal exceeds location limit', () => {
+    expect(isPayOnPickupAvailable({
+      enabled: true,
+      fee: 2,
+      maxOrder: 100,
+    }, 140)).toBe(false)
   })
 })
 

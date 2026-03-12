@@ -9,7 +9,7 @@ afterEach(() => {
 })
 
 describe('PaymentMethod', () => {
-  it('disables pay-on-pickup when location config turns it off', () => {
+  it('hides pay-on-pickup when location config turns it off', () => {
     const onChange = vi.fn()
 
     render(
@@ -23,12 +23,10 @@ describe('PaymentMethod', () => {
       />
     )
 
-    const payOnPickupButton = screen.getByRole('button', {
+    expect(screen.queryByRole('button', {
       name: /Płatność przy odbiorze/i,
-    }) as HTMLButtonElement
-
-    expect(payOnPickupButton.disabled).toBe(true)
-    expect(screen.getByText(/jest obecnie niedostępna/i)).toBeTruthy()
+    })).toBeNull()
+    expect(screen.getByText(/jest wyłączona/i)).toBeTruthy()
   })
 
   it('keeps pay-on-pickup enabled when config allows it and subtotal is below limit', () => {
@@ -50,5 +48,27 @@ describe('PaymentMethod', () => {
     }) as HTMLButtonElement
 
     expect(payOnPickupButton.disabled).toBe(false)
+  })
+
+  it('disables pay-on-pickup when subtotal exceeds location limit', () => {
+    const onChange = vi.fn()
+
+    render(
+      <PaymentMethod
+        selected="online"
+        onChange={onChange}
+        payOnPickupEnabled
+        payOnPickupFee={2}
+        payOnPickupMaxOrder={100}
+        orderSubtotal={140}
+      />
+    )
+
+    const payOnPickupButton = screen.getByRole('button', {
+      name: /Płatność przy odbiorze/i,
+    }) as HTMLButtonElement
+
+    expect(payOnPickupButton.disabled).toBe(true)
+    expect(screen.getByText(/dostępna do 100 zł/i)).toBeTruthy()
   })
 })

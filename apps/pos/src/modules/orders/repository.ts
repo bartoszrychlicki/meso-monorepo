@@ -15,6 +15,11 @@ import {
 import { supabase } from '@/lib/supabase/client';
 
 const baseRepo = createRepository<Order>('orders');
+const ACTIVE_KITCHEN_TICKET_STATUSES = [
+  OrderStatus.PENDING,
+  OrderStatus.PREPARING,
+  OrderStatus.READY,
+] as const;
 
 async function findByStatus(status: OrderStatus): Promise<Order[]> {
   return baseRepo.findMany((order) => order.status === status);
@@ -53,6 +58,22 @@ async function updateStatus(
     status,
     status_history: [...order.status_history, statusEntry],
   } as Partial<Order>);
+
+  if (status === OrderStatus.CANCELLED) {
+    const { error } = await supabase
+      .from('orders_kitchen_tickets')
+      .update({
+        status: OrderStatus.CANCELLED,
+        completed_at: statusEntry.timestamp,
+        updated_at: statusEntry.timestamp,
+      })
+      .eq('order_id', id)
+      .in('status', [...ACTIVE_KITCHEN_TICKET_STATUSES]);
+
+    if (error) {
+      throw new Error(`[orders_kitchen_tickets] cancel failed: ${error.message}`);
+    }
+  }
 
   // ===== CRM INTEGRATION START =====
   let loyaltyPointsAwarded = 0;
