@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { useCartStore, CartItemAddon } from '@/stores/cartStore'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { formatPrice } from '@/lib/formatters'
+import { formatPrice, formatPriceDelta } from '@/lib/formatters'
 import { getProductImageUrl, PRODUCT_BLUR_PLACEHOLDER, ProductImage } from '@/lib/product-image'
 import { createClient } from '@/lib/supabase/client'
 import { Tables } from '@/lib/table-mapping'
@@ -281,25 +281,29 @@ export function ProductCustomization({
                                     <div>
                                         <h3 className="text-lg font-bold text-white mb-3">Wybierz opcję</h3>
                                         <div className="grid grid-cols-1 gap-2">
-                                            {displayProduct.variants.map((variant) => (
-                                                <button
-                                                    key={variant.id}
-                                                    onClick={() => setSelectedVariant(variant)}
-                                                    className={cn(
-                                                        'flex items-center justify-between p-3 rounded-lg border transition-all',
-                                                        selectedVariant?.id === variant.id
-                                                            ? 'border-primary bg-primary/10 text-white'
-                                                            : 'border-zinc-700 text-zinc-400 hover:border-zinc-600'
-                                                    )}
-                                                >
-                                                    <span className="font-medium text-white">{variant.name}</span>
-                                                    {variant.price > 0 && (
-                                                        <span className="text-sm text-primary">
-                                                            +{formatPrice(variant.price)}
-                                                        </span>
-                                                    )}
-                                                </button>
-                                            ))}
+                                            {displayProduct.variants.map((variant) => {
+                                                    const variantPriceDelta = formatPriceDelta(variant.price)
+
+                                                    return (
+                                                        <button
+                                                            key={variant.id}
+                                                            onClick={() => setSelectedVariant(variant)}
+                                                            className={cn(
+                                                                'flex items-center justify-between p-3 rounded-lg border transition-all',
+                                                                selectedVariant?.id === variant.id
+                                                                    ? 'border-primary bg-primary/10 text-white'
+                                                                    : 'border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                                                            )}
+                                                        >
+                                                            <span className="font-medium text-white">{variant.name}</span>
+                                                            {variantPriceDelta && (
+                                                                <span className="text-sm text-primary">
+                                                                    {variantPriceDelta}
+                                                                </span>
+                                                            )}
+                                                        </button>
+                                                    )
+                                                })}
                                         </div>
                                     </div>
                                 )}

@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ChevronDown, Clock, Minus, Plus } from 'lucide-react'
 import { useCartStore, type CartItemAddon } from '@/stores/cartStore'
-import { formatPrice } from '@/lib/formatters'
+import { formatPrice, formatPriceDelta } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
 import { PRODUCT_BLUR_PLACEHOLDER } from '@/lib/product-image'
 import { Badge } from '@/components/ui/badge'
@@ -482,24 +482,28 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
             Wybierz opcję
           </h3>
           <div className="grid grid-cols-2 gap-3">
-            {sortedVariants.map((variant) => (
-              <button
-                key={variant.id}
-                type="button"
-                onClick={() => setSelectedVariant(variant)}
-                className={cn(
-                  'rounded-xl border p-3 text-left text-sm transition-all',
-                  selectedVariant?.id === variant.id
-                    ? 'border-primary/50 bg-primary/10 text-foreground'
-                    : 'border-border bg-secondary/30 text-foreground hover:border-primary/30'
-                )}
-              >
-                <span>{variant.name}</span>
-                {variant.price > 0 && (
-                  <span className="block text-muted-foreground">+{formatPrice(variant.price)}</span>
-                )}
-              </button>
-            ))}
+            {sortedVariants.map((variant) => {
+              const variantPriceDelta = formatPriceDelta(variant.price)
+
+              return (
+                <button
+                  key={variant.id}
+                  type="button"
+                  onClick={() => setSelectedVariant(variant)}
+                  className={cn(
+                    'rounded-xl border p-3 text-left text-sm transition-all',
+                    selectedVariant?.id === variant.id
+                      ? 'border-primary/50 bg-primary/10 text-foreground'
+                      : 'border-border bg-secondary/30 text-foreground hover:border-primary/30'
+                  )}
+                >
+                  <span>{variant.name}</span>
+                  {variantPriceDelta && (
+                    <span className="block text-muted-foreground">{variantPriceDelta}</span>
+                  )}
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
