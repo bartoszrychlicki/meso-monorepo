@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { transitionOrderStatus } from '@/lib/orders/status-transition';
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
-import type { Order } from '@/types/order';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -64,19 +64,6 @@ function getTicketStatusPatch(action: TransitionAction, now: string): Partial<Ki
   }
 }
 
-function getOrderTimestampPatch(status: OrderStatus, now: string): Partial<Order> {
-  switch (status) {
-    case OrderStatus.PREPARING:
-      return { preparing_at: now };
-    case OrderStatus.READY:
-      return { ready_at: now };
-    case OrderStatus.DELIVERED:
-      return { delivered_at: now };
-    default:
-      return {};
-  }
-}
-
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const body = (await request.json()) as TransitionBody;
@@ -88,7 +75,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const now = new Date().toISOString();
 
     const kitchenRepo = createServerRepository<KitchenTicket>('kitchen_tickets');
-    const ordersRepo = createServerRepository<Order>('orders');
 
     const currentTicket = await kitchenRepo.findById(id);
     if (!currentTicket) {
@@ -138,23 +124,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     try {
-      const order = await ordersRepo.findById(orderId);
-      if (!order) {
-        return NextResponse.json({ ticket: updatedTicket });
-      }
-
-      const statusHistory = Array.isArray(order.status_history) ? order.status_history : [];
-      const statusEntry = {
+      await transitionOrderStatus({
+        orderId,
         status: statusUpdate.status,
-        timestamp: now,
         note: statusUpdate.note,
-      };
-
-      await ordersRepo.update(order.id, {
-        status: statusUpdate.status,
-        status_history: [...statusHistory, statusEntry],
-        ...getOrderTimestampPatch(statusUpdate.status, now),
-      } as Partial<Order>);
+        requestOrigin: request.nextUrl.origin,
+      });
     } catch (error) {
       console.warn(
         `[KDS transition] Ticket ${id} transitioned, but linked order sync was skipped:`,

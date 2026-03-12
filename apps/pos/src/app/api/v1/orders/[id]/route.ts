@@ -7,6 +7,11 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import {
+  calculateOrderTotal,
+  mergeOrderMetadata,
+  readMetadataPaymentFee,
+} from '@/lib/orders/financials';
 import { createServiceClient } from '@/lib/supabase/server';
 import { CreateOrderSchema } from '@/schemas/order';
 import type { Order } from '@/types/order';
@@ -64,6 +69,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 
   const updateData = validation.data;
+  const mergedMetadata = mergeOrderMetadata(
+    existing.metadata,
+    updateData.metadata as Record<string, unknown> | undefined
+  );
 
   // If items are being updated, sync JSON + relational rows transactionally via RPC.
   if (updateData.items) {
@@ -130,10 +139,37 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       ...additionalFields
     } = updateData;
 
-    if (Object.keys(additionalFields).length > 0) {
+    const previousPaymentFee = readMetadataPaymentFee(existing.metadata);
+    const paymentFee = readMetadataPaymentFee(mergedMetadata);
+    const shouldPatchTotalForPaymentFee =
+      updateData.metadata !== undefined || previousPaymentFee !== paymentFee;
+    const correctedTotal = shouldPatchTotalForPaymentFee
+      ? calculateOrderTotal({
+          subtotal: updated.subtotal,
+          discount: updated.discount,
+          deliveryFee: updated.delivery_fee,
+          paymentFee,
+          tip: updated.tip,
+        })
+      : updated.total;
+
+    const patchAfterRpc: Partial<Order> = {
+      ...(Object.keys(additionalFields).length > 0
+        ? (additionalFields as Partial<Order>)
+        : {}),
+    };
+
+    if (updateData.metadata) {
+      patchAfterRpc.metadata = mergedMetadata;
+    }
+    if (shouldPatchTotalForPaymentFee && correctedTotal !== updated.total) {
+      patchAfterRpc.total = correctedTotal;
+    }
+
+    if (Object.keys(patchAfterRpc).length > 0) {
       const patched = await serverOrdersRepo.update(
         id,
-        additionalFields as Partial<Order>
+        patchAfterRpc
       );
       return apiSuccess(patched);
     }
@@ -141,7 +177,34 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return apiSuccess(updated);
   }
 
-  const updated = await serverOrdersRepo.update(id, updateData as Partial<Order>);
+  const nextOrder = {
+    ...existing,
+    ...updateData,
+    metadata: updateData.metadata ? mergedMetadata : existing.metadata,
+  } as Order;
+
+  const paymentFee = readMetadataPaymentFee(nextOrder.metadata);
+  const totalPatch =
+    updateData.discount !== undefined ||
+    updateData.delivery_fee !== undefined ||
+    updateData.tip !== undefined ||
+    updateData.metadata !== undefined
+      ? {
+          total: calculateOrderTotal({
+            subtotal: nextOrder.subtotal,
+            discount: nextOrder.discount,
+            deliveryFee: nextOrder.delivery_fee,
+            paymentFee,
+            tip: nextOrder.tip,
+          }),
+        }
+      : {};
+
+  const updated = await serverOrdersRepo.update(id, {
+    ...updateData,
+    ...(updateData.metadata ? { metadata: mergedMetadata } : {}),
+    ...totalPatch,
+  } as Partial<Order>);
   return apiSuccess(updated);
 }
 

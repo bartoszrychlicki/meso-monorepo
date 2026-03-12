@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { P24, P24Notification } from '@/lib/p24'
 import { sendOrderConfirmationEmail, type OrderEmailData } from '@/lib/email'
+import { readOrderDiscount, readOrderPaymentFee } from '@/lib/order-financials'
+import { markP24SessionStatus } from '@/lib/p24-payment-sessions'
 import { getPosApi } from '@/lib/pos-api'
 import { Tables } from '@/lib/table-mapping'
 import type { OrderStatus, PaymentStatus } from '@meso/core'
@@ -57,21 +59,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid session ID format' }, { status: 400 })
         }
 
-        // Update order status via POS API (instead of direct Supabase write)
-        const updateResult = await getPosApi().orders.updateStatus(paramOrderId, {
-            status: 'confirmed' as OrderStatus,
-            payment_status: 'paid' as PaymentStatus,
-            note: `P24 payment verified. Transaction: ${orderId}`,
-        })
-
-        if (!updateResult.success) {
-            console.error('[P24 Status] Failed to update order via POS API:', updateResult.error)
-            return NextResponse.json({ error: 'Order update failed' }, { status: 500 })
-        }
-
-        console.log('[P24 Status] Order updated successfully via POS API')
-
-        // Query full order data for confirmation email (direct Supabase read — allowed)
         const supabaseAdmin = createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -83,67 +70,117 @@ export async function POST(request: Request) {
             }
         )
 
-        const { data: fullOrder } = await supabaseAdmin
+        const { data: existingOrder, error: orderLookupError } = await supabaseAdmin
             .from(Tables.orders)
-            .select(`
-                *,
-                order_items:orders_order_items (
-                    id, quantity, unit_price, total_price, spice_level, addons,
-                    product:menu_products (name),
-                    variant:menu_products (name)
-                ),
-                location:users_locations (name, address, city)
-            `)
+            .select('id, status, payment_status, metadata')
             .eq('id', paramOrderId)
-            .single()
+            .maybeSingle()
 
-        if (fullOrder) {
-            const addr = (fullOrder.delivery_address ?? {}) as DeliveryAddressJson
+        if (orderLookupError || !existingOrder) {
+            console.error('[P24 Status] Could not load order for callback:', orderLookupError)
+            return NextResponse.json({ error: 'Order update failed' }, { status: 500 })
+        }
 
-            // Build tracking URL
-            const appUrl = process.env.NEXT_PUBLIC_APP_URL
-                || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
-                || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
-                || 'http://localhost:3000'
+        const paymentAlreadyConfirmed = existingOrder.payment_status === 'paid'
 
-            const emailData: OrderEmailData = {
-                orderId: fullOrder.id,
-                customerFirstName: addr.firstName ?? 'Kliencie',
-                customerLastName: addr.lastName ?? '',
-                customerEmail: addr.email ?? '',
-                deliveryType: fullOrder.delivery_type,
-                deliveryStreet: addr.street,
-                deliveryHouseNumber: addr.houseNumber,
-                deliveryCity: addr.city,
-                deliveryPostalCode: addr.postalCode,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            items: (fullOrder.order_items ?? []).map((item: any) => ({
-                    productName: item.product?.name ?? 'Produkt',
-                    quantity: item.quantity,
-                    unitPrice: item.unit_price,
-                    totalPrice: item.total_price,
-                    variantName: item.variant?.name ?? null,
-                    spiceLevel: item.spice_level ?? null,
-                    addons: Array.isArray(item.addons) ? item.addons : [],
-                })),
-                subtotal: fullOrder.subtotal,
-                deliveryFee: fullOrder.delivery_fee,
-                promoDiscount: fullOrder.promo_discount ?? 0,
-                tip: fullOrder.tip ?? 0,
-                total: fullOrder.total,
-                paymentMethod: fullOrder.payment_method,
-                locationName: fullOrder.location?.name ?? '',
-                locationAddress: fullOrder.location?.address ?? '',
-                locationCity: fullOrder.location?.city ?? '',
-                trackingUrl: `${appUrl}/order-confirmation?orderId=${fullOrder.id}`,
+        // Update order status via POS API (instead of direct Supabase write)
+        if (!paymentAlreadyConfirmed) {
+            const targetStatus =
+                existingOrder.status === 'pending'
+                    ? ('confirmed' as OrderStatus)
+                    : (existingOrder.status as OrderStatus)
+
+            const updateResult = await getPosApi().orders.updateStatus(paramOrderId, {
+                status: targetStatus,
+                payment_status: 'paid' as PaymentStatus,
+                note: `P24 payment verified. Transaction: ${orderId}`,
+            })
+
+            if (!updateResult.success) {
+                console.error('[P24 Status] Failed to update order via POS API:', updateResult.error)
+                return NextResponse.json({ error: 'Order update failed' }, { status: 500 })
             }
+        }
 
-            // Fire-and-forget: email does not block webhook response
-            void sendOrderConfirmationEmail(emailData)
-                .then(r => r.success
-                    ? console.log('[P24 Status] Email sent:', addr.email)
-                    : console.error('[P24 Status] Email failed:', r.error))
-                .catch(err => console.error('[P24 Status] Email threw:', err))
+        await supabaseAdmin
+            .from(Tables.orders)
+            .update({
+                metadata: markP24SessionStatus(
+                    existingOrder.metadata,
+                    sessionId,
+                    'verified',
+                    new Date().toISOString(),
+                    String(orderId)
+                ),
+            })
+            .eq('id', paramOrderId)
+
+        console.log('[P24 Status] Order updated successfully via POS API')
+
+        if (!paymentAlreadyConfirmed) {
+            const { data: fullOrder } = await supabaseAdmin
+                .from(Tables.orders)
+                .select(`
+                    *,
+                    order_items:orders_order_items (
+                        id, quantity, unit_price, total_price, spice_level, addons,
+                        product:menu_products (name),
+                        variant:menu_products (name)
+                    ),
+                    location:users_locations (name, address, city)
+                `)
+                .eq('id', paramOrderId)
+                .single()
+
+            if (fullOrder) {
+                const addr = (fullOrder.delivery_address ?? {}) as DeliveryAddressJson
+
+                // Build tracking URL
+                const appUrl = process.env.NEXT_PUBLIC_APP_URL
+                    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
+                    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
+                    || 'http://localhost:3000'
+
+                const emailData: OrderEmailData = {
+                    orderId: fullOrder.id,
+                    customerFirstName: addr.firstName ?? 'Kliencie',
+                    customerLastName: addr.lastName ?? '',
+                    customerEmail: addr.email ?? '',
+                    deliveryType: fullOrder.delivery_type,
+                    deliveryStreet: addr.street,
+                    deliveryHouseNumber: addr.houseNumber,
+                    deliveryCity: addr.city,
+                    deliveryPostalCode: addr.postalCode,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    items: (fullOrder.order_items ?? []).map((item: any) => ({
+                        productName: item.product?.name ?? 'Produkt',
+                        quantity: item.quantity,
+                        unitPrice: item.unit_price,
+                        totalPrice: item.total_price,
+                        variantName: item.variant?.name ?? null,
+                        spiceLevel: item.spice_level ?? null,
+                        addons: Array.isArray(item.addons) ? item.addons : [],
+                    })),
+                    subtotal: fullOrder.subtotal,
+                    deliveryFee: fullOrder.delivery_fee,
+                    paymentFee: readOrderPaymentFee(fullOrder),
+                    promoDiscount: readOrderDiscount(fullOrder),
+                    tip: fullOrder.tip ?? 0,
+                    total: fullOrder.total,
+                    paymentMethod: fullOrder.payment_method,
+                    locationName: fullOrder.location?.name ?? '',
+                    locationAddress: fullOrder.location?.address ?? '',
+                    locationCity: fullOrder.location?.city ?? '',
+                    trackingUrl: `${appUrl}/order-confirmation?orderId=${fullOrder.id}`,
+                }
+
+                // Fire-and-forget: email does not block webhook response
+                void sendOrderConfirmationEmail(emailData)
+                    .then(r => r.success
+                        ? console.log('[P24 Status] Email sent:', addr.email)
+                        : console.error('[P24 Status] Email failed:', r.error))
+                    .catch(err => console.error('[P24 Status] Email threw:', err))
+            }
         }
 
         return NextResponse.json({ status: 'OK' })

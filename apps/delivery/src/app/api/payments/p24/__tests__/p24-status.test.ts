@@ -76,8 +76,11 @@ vi.mock('@supabase/supabase-js', () => ({
 // Mock: @/lib/email (fire-and-forget confirmation email)
 // ---------------------------------------------------------------------------
 
+const { mockSendOrderConfirmationEmail } = vi.hoisted(() => ({
+  mockSendOrderConfirmationEmail: vi.fn().mockResolvedValue({ success: true }),
+}))
 vi.mock('@/lib/email', () => ({
-  sendOrderConfirmationEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendOrderConfirmationEmail: mockSendOrderConfirmationEmail,
 }))
 
 // ---------------------------------------------------------------------------
@@ -169,6 +172,17 @@ describe('POST /api/payments/p24/status (webhook)', () => {
   // ---- 500: POS API update fails ----
   it('returns 500 when POS API update fails', async () => {
     mockVerifyTransaction.mockResolvedValue(true)
+    mockFrom.mockImplementationOnce(() =>
+      chain({
+        data: {
+          id: ORDER_ID,
+          status: 'pending',
+          payment_status: 'pending',
+          metadata: {},
+        },
+        error: null,
+      })
+    )
 
     mockUpdateStatus.mockResolvedValue({
       success: false,
@@ -192,8 +206,36 @@ describe('POST /api/payments/p24/status (webhook)', () => {
       data: { id: ORDER_ID, status: 'confirmed', payment_status: 'paid' },
     })
 
-    // Supabase query for email data (read-only)
-    mockFrom.mockImplementation(() =>
+    mockFrom
+      .mockImplementationOnce(() =>
+        chain({
+          data: {
+            id: ORDER_ID,
+            status: 'pending',
+            payment_status: 'pending',
+            metadata: {
+              p24: {
+                active_session_id: `${ORDER_ID}-1234567890`,
+                sessions: [
+                  {
+                    sessionId: `${ORDER_ID}-1234567890`,
+                    status: 'pending',
+                    createdAt: '2026-03-12T10:00:00.000Z',
+                  },
+                ],
+              },
+            },
+          },
+          error: null,
+        })
+      )
+      .mockImplementationOnce(() =>
+        chain({
+          data: null,
+          error: null,
+        })
+      )
+      .mockImplementationOnce(() =>
       chain({
         data: {
           id: ORDER_ID,
@@ -201,8 +243,10 @@ describe('POST /api/payments/p24/status (webhook)', () => {
           total: 50.0,
           subtotal: 42.01,
           delivery_fee: 7.99,
+          discount: 5,
           delivery_type: 'delivery',
           payment_method: 'blik',
+          metadata: { payment_fee: 2 },
           delivery_address: { firstName: 'Jan', email: 'jan@test.pl' },
           order_items: [],
           location: { name: 'Meso Wro', address: 'Rynek 1', city: 'Wroclaw' },
@@ -216,6 +260,19 @@ describe('POST /api/payments/p24/status (webhook)', () => {
 
     const json = await res.json()
     expect(json.status).toBe('OK')
+    expect(mockUpdateStatus).toHaveBeenCalledWith(
+      ORDER_ID,
+      expect.objectContaining({
+        status: 'confirmed',
+        payment_status: 'paid',
+      })
+    )
+    expect(mockSendOrderConfirmationEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentFee: 2,
+        promoDiscount: 5,
+      })
+    )
   })
 
   // ---- Correctly extracts orderId from sessionId ----
@@ -228,18 +285,41 @@ describe('POST /api/payments/p24/status (webhook)', () => {
       data: { id: ORDER_ID, status: 'confirmed' },
     })
 
-    // Supabase query for email data
-    mockFrom.mockImplementation(() =>
-      chain({
-        data: {
-          id: ORDER_ID,
-          delivery_address: {},
-          order_items: [],
-          location: null,
-        },
-        error: null,
-      })
-    )
+    mockFrom
+      .mockImplementationOnce(() =>
+        chain({
+          data: {
+            id: ORDER_ID,
+            status: 'pending',
+            payment_status: 'pending',
+            metadata: {},
+          },
+          error: null,
+        })
+      )
+      .mockImplementationOnce(() =>
+        chain({
+          data: null,
+          error: null,
+        })
+      )
+      .mockImplementationOnce(() =>
+        chain({
+          data: {
+            id: ORDER_ID,
+            delivery_address: {},
+            order_items: [],
+            location: null,
+            delivery_type: 'pickup',
+            subtotal: 20,
+            delivery_fee: 0,
+            tip: 0,
+            total: 20,
+            payment_method: 'blik',
+          },
+          error: null,
+        })
+      )
 
     const sessionId = 'abc-def-123-1234567890'
     const res = await POST(makeRequest(makeP24Notification({ sessionId })))
@@ -252,19 +332,16 @@ describe('POST /api/payments/p24/status (webhook)', () => {
     )
   })
 
-  it('returns 200 for duplicate callback notifications (idempotent behavior)', async () => {
+  it('returns 200 for duplicate callback notifications without sending duplicate side effects', async () => {
     mockVerifyTransaction.mockResolvedValue(true)
-    mockUpdateStatus.mockResolvedValue({
-      success: true,
-      data: { id: ORDER_ID, status: 'confirmed', payment_status: 'paid' },
-    })
-    mockFrom.mockImplementation(() =>
+    mockFrom
+      .mockImplementation(() =>
       chain({
         data: {
           id: ORDER_ID,
-          delivery_address: {},
-          order_items: [],
-          location: null,
+          status: 'accepted',
+          payment_status: 'paid',
+          metadata: {},
         },
         error: null,
       })
@@ -276,6 +353,7 @@ describe('POST /api/payments/p24/status (webhook)', () => {
 
     expect(firstRes.status).toBe(200)
     expect(secondRes.status).toBe(200)
-    expect(mockUpdateStatus).toHaveBeenCalledTimes(2)
+    expect(mockUpdateStatus).not.toHaveBeenCalled()
+    expect(mockSendOrderConfirmationEmail).not.toHaveBeenCalled()
   })
 })

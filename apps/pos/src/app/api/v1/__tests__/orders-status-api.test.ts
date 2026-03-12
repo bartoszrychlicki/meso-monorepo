@@ -22,11 +22,11 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
   createServerRepository: () => mockServerRepo,
 }))
 
-const { mockDispatchWebhook } = vi.hoisted(() => ({
-  mockDispatchWebhook: vi.fn(),
+const { mockScheduleWebhookDispatch } = vi.hoisted(() => ({
+  mockScheduleWebhookDispatch: vi.fn(),
 }))
-vi.mock('@/lib/webhooks/dispatcher', () => ({
-  dispatchWebhook: mockDispatchWebhook,
+vi.mock('@/lib/webhooks/schedule', () => ({
+  scheduleWebhookDispatch: mockScheduleWebhookDispatch,
 }))
 
 const {
@@ -62,12 +62,31 @@ const validApiKey = {
 
 const baseOrder = {
   id: 'order-1',
+  order_number: 'WEB-20260303-001',
   status: 'confirmed',
   payment_status: 'pending',
   status_history: [{ status: 'confirmed', timestamp: '2026-03-03T10:00:00.000Z' }],
   customer_phone: '+48500100100',
+  customer_name: 'Jan Kowalski',
   channel: 'delivery_app',
+  source: 'delivery',
   external_order_id: 'ext-1',
+  external_channel: 'glovo',
+  items: [
+    {
+      id: 'item-1',
+      product_id: 'prod-1',
+      product_name: 'Tonkotsu Ramen',
+      quantity: 2,
+      unit_price: 32,
+      modifiers: [],
+      subtotal: 64,
+      notes: 'bez szczypiorku',
+    },
+  ],
+  total: 89,
+  estimated_ready_at: '2026-03-03T10:30:00.000Z',
+  created_at: '2026-03-03T10:00:00.000Z',
 }
 
 function makeRequest(url: string, body: Record<string, unknown>) {
@@ -86,7 +105,7 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
-    mockDispatchWebhook.mockResolvedValue([])
+    mockScheduleWebhookDispatch.mockReset()
     mockEnsureCustomerForOrder.mockImplementation(async (order) => order)
     mockSubmitPosbistroOrder.mockResolvedValue(null)
   })
@@ -105,7 +124,7 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     expect(res.status).toBe(200)
     expect(body.data.status).toBe('confirmed')
     expect(mockServerRepo.update).not.toHaveBeenCalled()
-    expect(mockDispatchWebhook).not.toHaveBeenCalled()
+    expect(mockScheduleWebhookDispatch).not.toHaveBeenCalled()
   })
 
   it('updates payment status when status is repeated but payment changes', async () => {
@@ -132,6 +151,55 @@ describe('PATCH /api/v1/orders/:id/status', () => {
       'order-1',
       expect.objectContaining({
         payment_status: 'paid',
+      })
+    )
+  })
+
+  it.each([
+    {
+      from: 'accepted',
+      to: 'preparing',
+      field: 'preparing_at',
+    },
+    {
+      from: 'preparing',
+      to: 'ready',
+      field: 'ready_at',
+    },
+    {
+      from: 'ready',
+      to: 'out_for_delivery',
+      field: 'picked_up_at',
+    },
+    {
+      from: 'confirmed',
+      to: 'cancelled',
+      field: 'cancelled_at',
+    },
+  ])('sets $field when transitioning from $from to $to', async ({ from, to, field }) => {
+    mockFindById.mockResolvedValue({
+      ...baseOrder,
+      status: from,
+    })
+    mockServerRepo.update.mockResolvedValue({
+      ...baseOrder,
+      status: to,
+      [field]: '2026-03-03T10:05:00.000Z',
+    })
+
+    const res = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
+        status: to,
+      }),
+      makeParams('order-1')
+    )
+
+    expect(res.status).toBe(200)
+    expect(mockServerRepo.update).toHaveBeenCalledWith(
+      'order-1',
+      expect.objectContaining({
+        status: to,
+        [field]: expect.any(String),
       })
     )
   })
@@ -164,6 +232,15 @@ describe('PATCH /api/v1/orders/:id/status', () => {
 
     expect(res.status).toBe(200)
     expect(mockAwardOrderLoyaltyPoints).toHaveBeenCalledTimes(1)
+    expect(mockServerRepo.update).toHaveBeenCalledWith(
+      'order-1',
+      expect.objectContaining({
+        status: 'delivered',
+        delivered_at: expect.any(String),
+        payment_status: 'paid',
+        paid_at: expect.any(String),
+      })
+    )
   })
 
   it('ensures customer and submits to POSBistro when order becomes confirmed', async () => {
@@ -194,6 +271,13 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     )
 
     expect(res.status).toBe(200)
+    expect(mockServerRepo.update).toHaveBeenCalledWith(
+      'order-1',
+      expect.objectContaining({
+        status: 'confirmed',
+        confirmed_at: expect.any(String),
+      })
+    )
     expect(mockEnsureCustomerForOrder).toHaveBeenCalledTimes(1)
     expect(mockSubmitPosbistroOrder).toHaveBeenCalledTimes(1)
     expect(mockSubmitPosbistroOrder).toHaveBeenCalledWith(
@@ -203,6 +287,60 @@ describe('PATCH /api/v1/orders/:id/status', () => {
       }),
       expect.objectContaining({
         confirmBaseUrl: 'http://localhost:3000/api/integrations/posbistro/confirm',
+      })
+    )
+  })
+
+  it('dispatches enriched webhook payloads for non-delivery-app orders too', async () => {
+    mockFindById.mockResolvedValue({
+      ...baseOrder,
+      channel: 'pos',
+      external_channel: undefined,
+      source: 'takeaway',
+      status: 'accepted',
+    })
+    mockServerRepo.update.mockResolvedValue({
+      ...baseOrder,
+      channel: 'pos',
+      external_channel: undefined,
+      source: 'takeaway',
+      status: 'preparing',
+    })
+
+    const res = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
+        status: 'preparing',
+        note: 'Do odbioru za 15 min',
+      }),
+      makeParams('order-1')
+    )
+
+    expect(res.status).toBe(200)
+    expect(mockScheduleWebhookDispatch).toHaveBeenCalledTimes(1)
+    expect(mockScheduleWebhookDispatch).toHaveBeenCalledWith(
+      'order.status_changed',
+      expect.objectContaining({
+        pos_order_id: 'order-1',
+        order_number: 'WEB-20260303-001',
+        status: 'preparing',
+        previous_status: 'accepted',
+        channel: 'pos',
+        order_type: 'takeaway',
+        source: 'pos',
+        total: 8900,
+        currency: 'PLN',
+        customer_name: 'Jan Kowalski',
+        customer_phone: '+48500100100',
+        estimated_ready_at: '2026-03-03T10:30:00.000Z',
+        created_at: '2026-03-03T10:00:00.000Z',
+        items: [
+          {
+            name: 'Tonkotsu Ramen',
+            quantity: 2,
+            unit_price: 3200,
+            notes: 'bez szczypiorku',
+          },
+        ],
       })
     )
   })

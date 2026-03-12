@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { ProductCategory } from '@/types/enums';
 import { CreateRecipeInput } from '@/schemas/recipe';
@@ -77,6 +77,10 @@ vi.mock('sonner', () => ({
 }));
 
 import { RecipeForm } from '../recipe-form';
+
+afterEach(() => {
+  cleanup();
+});
 
 describe('RecipeForm', () => {
   const mockSubmit = vi.fn().mockResolvedValue(undefined);

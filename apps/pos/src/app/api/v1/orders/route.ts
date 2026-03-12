@@ -12,6 +12,9 @@ import {
   ensureCustomerForOrderDraft,
   submitPosbistroOrder,
 } from '@/lib/integrations/posbistro/service';
+import { calculateOrderTotal, readMetadataPaymentFee, roundCurrency } from '@/lib/orders/financials';
+import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
+import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
 import { createServiceClient } from '@/lib/supabase/server';
 import { estimateOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { CreateOrderSchema } from '@/schemas/order';
@@ -60,10 +63,6 @@ function isExternalIdUniqueViolation(error: unknown): boolean {
 }
 
 const VAT_RATE = 0.08;
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 function calculateIncludedTaxFromGross(grossAmount: number, rate: number): number {
   if (grossAmount <= 0) return 0;
@@ -273,9 +272,16 @@ export async function POST(request: NextRequest) {
   const tax = calculateIncludedTaxFromGross(subtotal, VAT_RATE);
   const discount = input.discount ?? 0;
   const deliveryFee = input.delivery_fee ?? 0;
+  const paymentFee = readMetadataPaymentFee(input.metadata);
   const tip = input.tip ?? 0;
   const loyaltyPointsUsed = input.loyalty_points_used ?? 0;
-  const total = roundCurrency(subtotal - discount + deliveryFee + tip);
+  const total = calculateOrderTotal({
+    subtotal,
+    discount,
+    deliveryFee,
+    paymentFee,
+    tip,
+  });
   const loyaltyPointsEarned = await estimateOrderLoyaltyPoints(
     serviceClient,
     input.customer_id,
@@ -402,23 +408,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (initialStatus === OrderStatus.CONFIRMED) {
-      const orderForExport = {
-        ...orderPayload,
-        ...order,
-        id: order.id,
-        status: initialStatus,
-        items,
-      } as Order;
+    const orderForSideEffects = {
+      ...orderPayload,
+      ...order,
+      id: order.id,
+      status: order.status,
+      items,
+    } as Order;
 
+    if (initialStatus === OrderStatus.CONFIRMED) {
       try {
-        await submitPosbistroOrder(orderForExport, {
+        await submitPosbistroOrder(orderForSideEffects, {
           confirmBaseUrl: buildPosbistroConfirmBaseUrl(request.nextUrl.origin),
         });
       } catch (error) {
         console.error('[POSBistro] submit on create failed:', error);
       }
     }
+
+    const webhookData = buildOrderStatusChangedWebhookData(orderForSideEffects, {
+      status: order.status,
+      previousStatus: '',
+    });
+
+    scheduleWebhookDispatch(
+      'order.status_changed',
+      webhookData as unknown as Record<string, unknown>
+    );
 
     return apiCreated(order);
   } catch (error) {
