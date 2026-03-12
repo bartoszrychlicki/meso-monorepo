@@ -1,9 +1,16 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { useKitchen, useKitchenPolling } from '../hooks';
 import { KdsCard } from './kds-card';
 import { cn } from '@/lib/utils';
+import {
+  getNewPendingTicketIds,
+  playNewKitchenOrderSound,
+  primeKitchenAlertAudio,
+} from '../alerts';
 import { Inbox, ChefHat, Bell } from 'lucide-react';
+import { useKdsSoundEnabled } from '../hooks';
 
 interface KdsColumnProps {
   title: string;
@@ -39,7 +46,39 @@ function KdsColumn({ title, count, icon, headerColor, children }: KdsColumnProps
 
 export function KdsBoard() {
   const { newTickets, preparingTickets, readyTickets, isLoading } = useKitchen();
+  const soundEnabled = useKdsSoundEnabled();
+  const previousNewTicketIdsRef = useRef<Set<string> | null>(null);
   useKitchenPolling(5000);
+
+  useEffect(() => {
+    const unlockAudio = () => {
+      void primeKitchenAlertAudio();
+    };
+
+    window.addEventListener('pointerdown', unlockAudio, { passive: true });
+    window.addEventListener('keydown', unlockAudio);
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, []);
+
+  useEffect(() => {
+    const currentTicketIds = new Set(newTickets.map((ticket) => ticket.id));
+    const previousTicketIds = previousNewTicketIdsRef.current;
+    previousNewTicketIdsRef.current = currentTicketIds;
+
+    if (!previousTicketIds || !soundEnabled) {
+      return;
+    }
+
+    if (getNewPendingTicketIds(previousTicketIds, newTickets).length === 0) {
+      return;
+    }
+
+    void playNewKitchenOrderSound();
+  }, [newTickets, soundEnabled]);
 
   if (isLoading) {
     return (

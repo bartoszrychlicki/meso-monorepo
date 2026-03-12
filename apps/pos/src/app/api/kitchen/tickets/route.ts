@@ -1,7 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { createServiceClient } from '@/lib/supabase/server';
+import {
+  ACTIVE_KDS_ORDER_STATUSES,
+  COMPLETED_KDS_ORDER_STATUSES,
+  extractKitchenTicketOrderIds,
+  filterKitchenTicketsByLinkedOrders,
+} from '@/modules/kitchen/ticket-filters';
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
+import type { Order } from '@/types/order';
+
+type LinkedOrder = Pick<Order, 'id' | 'status'>;
+
+const isSupabaseBackend = process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+
+async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
+  if (orderIds.length === 0) {
+    return [];
+  }
+
+  if (isSupabaseBackend) {
+    const { data, error } = await createServiceClient()
+      .from('orders_orders')
+      .select('id, status')
+      .in('id', orderIds);
+
+    if (error) {
+      throw new Error(`[orders_orders] linked order lookup failed: ${error.message}`);
+    }
+
+    return (data ?? []) as LinkedOrder[];
+  }
+
+  const ordersRepo = createServerRepository<Order>('orders');
+  const orders = await ordersRepo.findMany((order) => orderIds.includes(order.id));
+  return orders.map((order) => ({
+    id: order.id,
+    status: order.status,
+  }));
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,6 +67,15 @@ export async function GET(request: NextRequest) {
           ticket.status === OrderStatus.READY
       );
     }
+
+    const linkedOrders = await loadLinkedOrders(extractKitchenTicketOrderIds(tickets));
+    tickets = filterKitchenTicketsByLinkedOrders(
+      tickets,
+      linkedOrders,
+      filter === 'completed_today'
+        ? COMPLETED_KDS_ORDER_STATUSES
+        : ACTIVE_KDS_ORDER_STATUSES
+    );
 
     return NextResponse.json({ tickets });
   } catch (error) {
