@@ -110,6 +110,7 @@ function makeRequest(
 // ---------------------------------------------------------------------------
 
 const USER_ID = 'user-abc-123'
+const CUSTOMER_ID = 'crm-customer-1'
 const ORDER_ID = 'order-abc-456'
 
 // ---------------------------------------------------------------------------
@@ -167,17 +168,32 @@ describe('POST /api/payments/p24/register', () => {
   // ---- 403: Order belongs to different user ----
   it('returns 403 when order belongs to a different user', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID, email: 'test@meso.pl' } } })
-    mockAdminFrom.mockImplementation(() =>
-      chain({
-        data: {
-          id: ORDER_ID,
-          customer_id: 'different-user-999',
-          total: 50.0,
-          delivery_address: { email: 'other@meso.pl' },
-        },
-        error: null,
-      })
-    )
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === 'orders_orders') {
+        return chain({
+          data: {
+            id: ORDER_ID,
+            customer_id: 'different-customer-999',
+            total: 50.0,
+            delivery_address: { email: 'other@meso.pl' },
+            payment_status: 'pending',
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            id: CUSTOMER_ID,
+            auth_id: USER_ID,
+          },
+          error: null,
+        })
+      }
+
+      return chain()
+    })
 
     const res = await POST(makeRequest('POST', { orderId: ORDER_ID }))
     expect(res.status).toBe(403)
@@ -189,17 +205,32 @@ describe('POST /api/payments/p24/register', () => {
   // ---- 200: Success ----
   it('returns 200 with token and URL on success', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID, email: 'test@meso.pl' } } })
-    mockAdminFrom.mockImplementation(() =>
-      chain({
-        data: {
-          id: ORDER_ID,
-          customer_id: USER_ID,
-          total: 75.5,
-          delivery_address: { email: 'test@meso.pl' },
-        },
-        error: null,
-      })
-    )
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === 'orders_orders') {
+        return chain({
+          data: {
+            id: ORDER_ID,
+            customer_id: CUSTOMER_ID,
+            total: 75.5,
+            payment_status: 'pending',
+            delivery_address: { email: 'test@meso.pl' },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            id: CUSTOMER_ID,
+            auth_id: USER_ID,
+          },
+          error: null,
+        })
+      }
+
+      return chain()
+    })
 
     mockRegisterTransaction.mockResolvedValue('test-token-abc')
     mockGetPaymentLink.mockReturnValue('https://sandbox.przelewy24.pl/trnRequest/test-token-abc')
@@ -222,20 +253,87 @@ describe('POST /api/payments/p24/register', () => {
     )
   })
 
+  it('returns the existing active P24 session instead of registering a duplicate one', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID, email: 'test@meso.pl' } } })
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === 'orders_orders') {
+        return chain({
+          data: {
+            id: ORDER_ID,
+            customer_id: CUSTOMER_ID,
+            total: 75.5,
+            payment_status: 'pending',
+            metadata: {
+              p24: {
+                active_session_id: 'session-1',
+                sessions: [
+                  {
+                    sessionId: 'session-1',
+                    status: 'pending',
+                    createdAt: '2026-03-12T10:00:00.000Z',
+                    token: 'existing-token',
+                    url: 'https://sandbox.przelewy24.pl/trnRequest/existing-token',
+                  },
+                ],
+              },
+            },
+            delivery_address: { email: 'test@meso.pl' },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            id: CUSTOMER_ID,
+            auth_id: USER_ID,
+          },
+          error: null,
+        })
+      }
+
+      return chain()
+    })
+
+    const res = await POST(makeRequest('POST', { orderId: ORDER_ID }))
+    const json = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(json.token).toBe('existing-token')
+    expect(json.url).toBe('https://sandbox.przelewy24.pl/trnRequest/existing-token')
+    expect(mockRegisterTransaction).not.toHaveBeenCalled()
+  })
+
   // ---- 500: P24 registration failure ----
   it('returns 500 on P24 registration failure', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: USER_ID, email: 'test@meso.pl' } } })
-    mockAdminFrom.mockImplementation(() =>
-      chain({
-        data: {
-          id: ORDER_ID,
-          customer_id: USER_ID,
-          total: 50.0,
-          delivery_address: { email: 'test@meso.pl' },
-        },
-        error: null,
-      })
-    )
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === 'orders_orders') {
+        return chain({
+          data: {
+            id: ORDER_ID,
+            customer_id: CUSTOMER_ID,
+            total: 50.0,
+            payment_status: 'pending',
+            delivery_address: { email: 'test@meso.pl' },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            id: CUSTOMER_ID,
+            auth_id: USER_ID,
+          },
+          error: null,
+        })
+      }
+
+      return chain()
+    })
 
     mockRegisterTransaction.mockRejectedValue(new Error('P24 API connection failed'))
 

@@ -14,6 +14,7 @@ import type { OrderConfirmation } from '@/stores/orderConfirmationStore'
 import { PAYMENT_TIMEOUT_MS, getPickupStepIndex, isPaymentPending } from '@/lib/order-confirmation-utils'
 import { mapConfirmationItems } from '@/lib/order-confirmation-mapper'
 import { resolveCheckoutConfig } from '@/lib/location-config'
+import { readOrderDeliveryFee, readOrderDiscount, readOrderPaymentFee } from '@/lib/order-financials'
 
 // Step definitions for pickup orders
 const pickupSteps = [
@@ -53,8 +54,9 @@ function buildConfirmation(order: Record<string, any>, waitMinutes = 20): OrderC
             city: locAddr?.city || '',
         } : null,
         subtotal: order.subtotal,
-        deliveryFee: order.delivery_fee,
-        discount: order.promo_discount || 0,
+        deliveryFee: readOrderDeliveryFee(order),
+        paymentFee: readOrderPaymentFee(order),
+        discount: readOrderDiscount(order),
         tip: order.tip || 0,
         total: order.total,
         paymentMethod: order.payment_method,
@@ -587,12 +589,20 @@ function OrderConfirmationContent() {
                         <span className="text-green-400">-{formatPriceExact(confirmation.discount)}</span>
                     </div>
                 )}
-                <div className="flex justify-between">
-                    <span className="text-muted-foreground">Dostawa</span>
-                    <span className="text-foreground">
-                        {confirmation.deliveryFee > 0 ? formatPriceExact(confirmation.deliveryFee) : 'Gratis'}
-                    </span>
-                </div>
+                {(confirmation.deliveryType === 'delivery' || confirmation.deliveryFee > 0) && (
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Dostawa</span>
+                        <span className="text-foreground">
+                            {confirmation.deliveryFee > 0 ? formatPriceExact(confirmation.deliveryFee) : 'Gratis'}
+                        </span>
+                    </div>
+                )}
+                {confirmation.paymentFee > 0 && (
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Płatność przy odbiorze</span>
+                        <span className="text-foreground">{formatPriceExact(confirmation.paymentFee)}</span>
+                    </div>
+                )}
                 {confirmation.tip > 0 && (
                     <div className="flex justify-between">
                         <span className="text-muted-foreground">Napiwek</span>

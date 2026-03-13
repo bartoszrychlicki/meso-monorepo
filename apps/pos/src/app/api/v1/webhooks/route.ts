@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { WebhookEvent } from '@/lib/webhooks/types';
 
 const _VALID_EVENTS: WebhookEvent[] = [
+  'order.created',
   'order.status_changed',
   'order.cancelled',
 ];
@@ -19,7 +20,7 @@ const _VALID_EVENTS: WebhookEvent[] = [
 const RegisterWebhookSchema = z.object({
   url: z.string().url('Wymagany prawidłowy URL'),
   events: z
-    .array(z.enum(['order.status_changed', 'order.cancelled']))
+    .array(z.enum(['order.created', 'order.status_changed', 'order.cancelled']))
     .min(1, 'Wymagany przynajmniej jeden event'),
   secret: z.string().min(16, 'Secret musi mieć minimum 16 znaków'),
   description: z.string().optional(),

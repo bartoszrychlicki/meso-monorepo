@@ -24,6 +24,7 @@ export interface OrderEmailData {
   items: OrderEmailItem[]
   subtotal: number
   deliveryFee: number
+  paymentFee: number
   promoDiscount: number
   tip: number
   total: number
@@ -112,6 +113,9 @@ export function buildOrderConfirmationHtml(
   summaryRows.push(summaryRow('Wartość zamówienia', data.subtotal))
   if (data.deliveryType === 'delivery') {
     summaryRows.push(summaryRow('Dostawa', data.deliveryFee))
+  }
+  if (data.paymentFee > 0) {
+    summaryRows.push(summaryRow('Opłata za płatność przy odbiorze', data.paymentFee))
   }
   if (data.promoDiscount > 0) {
     summaryRows.push(summaryRow('Rabat', -data.promoDiscount, '#22c55e'))
