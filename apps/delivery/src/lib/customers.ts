@@ -40,3 +40,15 @@ export async function fetchCustomerByAuthId<T>(
 
   return (data as T | null) ?? null
 }
+
+export type CustomerIdentity = {
+  id: string
+  auth_id?: string | null
+}
+
+export async function fetchCustomerIdentityByAuthId(
+  client: unknown,
+  authUserId: string
+): Promise<CustomerIdentity | null> {
+  return fetchCustomerByAuthId<CustomerIdentity>(client, authUserId, 'id, auth_id')
+}

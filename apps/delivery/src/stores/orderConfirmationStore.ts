@@ -21,6 +21,7 @@ export interface OrderConfirmation {
   } | null
   subtotal: number
   deliveryFee: number
+  paymentFee: number
   discount: number
   tip: number
   total: number

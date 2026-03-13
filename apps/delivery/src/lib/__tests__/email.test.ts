@@ -29,6 +29,7 @@ const sampleData: OrderEmailData = {
   ],
   subtotal: 77,
   deliveryFee: 0,
+  paymentFee: 0,
   promoDiscount: 0,
   tip: 5,
   total: 82,
@@ -93,10 +94,23 @@ describe('buildOrderConfirmationHtml', () => {
   })
 
   it('ukrywa rabat i napiwek gdy sa zerowe', () => {
-    const noExtras: OrderEmailData = { ...sampleData, tip: 0, promoDiscount: 0 }
+    const noExtras: OrderEmailData = { ...sampleData, tip: 0, promoDiscount: 0, paymentFee: 0 }
     const html = buildOrderConfirmationHtml(noExtras, '1E240')
     expect(html).not.toContain('Napiwek')
     expect(html).not.toContain('Rabat')
+  })
+
+  it('pokazuje oplate za platnosc przy odbiorze osobno od dostawy', () => {
+    const html = buildOrderConfirmationHtml(
+      {
+        ...sampleData,
+        paymentFee: 2,
+      },
+      '1E240'
+    )
+
+    expect(html).toContain('Opłata za płatność przy odbiorze')
+    expect(html).not.toContain('<td style="padding:4px 0;color:#cbd5e1;font-size:14px;">Dostawa</td>')
   })
 
   it('zawiera link do sledzenia zamowienia gdy trackingUrl podany', () => {

@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchCustomerIdentityByAuthId } from '@/lib/customers'
 import { P24 } from '@/lib/p24'
+import {
+    getActiveP24Session,
+    markP24SessionStatus,
+    upsertP24Session,
+} from '@/lib/p24-payment-sessions'
 import { Tables } from '@/lib/table-mapping'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +17,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    let supabaseAdmin: ReturnType<typeof createAdminClient> | null = null
+    let orderIdForFailure: string | null = null
+    let failedSessionId: string | null = null
+
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -30,7 +40,7 @@ export async function POST(request: Request) {
         // Get Order using Admin Client to bypass RLS
         console.log(`[P24 Register] Processing for Order ID: ${orderId}, User ID: ${user.id}`)
 
-        const supabaseAdmin = createAdminClient()
+        supabaseAdmin = createAdminClient()
         const { data: order, error: orderError } = await supabaseAdmin
             .from(Tables.orders)
             .select('*')
@@ -42,8 +52,25 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Nie znaleziono zamówienia w bazie danych' }, { status: 400 })
         }
 
-        if (order.customer_id !== user.id) {
+        const customer = await fetchCustomerIdentityByAuthId(supabaseAdmin, user.id)
+        if (!customer || order.customer_id !== customer.id) {
             return NextResponse.json({ error: 'Brak uprawnień do tego zamówienia' }, { status: 403 })
+        }
+        if (order.payment_status === 'paid') {
+            return NextResponse.json({ error: 'To zamówienie jest już opłacone' }, { status: 409 })
+        }
+
+        const activeSession = getActiveP24Session(order.metadata)
+        if (
+            activeSession &&
+            activeSession.status === 'pending' &&
+            activeSession.url &&
+            activeSession.token
+        ) {
+            return NextResponse.json({
+                token: activeSession.token,
+                url: activeSession.url,
+            })
         }
 
         // Initialize P24
@@ -85,13 +112,31 @@ export async function POST(request: Request) {
 
         // Prepare data
         const amount = Math.round(order.total * 100) // Convert to grosze
-        const sessionId = `${order.id}-${Date.now()}` // Unique session ID
+        const now = new Date().toISOString()
+        const sessionId = `${order.id}-${Date.now()}`
         const description = `Zamówienie #${order.id}`
+        orderIdForFailure = order.id
+        failedSessionId = sessionId
 
         // Extract email from delivery_address or user auth
         // order.delivery_address is JSONB, let's cast it safely
         const deliveryAddress = order.delivery_address as Record<string, string | undefined>
         const email = deliveryAddress?.email || user.email || 'klient@meso.pl'
+
+        const pendingMetadata = upsertP24Session(
+            order.metadata,
+            {
+                sessionId,
+                status: 'registering',
+                createdAt: now,
+            },
+            { replaceCurrentActive: true, now }
+        )
+
+        await supabaseAdmin
+            .from(Tables.orders)
+            .update({ metadata: pendingMetadata })
+            .eq('id', order.id)
 
         // Register transaction
         const token = await p24.registerTransaction(
@@ -103,10 +148,22 @@ export async function POST(request: Request) {
             `${appUrl}/api/payments/p24/status`, // urlStatus
         )
 
-        // Update order with session ID if we want to track it, 
-        // or just rely on P24 returning it in notification.
-        // Good practice to store p24_session_id in order if we have a column, 
-        // but for now we might not have it. We can add it to metadata or just proceed.
+        const completedMetadata = upsertP24Session(
+            pendingMetadata,
+            {
+                sessionId,
+                token,
+                url: p24.getPaymentLink(token),
+                status: 'pending',
+                createdAt: now,
+            },
+            { now }
+        )
+
+        await supabaseAdmin
+            .from(Tables.orders)
+            .update({ metadata: completedMetadata })
+            .eq('id', order.id)
 
         return NextResponse.json({
             token,
@@ -114,6 +171,31 @@ export async function POST(request: Request) {
         })
 
     } catch (error) {
+        if (supabaseAdmin && orderIdForFailure && failedSessionId) {
+            try {
+                const { data: failedOrder } = await supabaseAdmin
+                    .from(Tables.orders)
+                    .select('metadata')
+                    .eq('id', orderIdForFailure)
+                    .maybeSingle()
+
+                if (failedOrder) {
+                    await supabaseAdmin
+                        .from(Tables.orders)
+                        .update({
+                            metadata: markP24SessionStatus(
+                                failedOrder.metadata,
+                                failedSessionId,
+                                'failed'
+                            ),
+                        })
+                        .eq('id', orderIdForFailure)
+                }
+            } catch (metadataError) {
+                console.error('[P24 Register] Failed to persist session failure state:', metadataError)
+            }
+        }
+
         console.error('Payment registration error:', error)
         return NextResponse.json(
             { error: error instanceof Error ? error.message : 'Internal server error' },

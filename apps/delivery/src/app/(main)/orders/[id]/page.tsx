@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { isOrderActive } from '@/lib/order-confirmation-utils'
 import { formatOrderDisplayId } from '@/lib/format-order-display-id'
 import { getLocationAddressParts } from '@/lib/location-address'
+import { readOrderDeliveryFee, readOrderDiscount, readOrderPaymentFee } from '@/lib/order-financials'
 
 export default function OrderDetailsPage() {
     const params = useParams()
@@ -58,6 +59,9 @@ export default function OrderDetailsPage() {
     const statusMessage = getOrderStatusMessage(order.status, order.payment_status)
     const pickupAddress = order.location ? getLocationAddressParts(order.location.address) : null
     const pickupAddressLine = [pickupAddress?.postalCode, pickupAddress?.city].filter(Boolean).join(' ')
+    const deliveryFee = readOrderDeliveryFee(order)
+    const paymentFee = readOrderPaymentFee(order)
+    const discount = readOrderDiscount(order)
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-6 pb-24 space-y-6">
@@ -168,17 +172,24 @@ export default function OrderDetailsPage() {
                         <span className="text-foreground">{formatPrice(order.subtotal)}</span>
                     </div>
 
-                    {order.delivery_fee > 0 && (
+                    {(order.delivery_type === 'delivery' || deliveryFee > 0) && (
                         <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Dostawa</span>
-                            <span className="text-foreground">{formatPrice(order.delivery_fee)}</span>
+                            <span className="text-foreground">{deliveryFee > 0 ? formatPrice(deliveryFee) : 'Gratis'}</span>
                         </div>
                     )}
 
-                    {order.promo_discount > 0 && (
+                    {paymentFee > 0 && (
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Płatność przy odbiorze</span>
+                            <span className="text-foreground">{formatPrice(paymentFee)}</span>
+                        </div>
+                    )}
+
+                    {discount > 0 && (
                         <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Rabat {order.promo_code && `(${order.promo_code})`}</span>
-                            <span className="text-green-400">-{formatPrice(order.promo_discount)}</span>
+                            <span className="text-green-400">-{formatPrice(discount)}</span>
                         </div>
                     )}
 
