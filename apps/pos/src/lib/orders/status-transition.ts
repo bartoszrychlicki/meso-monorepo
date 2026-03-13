@@ -162,7 +162,12 @@ export async function transitionOrderStatus(
   } as Partial<Order>);
 
   if (input.status === OrderStatus.CANCELLED) {
-    await cancelKitchenTicketsForOrder(input.orderId, nowIso);
+    try {
+      await cancelKitchenTicketsForOrder(input.orderId, nowIso);
+    } catch (error) {
+      // Keep status updates resilient even if KDS cleanup fails.
+      console.error('[KDS] cancel tickets on order cancellation failed:', error);
+    }
   }
 
   if (input.status === OrderStatus.DELIVERED && (updated.customer_id || updated.customer_phone)) {

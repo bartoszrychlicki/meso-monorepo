@@ -258,6 +258,37 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready'])
   })
 
+  it('still returns 200 when kitchen ticket cancellation fails', async () => {
+    mockFindById.mockResolvedValue({
+      ...baseOrder,
+      status: 'confirmed',
+    })
+    mockServerRepo.update.mockResolvedValue({
+      ...baseOrder,
+      status: 'cancelled',
+      cancelled_at: '2026-03-03T10:05:00.000Z',
+      status_history: [
+        ...baseOrder.status_history,
+        { status: 'cancelled', timestamp: '2026-03-03T10:05:00.000Z' },
+      ],
+    })
+    mockKitchenTicketsIn.mockResolvedValueOnce({
+      error: { message: 'temporary database error' },
+    })
+
+    const res = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
+        status: 'cancelled',
+      }),
+      makeParams('order-1')
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.data.status).toBe('cancelled')
+    expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready'])
+  })
+
   it('awards loyalty points through the server helper when order is delivered', async () => {
     mockFindById.mockResolvedValue({
       ...baseOrder,
