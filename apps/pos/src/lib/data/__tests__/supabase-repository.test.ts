@@ -116,6 +116,30 @@ describe('SupabaseRepository', () => {
 
       await expect(repo.findById('abc')).rejects.toThrow('findById failed');
     });
+
+    it('retries once for transient network errors', async () => {
+      const row = {
+        id: 'abc-123',
+        name: 'Recovered Item',
+        quantity: '100',
+        price: '1.5',
+        is_active: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      };
+
+      chain.maybeSingle
+        .mockResolvedValueOnce({
+          data: null,
+          error: { message: 'TypeError: Load failed (example.supabase.co)' },
+        })
+        .mockResolvedValueOnce({ data: row, error: null });
+
+      const result = await repo.findById('abc-123');
+
+      expect(result?.id).toBe('abc-123');
+      expect(chain.maybeSingle).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('findMany with object filter', () => {

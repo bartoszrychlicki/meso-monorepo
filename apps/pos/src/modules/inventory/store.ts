@@ -25,6 +25,7 @@ interface InventoryStore {
   currentComponents: StockItemComponentWithDetails[];
   currentUsage: StockItemUsage | null;
   isDetailLoading: boolean;
+  detailLoadError: string | null;
 
   loadAll: () => Promise<void>;
   loadStockItems: () => Promise<void>;
@@ -75,6 +76,7 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   currentComponents: [],
   currentUsage: null,
   isDetailLoading: false,
+  detailLoadError: null,
 
   loadAll: async () => {
     set({ isLoading: true, loadError: null });
@@ -135,8 +137,12 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   },
 
   loadInventoryCategories: async () => {
-    const inventoryCategories = await inventoryRepository.getAllInventoryCategories();
-    set({ inventoryCategories });
+    try {
+      const inventoryCategories = await inventoryRepository.getAllInventoryCategories();
+      set({ inventoryCategories });
+    } catch {
+      set({ loadError: 'Nie udalo sie zaladowac kategorii magazynowych. Sprobuj ponownie.' });
+    }
   },
 
   setSelectedWarehouse: (id) => {
@@ -262,23 +268,54 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
 
   // Detail view actions
   loadStockItemDetail: async (id: string) => {
-    set({ isDetailLoading: true, currentStockItem: null, currentComponents: [], currentUsage: null });
+    set({
+      isDetailLoading: true,
+      currentStockItem: null,
+      currentComponents: [],
+      currentUsage: null,
+      detailLoadError: null,
+    });
     try {
       const item = await inventoryRepository.getStockItemById(id);
+      if (!item) {
+        set({
+          currentStockItem: null,
+          detailLoadError: 'Nie znaleziono pozycji magazynowej lub nie udalo sie jej zaladowac.',
+        });
+        return;
+      }
       set({ currentStockItem: item });
+    } catch {
+      set({
+        detailLoadError: 'Nie udalo sie zaladowac szczegolow pozycji magazynowej. Sprobuj ponownie.',
+      });
     } finally {
       set({ isDetailLoading: false });
     }
   },
 
   loadComponents: async (id: string) => {
-    const components = await inventoryRepository.getComponentsForItem(id);
-    set({ currentComponents: components });
+    try {
+      const components = await inventoryRepository.getComponentsForItem(id);
+      set({ currentComponents: components });
+    } catch {
+      set({
+        currentComponents: [],
+        detailLoadError: 'Nie udalo sie zaladowac skladowych pozycji magazynowej. Sprobuj ponownie.',
+      });
+    }
   },
 
   loadUsage: async (id: string) => {
-    const usage = await inventoryRepository.getStockItemUsage(id);
-    set({ currentUsage: usage });
+    try {
+      const usage = await inventoryRepository.getStockItemUsage(id);
+      set({ currentUsage: usage });
+    } catch {
+      set({
+        currentUsage: { in_components: [] },
+        detailLoadError: 'Nie udalo sie zaladowac uzycia pozycji magazynowej. Sprobuj ponownie.',
+      });
+    }
   },
 
   addComponent: async (parentId: string, componentId: string, quantity: number) => {
