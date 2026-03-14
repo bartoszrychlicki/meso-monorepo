@@ -67,7 +67,7 @@ describe('GET /api/v1/api-keys', () => {
 
     expect(response.status).toBe(500);
     expect(body.success).toBe(false);
-    expect(body.error.code).toBe('API_KEYS_LIST_FAILED');
-    expect(body.error.message).toContain('permission denied');
+    expect(body.error.code).toBe('INTERNAL_ERROR');
+    expect(body.error.message).toBe('Nie udało się pobrać kluczy API');
   });
 });

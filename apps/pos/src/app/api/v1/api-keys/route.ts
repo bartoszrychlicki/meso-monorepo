@@ -11,6 +11,7 @@ import {
   revokeApiKey,
   deleteApiKey,
 } from '@/lib/api-keys';
+import { createClient } from '@/lib/supabase/server';
 import { ApiKeyPermission, ALL_API_KEY_PERMISSIONS } from '@/types/api-key';
 import { z } from 'zod';
 
@@ -33,12 +34,26 @@ const RevokeApiKeySchema = z.object({
   id: z.string().min(1, 'ID klucza jest wymagane'),
 });
 
+async function getAuthenticatedUserId(): Promise<string | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user?.id ?? null;
+}
+
 /**
  * GET /api/v1/api-keys
  * List all API keys (internal endpoint, no API key auth required — uses session).
  * In the current prototype, this is open for the Settings UI.
  */
 export async function GET() {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return apiError('UNAUTHORIZED', 'Wymagane zalogowanie użytkownika', 401);
+  }
+
   try {
     const keys = await listApiKeys();
 
@@ -46,11 +61,11 @@ export async function GET() {
     const safeKeys = keys.map(({ key_hash: _hash, ...rest }) => rest);
     return apiSuccess(safeKeys);
   } catch (error) {
-    return apiError(
-      'API_KEYS_LIST_FAILED',
-      error instanceof Error ? error.message : 'Nie udało się pobrać kluczy API',
-      500
-    );
+    const message = error instanceof Error ? error.message : 'Nieznany błąd';
+    if (message.includes('row-level security policy')) {
+      return apiError('FORBIDDEN', 'Brak uprawnień do listowania kluczy API', 403);
+    }
+    return apiError('INTERNAL_ERROR', 'Nie udało się pobrać kluczy API', 500);
   }
 }
 
@@ -59,30 +74,35 @@ export async function GET() {
  * Create a new API key. Returns the raw key ONCE.
  */
 export async function POST(request: NextRequest) {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return apiError('UNAUTHORIZED', 'Wymagane zalogowanie użytkownika', 401);
+  }
+
+  let body: unknown;
   try {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
-    }
+    body = await request.json();
+  } catch {
+    return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
+  }
 
-    const validation = CreateApiKeySchema.safeParse(body);
-    if (!validation.success) {
-      return apiValidationError(
-        validation.error.issues.map((i) => ({
-          field: i.path.join('.'),
-          message: i.message,
-        }))
-      );
-    }
+  const validation = CreateApiKeySchema.safeParse(body);
+  if (!validation.success) {
+    return apiValidationError(
+      validation.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }))
+    );
+  }
 
-    const { name, permissions, expires_at } = validation.data;
+  const { name, permissions, expires_at } = validation.data;
 
+  try {
     const { apiKey, rawKey } = await createApiKey({
       name,
       permissions: permissions as ApiKeyPermission[],
-      created_by: 'admin', // In production, would come from session
+      created_by: userId,
       expires_at,
     });
 
@@ -93,11 +113,11 @@ export async function POST(request: NextRequest) {
       raw_key: rawKey,
     });
   } catch (error) {
-    return apiError(
-      'API_KEY_CREATE_FAILED',
-      error instanceof Error ? error.message : 'Nie udało się utworzyć klucza API',
-      500
-    );
+    const message = error instanceof Error ? error.message : 'Nieznany błąd';
+    if (message.includes('row-level security policy')) {
+      return apiError('FORBIDDEN', 'Brak uprawnień do utworzenia klucza API', 403);
+    }
+    return apiError('INTERNAL_ERROR', 'Nie udało się utworzyć klucza API', 500);
   }
 }
 
@@ -106,27 +126,32 @@ export async function POST(request: NextRequest) {
  * Revoke or delete an API key.
  */
 export async function DELETE(request: NextRequest) {
+  const userId = await getAuthenticatedUserId();
+  if (!userId) {
+    return apiError('UNAUTHORIZED', 'Wymagane zalogowanie użytkownika', 401);
+  }
+
+  let body: unknown;
   try {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
-    }
+    body = await request.json();
+  } catch {
+    return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
+  }
 
-    const validation = RevokeApiKeySchema.safeParse(body);
-    if (!validation.success) {
-      return apiValidationError(
-        validation.error.issues.map((i) => ({
-          field: i.path.join('.'),
-          message: i.message,
-        }))
-      );
-    }
+  const validation = RevokeApiKeySchema.safeParse(body);
+  if (!validation.success) {
+    return apiValidationError(
+      validation.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }))
+    );
+  }
 
-    const { searchParams } = new URL(request.url);
-    const permanent = searchParams.get('permanent') === 'true';
+  const { searchParams } = new URL(request.url);
+  const permanent = searchParams.get('permanent') === 'true';
 
+  try {
     if (permanent) {
       await deleteApiKey(validation.data.id);
     } else {
@@ -135,10 +160,10 @@ export async function DELETE(request: NextRequest) {
 
     return apiSuccess({ revoked: true });
   } catch (error) {
-    return apiError(
-      'API_KEY_DELETE_FAILED',
-      error instanceof Error ? error.message : 'Nie udało się unieważnić klucza API',
-      500
-    );
+    const message = error instanceof Error ? error.message : 'Nieznany błąd';
+    if (message.includes('row-level security policy')) {
+      return apiError('FORBIDDEN', 'Brak uprawnień do usunięcia klucza API', 403);
+    }
+    return apiError('INTERNAL_ERROR', 'Nie udało się usunąć klucza API', 500);
   }
 }
