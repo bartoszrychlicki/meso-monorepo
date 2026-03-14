@@ -356,6 +356,14 @@ describe('UpdateDeliveryConfigSchema', () => {
     }
   });
 
+  it('accepts is_pickup_active as boolean', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({ is_pickup_active: false });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.is_pickup_active).toBe(false);
+    }
+  });
+
   it('accepts ordering_paused_until_date as null', () => {
     const result = UpdateDeliveryConfigSchema.safeParse({ ordering_paused_until_date: null });
     expect(result.success).toBe(true);

@@ -51,6 +51,7 @@ type RpcErrorLike = {
 type DeliveryAvailabilityConfig = {
   opening_time?: string | null;
   ordering_paused_until_date?: string | null;
+  is_pickup_active?: boolean | null;
 };
 
 function asRpcError(value: unknown): RpcErrorLike {
@@ -271,7 +272,7 @@ export async function POST(request: NextRequest) {
 
   const { data: deliveryAvailabilityConfig, error: deliveryAvailabilityError } = await serviceClient
     .from('orders_delivery_config')
-    .select('opening_time, ordering_paused_until_date')
+    .select('opening_time, ordering_paused_until_date, is_pickup_active')
     .eq('location_id', input.location_id)
     .maybeSingle();
 
@@ -282,6 +283,19 @@ export async function POST(request: NextRequest) {
       500,
       [deliveryAvailabilityError]
     );
+  }
+
+  if (
+    input.delivery_type === 'pickup' &&
+    deliveryAvailabilityConfig &&
+    deliveryAvailabilityConfig.is_pickup_active === false
+  ) {
+    return apiValidationError([
+      {
+        field: 'delivery_type',
+        message: 'Odbior osobisty jest obecnie niedostepny dla tej lokalizacji.',
+      },
+    ]);
   }
 
   const orderingPause = isOrderingPaused(

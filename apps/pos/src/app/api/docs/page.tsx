@@ -991,6 +991,7 @@ export default function ApiDocsPage() {
       "id": "uuid",
       "location_id": "uuid",
       "is_delivery_active": true,
+      "is_pickup_active": true,
       "delivery_radius_km": 5,
       "delivery_fee": 10.00,
       "min_order_amount": 30.00,

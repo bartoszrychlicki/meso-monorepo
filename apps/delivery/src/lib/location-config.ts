@@ -1,4 +1,5 @@
 export interface DeliveryConfigRecord {
+  is_pickup_active?: boolean | null
   opening_time?: string | null
   closing_time?: string | null
   pickup_time_min?: number | null
@@ -16,6 +17,7 @@ export interface DeliveryConfigRecord {
 }
 
 export interface CheckoutRuntimeConfig {
+  pickupEnabled: boolean
   openTime: string
   closeTime: string
   pickupBufferAfterOpen: number
@@ -124,6 +126,9 @@ export function resolveCheckoutConfig(
   return {
     openTime: asTime(config?.opening_time, DEFAULTS.openTime),
     closeTime: asTime(config?.closing_time, DEFAULTS.closeTime),
+    pickupEnabled: typeof config?.is_pickup_active === 'boolean'
+      ? config.is_pickup_active
+      : true,
     pickupBufferAfterOpen: asNumber(
       config?.pickup_buffer_after_open,
       DEFAULTS.pickupBufferAfterOpen

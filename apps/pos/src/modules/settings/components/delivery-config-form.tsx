@@ -35,6 +35,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     resolver: zodResolver(UpdateDeliveryConfigSchema) as Resolver<UpdateDeliveryConfigInput>,
     defaultValues: {
       is_delivery_active: deliveryConfig?.is_delivery_active ?? false,
+      is_pickup_active: deliveryConfig?.is_pickup_active ?? true,
       delivery_radius_km: deliveryConfig?.delivery_radius_km ?? 5,
       delivery_fee: deliveryConfig?.delivery_fee ?? 0,
       min_order_amount: deliveryConfig?.min_order_amount ?? 0,
@@ -56,6 +57,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     if (deliveryConfig) {
       form.reset({
         is_delivery_active: deliveryConfig.is_delivery_active,
+        is_pickup_active: deliveryConfig.is_pickup_active,
         delivery_radius_km: deliveryConfig.delivery_radius_km,
         delivery_fee: deliveryConfig.delivery_fee,
         min_order_amount: deliveryConfig.min_order_amount,
@@ -80,10 +82,10 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     setIsSubmitting(true);
     try {
       await saveDeliveryConfig(locationId, data);
-      toast.success('Ustawienia dostawy zapisane');
+      toast.success('Ustawienia zapisane');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Nieznany blad';
-      toast.error(`Nie udalo sie zapisac ustawien dostawy: ${message}`);
+      toast.error(`Nie udalo sie zapisac ustawien: ${message}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -97,9 +99,36 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     >
       <Card>
         <CardHeader>
-          <CardTitle>Ustawienia dostawy</CardTitle>
+          <CardTitle>Ustawienia zamowien online i dostawy</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="space-y-2 rounded-lg border p-4">
+            <Label htmlFor="ordering_paused_until_date">Wznowienie zamowien online</Label>
+            <Input
+              id="ordering_paused_until_date"
+              type="date"
+              value={form.watch('ordering_paused_until_date') ?? ''}
+              onChange={(event) =>
+                form.setValue(
+                  'ordering_paused_until_date',
+                  event.target.value ? event.target.value : null,
+                  { shouldValidate: true }
+                )
+              }
+              data-field="ordering_paused_until_date"
+            />
+            <p className="text-sm text-muted-foreground">
+              To ustawienie dotyczy wszystkich zamowien online: odbioru i dostawy. Po ustawieniu
+              tej daty aplikacja zablokuje zamowienia ASAP i pozwoli skladac tylko zamowienia na
+              przyszlosc od godziny otwarcia wskazanego dnia.
+            </p>
+            {form.formState.errors.ordering_paused_until_date && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.ordering_paused_until_date.message}
+              </p>
+            )}
+          </div>
+
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="is_delivery_active">Dostawa aktywna</Label>
@@ -221,33 +250,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               )}
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="ordering_paused_until_date">Wznowienie zamowień online</Label>
-            <Input
-              id="ordering_paused_until_date"
-              type="date"
-              disabled={!isDeliveryActive}
-              value={form.watch('ordering_paused_until_date') ?? ''}
-              onChange={(event) =>
-                form.setValue(
-                  'ordering_paused_until_date',
-                  event.target.value ? event.target.value : null,
-                  { shouldValidate: true }
-                )
-              }
-              data-field="ordering_paused_until_date"
-            />
-            <p className="text-sm text-muted-foreground">
-              Po ustawieniu tej daty aplikacja zablokuje zamowienia ASAP i pozwoli skladac tylko
-              zamowienia na przyszlosc od godziny otwarcia wskazanego dnia.
-            </p>
-            {form.formState.errors.ordering_paused_until_date && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.ordering_paused_until_date.message}
-              </p>
-            )}
-          </div>
         </CardContent>
       </Card>
 
@@ -256,6 +258,23 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
           <CardTitle>Odbior osobisty</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="is_pickup_active">Odbior osobisty aktywny</Label>
+              <p className="text-sm text-muted-foreground">
+                Wylacz, aby ukryc odbior osobisty jako dostepna metode skladania zamowienia.
+              </p>
+            </div>
+            <Switch
+              id="is_pickup_active"
+              checked={form.watch('is_pickup_active')}
+              onCheckedChange={(checked) =>
+                form.setValue('is_pickup_active', checked, { shouldValidate: true })
+              }
+              data-field="is_pickup_active"
+            />
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="pickup_time_min">Minimalny czas odbioru (min)</Label>
@@ -382,7 +401,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
           ) : (
             <Save className="mr-2 h-4 w-4" />
           )}
-          Zapisz ustawienia dostawy
+          Zapisz ustawienia
         </Button>
       </div>
     </form>

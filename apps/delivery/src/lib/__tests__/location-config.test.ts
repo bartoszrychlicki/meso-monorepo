@@ -25,6 +25,7 @@ describe('resolveCheckoutConfig', () => {
     })
 
     expect(result).toEqual({
+      pickupEnabled: true,
       openTime: '09:00:00',
       closeTime: '21:30:00',
       pickupBufferAfterOpen: 10,
@@ -50,6 +51,7 @@ describe('resolveCheckoutConfig', () => {
     const result = resolveCheckoutConfig(null)
 
     expect(result).toEqual({
+      pickupEnabled: true,
       openTime: '11:00',
       closeTime: '22:00',
       pickupBufferAfterOpen: 30,
@@ -69,6 +71,14 @@ describe('resolveCheckoutConfig', () => {
     })
 
     expect(result.payOnPickupMaxOrder).toBe(100)
+  })
+
+  it('preserves pickup availability from location config', () => {
+    const result = resolveCheckoutConfig({
+      is_pickup_active: false,
+    })
+
+    expect(result.pickupEnabled).toBe(false)
   })
 })
 

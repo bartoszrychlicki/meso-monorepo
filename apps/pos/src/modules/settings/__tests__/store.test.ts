@@ -59,6 +59,7 @@ function makeDeliveryConfig(overrides: Partial<DeliveryConfig> = {}): DeliveryCo
     min_order_amount: 30,
     estimated_delivery_minutes: 45,
     is_delivery_active: true,
+    is_pickup_active: true,
     opening_time: '10:00',
     closing_time: '22:00',
     pickup_time_min: 15,

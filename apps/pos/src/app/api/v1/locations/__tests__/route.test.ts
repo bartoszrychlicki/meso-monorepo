@@ -115,6 +115,7 @@ describe('GET /api/v1/locations/:id', () => {
     id: 'dc-1',
     location_id: 'loc-1',
     is_delivery_active: true,
+    is_pickup_active: true,
     delivery_radius_km: 5,
     delivery_fee: 10,
     min_order_amount: 30,
@@ -195,6 +196,7 @@ describe('GET /api/v1/locations/:id', () => {
     expect(body.data.name).toBe('Kuchnia Centralna');
     expect(body.data.delivery_config).toBeTruthy();
     expect(body.data.delivery_config.is_delivery_active).toBe(true);
+    expect(body.data.delivery_config.is_pickup_active).toBe(true);
     expect(body.data.delivery_config.ordering_paused_until_date).toBeNull();
     expect(body.data.receipt_config).toBeTruthy();
     expect(body.data.receipt_config.receipt_header).toBe('MESO');

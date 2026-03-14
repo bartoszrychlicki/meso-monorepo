@@ -32,6 +32,7 @@ export const UpdateDeliveryConfigSchema = z.object({
   min_order_amount: z.number().min(0, 'Nie może być ujemna'),
   estimated_delivery_minutes: z.number().int().min(1, 'Min. 1 minuta'),
   is_delivery_active: z.boolean(),
+  is_pickup_active: z.boolean(),
   opening_time: z.string().regex(/^\d{2}:\d{2}$/, 'Format HH:MM'),
   closing_time: z.string().regex(/^\d{2}:\d{2}$/, 'Format HH:MM'),
   pickup_time_min: z.number().int().min(1),

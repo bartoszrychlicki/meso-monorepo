@@ -53,6 +53,7 @@ export default function CheckoutPage() {
     const contactResolveRef = useRef<((data: ContactFormData | null) => void) | null>(null)
     const todayDate = useMemo(() => formatDateInputValue(new Date()), [])
     const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfigRecord | null>(null)
+    const [locationConfigLoaded, setLocationConfigLoaded] = useState(false)
     const [pickupEstimate, setPickupEstimate] = useState('~20')
     const [selectedPickupDate, setSelectedPickupDate] = useState(todayDate)
 
@@ -85,6 +86,11 @@ export default function CheckoutPage() {
         () => resolveOrderingAvailability(deliveryConfig),
         [deliveryConfig]
     )
+    const checkoutRuntimeConfig = useMemo(
+        () => resolveCheckoutConfig(deliveryConfig),
+        [deliveryConfig]
+    )
+    const pickupEnabled = checkoutRuntimeConfig.pickupEnabled
     const minimumPickupDate = orderingAvailability.isOrderingPaused
         ? (orderingAvailability.firstAvailableDate ?? todayDate)
         : todayDate
@@ -142,7 +148,7 @@ export default function CheckoutPage() {
                 const { data: deliveryConfig } = await supabase
                     .from(Tables.deliveryConfig)
                     .select(
-                        'opening_time, closing_time, pickup_time_min, pickup_time_max, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order, ordering_paused_until_date'
+                        'is_pickup_active, opening_time, closing_time, pickup_time_min, pickup_time_max, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order, ordering_paused_until_date'
                     )
                     .eq('location_id', locationData.id)
                     .maybeSingle()
@@ -176,6 +182,8 @@ export default function CheckoutPage() {
                 })
                 setPayOnPickupFee(payOnPickupRuntimeConfig.fee)
             }
+
+            setLocationConfigLoaded(true)
         }
 
         fetchLocationConfig()
@@ -277,6 +285,18 @@ export default function CheckoutPage() {
         return <EmptyState type="cart" action={{ label: 'Wróć do menu', href: '/' }} />
     }
 
+    if (locationConfigLoaded && !pickupEnabled) {
+        return (
+            <EmptyState
+                type="custom"
+                title="Odbior osobisty jest aktualnie niedostepny"
+                description="Ten lokal chwilowo nie przyjmuje zamowien online z odbiorem osobistym."
+                icon={<Store className="w-16 h-16 text-primary/50" />}
+                action={{ label: 'Wroc do koszyka', href: '/cart' }}
+            />
+        )
+    }
+
     const handleContactSubmit = (data: ContactFormData, savePhone: boolean) => {
         setContactData(data)
         setSavePhoneToProfile(savePhone)
@@ -373,6 +393,7 @@ export default function CheckoutPage() {
             {/* Section 1: Delivery mode toggle */}
             <section className="mb-4">
                 <DeliveryForm
+                    pickupEnabled={pickupEnabled}
                     value={deliveryData}
                     onChange={(val) => {
                         setDeliveryData(val as DeliveryFormData)
