@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
@@ -26,6 +26,7 @@ export default function StockItemDetailPage() {
   const {
     currentStockItem,
     inventoryCategories,
+    detailLoadError,
     isDetailLoading,
     loadStockItemDetail,
     loadInventoryCategories,
@@ -33,25 +34,16 @@ export default function StockItemDetailPage() {
     loadUsage,
     updateStockItem,
   } = useInventoryStore();
-  const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
 
   useBreadcrumbLabel(id, currentStockItem?.name);
 
   const loadDetailData = useCallback(async () => {
-    setDetailLoadError(null);
-    const results = await Promise.allSettled([
+    await Promise.all([
       loadStockItemDetail(id),
       loadInventoryCategories(),
       loadComponents(id),
       loadUsage(id),
     ]);
-
-    const failed = results.filter((result) => result.status === 'rejected');
-    if (failed.length > 0) {
-      setDetailLoadError(
-        'Nie udalo sie zaladowac wszystkich danych szczegolow. Sprobuj ponownie.'
-      );
-    }
   }, [id, loadStockItemDetail, loadInventoryCategories, loadComponents, loadUsage]);
 
   useEffect(() => {

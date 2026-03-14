@@ -141,7 +141,11 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
       const inventoryCategories = await inventoryRepository.getAllInventoryCategories();
       set({ inventoryCategories });
     } catch {
-      set({ loadError: 'Nie udalo sie zaladowac kategorii magazynowych. Sprobuj ponownie.' });
+      const message = 'Nie udalo sie zaladowac kategorii magazynowych. Sprobuj ponownie.';
+      set({
+        loadError: message,
+        detailLoadError: message,
+      });
     }
   },
 
