@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
@@ -34,6 +34,7 @@ export default function StockItemDetailPage() {
     loadUsage,
     updateStockItem,
   } = useInventoryStore();
+  const [isInitialLoadPending, setIsInitialLoadPending] = useState(true);
 
   useBreadcrumbLabel(id, currentStockItem?.name);
 
@@ -47,11 +48,18 @@ export default function StockItemDetailPage() {
   }, [id, loadStockItemDetail, loadInventoryCategories, loadComponents, loadUsage]);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      void loadDetailData();
-    }, 0);
+    let cancelled = false;
 
-    return () => window.clearTimeout(timeoutId);
+    setIsInitialLoadPending(true);
+    void loadDetailData().finally(() => {
+      if (!cancelled) {
+        setIsInitialLoadPending(false);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [loadDetailData]);
 
   const handleTabChange = (value: string) => {
@@ -60,7 +68,7 @@ export default function StockItemDetailPage() {
     router.replace(url.pathname + url.search);
   };
 
-  if (isDetailLoading && !currentStockItem) {
+  if ((isInitialLoadPending || isDetailLoading) && !currentStockItem) {
     return (
       <div className="space-y-6" data-page="stock-item-detail">
         <PageHeader title="Ladowanie..." />

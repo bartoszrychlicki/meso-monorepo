@@ -183,4 +183,25 @@ describe('StockItemDetailPage', () => {
     ).toBeInTheDocument();
     expect(screen.getAllByText('Sprobuj ponownie')[0]).toBeInTheDocument();
   });
+
+  it('keeps the initial view in loading state before detail data resolves', () => {
+    const pending = new Promise<void>(() => {});
+
+    useInventoryStore.setState({
+      currentStockItem: null,
+      currentComponents: [],
+      currentUsage: null,
+      isDetailLoading: false,
+      detailLoadError: null,
+      loadStockItemDetail: vi.fn(() => pending),
+      loadInventoryCategories: vi.fn(() => pending),
+      loadComponents: vi.fn(() => pending),
+      loadUsage: vi.fn(() => pending),
+    });
+
+    render(<StockItemDetailPage />);
+
+    expect(screen.getByRole('heading', { name: 'Ladowanie...' })).toBeInTheDocument();
+    expect(screen.queryByText('Nie udalo sie zaladowac pozycji')).not.toBeInTheDocument();
+  });
 });
