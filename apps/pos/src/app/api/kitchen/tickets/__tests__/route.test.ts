@@ -67,6 +67,7 @@ describe('GET /api/kitchen/tickets', () => {
       makeTicket({ id: 'ticket-active', order_id: 'order-active', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-unpaid-online', order_id: 'order-unpaid-online', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-unpaid-blik', order_id: 'order-unpaid-blik', status: OrderStatus.PENDING }),
+      makeTicket({ id: 'ticket-pos-blik', order_id: 'order-pos-blik', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-pay-on-pickup', order_id: 'order-pay-on-pickup', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-orphan', order_id: '', status: OrderStatus.PREPARING }),
       makeTicket({ id: 'ticket-cancelled', order_id: 'order-cancelled', status: OrderStatus.READY }),
@@ -75,30 +76,42 @@ describe('GET /api/kitchen/tickets', () => {
       {
         id: 'order-active',
         status: OrderStatus.CONFIRMED,
+        channel: 'pos',
         payment_method: 'cash',
         payment_status: 'pending',
       },
       {
         id: 'order-unpaid-online',
         status: OrderStatus.PENDING,
+        channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'pending',
       },
       {
         id: 'order-unpaid-blik',
         status: OrderStatus.PENDING,
+        channel: 'delivery_app',
+        payment_method: 'blik',
+        payment_status: 'pending',
+      },
+      {
+        id: 'order-pos-blik',
+        status: OrderStatus.PENDING,
+        channel: 'pos',
         payment_method: 'blik',
         payment_status: 'pending',
       },
       {
         id: 'order-pay-on-pickup',
         status: OrderStatus.CONFIRMED,
+        channel: 'delivery_app',
         payment_method: 'pay_on_pickup',
         payment_status: 'pay_on_pickup',
       },
       {
         id: 'order-cancelled',
         status: OrderStatus.CANCELLED,
+        channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'paid',
       },
@@ -110,9 +123,10 @@ describe('GET /api/kitchen/tickets', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.tickets).toHaveLength(2);
+    expect(body.tickets).toHaveLength(3);
     expect(body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual([
       'ticket-active',
+      'ticket-pos-blik',
       'ticket-pay-on-pickup',
     ]);
   });
@@ -148,18 +162,21 @@ describe('GET /api/kitchen/tickets', () => {
       {
         id: 'order-delivered',
         status: OrderStatus.DELIVERED,
+        channel: 'pos',
         payment_method: 'cash',
         payment_status: 'pending',
       },
       {
         id: 'order-stale',
         status: OrderStatus.CANCELLED,
+        channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'paid',
       },
       {
         id: 'order-refunded-online',
         status: OrderStatus.DELIVERED,
+        channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'failed',
       },

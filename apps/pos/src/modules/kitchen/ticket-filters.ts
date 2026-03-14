@@ -1,8 +1,8 @@
-import { OrderStatus, PaymentMethod, PaymentStatus } from '@/types/enums';
+import { OrderChannel, OrderStatus, PaymentMethod, PaymentStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 import type { Order } from '@/types/order';
 
-type LinkedOrder = Pick<Order, 'id' | 'status' | 'payment_method' | 'payment_status'>;
+type LinkedOrder = Pick<Order, 'id' | 'status' | 'channel' | 'payment_method' | 'payment_status'>;
 type FilterKitchenTicketsOptions = {
   excludeUnpaidPrepaidOrders?: boolean;
 };
@@ -10,6 +10,10 @@ type FilterKitchenTicketsOptions = {
 const PREPAID_KDS_PAYMENT_METHODS = new Set<PaymentMethod>([
   PaymentMethod.ONLINE,
   PaymentMethod.BLIK,
+]);
+const REMOTE_PREPAID_KDS_CHANNELS = new Set<OrderChannel>([
+  OrderChannel.DELIVERY_APP,
+  OrderChannel.ONLINE,
 ]);
 
 export const ACTIVE_KDS_ORDER_STATUSES = new Set<OrderStatus>([
@@ -46,6 +50,8 @@ export function filterKitchenTicketsByLinkedOrders(
           allowedStatuses.has(order.status) &&
           !(
             options.excludeUnpaidPrepaidOrders &&
+            order.channel &&
+            REMOTE_PREPAID_KDS_CHANNELS.has(order.channel) &&
             order.payment_method &&
             PREPAID_KDS_PAYMENT_METHODS.has(order.payment_method) &&
             order.payment_status !== PaymentStatus.PAID

@@ -11,7 +11,7 @@ import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 import type { Order } from '@/types/order';
 
-type LinkedOrder = Pick<Order, 'id' | 'status' | 'payment_method' | 'payment_status'>;
+type LinkedOrder = Pick<Order, 'id' | 'status' | 'channel' | 'payment_method' | 'payment_status'>;
 
 const isSupabaseBackend = process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
 
@@ -23,7 +23,7 @@ async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
   if (isSupabaseBackend) {
     const { data, error } = await createServiceClient()
       .from('orders_orders')
-      .select('id, status, payment_method, payment_status')
+      .select('id, status, channel, payment_method, payment_status')
       .in('id', orderIds);
 
     if (error) {
@@ -38,6 +38,7 @@ async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
   return orders.map((order) => ({
     id: order.id,
     status: order.status,
+    channel: order.channel,
     payment_method: order.payment_method,
     payment_status: order.payment_status,
   }));
