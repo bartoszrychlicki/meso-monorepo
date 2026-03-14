@@ -128,6 +128,7 @@ describe('useInventoryStore', () => {
       currentComponents: [],
       currentUsage: null,
       isDetailLoading: false,
+      detailLoadError: null,
     });
   });
 
@@ -347,6 +348,21 @@ describe('useInventoryStore', () => {
 
       expect(mockDeleteInventoryCategory).toHaveBeenCalledWith('cat-001');
       expect(useInventoryStore.getState().inventoryCategories).toEqual([]);
+    });
+  });
+
+  describe('loadInventoryCategories', () => {
+    it('exposes category load failures for detail views', async () => {
+      mockGetAllInventoryCategories.mockRejectedValue(new Error('network error'));
+
+      await useInventoryStore.getState().loadInventoryCategories();
+
+      expect(useInventoryStore.getState().loadError).toBe(
+        'Nie udalo sie zaladowac kategorii magazynowych. Sprobuj ponownie.'
+      );
+      expect(useInventoryStore.getState().detailLoadError).toBe(
+        'Nie udalo sie zaladowac kategorii magazynowych. Sprobuj ponownie.'
+      );
     });
   });
 
