@@ -119,6 +119,7 @@ function makeParams(id: string) {
 describe('PATCH /api/v1/orders/:id/status', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.unstubAllEnvs()
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
     mockScheduleWebhookDispatch.mockReset()
@@ -288,7 +289,48 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     expect(body.data.status).toBe('cancelled')
     expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready'])
   })
-  it('awards loyalty points through the server helper when order is delivered', async () => {
+  it('updates delivered orders without invoking app-side loyalty awarding in supabase mode', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase')
+
+    mockFindById.mockResolvedValue({
+      ...baseOrder,
+      status: 'ready',
+      customer_id: 'customer-1',
+    })
+    mockServerRepo.update.mockResolvedValue({
+      ...baseOrder,
+      status: 'delivered',
+      customer_id: 'customer-1',
+      payment_status: 'paid',
+      status_history: [
+        ...baseOrder.status_history,
+        { status: 'delivered', timestamp: '2026-03-03T10:10:00.000Z' },
+      ],
+    })
+    const res = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
+        status: 'delivered',
+        payment_status: 'paid',
+      }),
+      makeParams('order-1')
+    )
+
+    expect(res.status).toBe(200)
+    expect(mockAwardOrderLoyaltyPoints).not.toHaveBeenCalled()
+    expect(mockServerRepo.update).toHaveBeenCalledWith(
+      'order-1',
+      expect.objectContaining({
+        status: 'delivered',
+        delivered_at: expect.any(String),
+        payment_status: 'paid',
+        paid_at: expect.any(String),
+      })
+    )
+  })
+
+  it('awards loyalty points through the server helper in localStorage mode', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'localStorage')
+
     mockFindById.mockResolvedValue({
       ...baseOrder,
       status: 'ready',
@@ -316,13 +358,11 @@ describe('PATCH /api/v1/orders/:id/status', () => {
 
     expect(res.status).toBe(200)
     expect(mockAwardOrderLoyaltyPoints).toHaveBeenCalledTimes(1)
-    expect(mockServerRepo.update).toHaveBeenCalledWith(
-      'order-1',
+    expect(mockAwardOrderLoyaltyPoints).toHaveBeenCalledWith(
+      expect.anything(),
       expect.objectContaining({
+        id: 'order-1',
         status: 'delivered',
-        delivered_at: expect.any(String),
-        payment_status: 'paid',
-        paid_at: expect.any(String),
       })
     )
   })

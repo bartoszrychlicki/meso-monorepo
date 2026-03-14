@@ -21,6 +21,10 @@ type OrderRepo = Pick<
   'findById' | 'update'
 >;
 
+function usesSupabaseBackend(): boolean {
+  return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+}
+
 async function cancelKitchenTicketsForOrder(
   orderId: string,
   nowIso: string
@@ -167,11 +171,16 @@ export async function transitionOrderStatus(
       console.error('[KDS] cancel tickets on order cancellation failed:', error);
     }
   }
-  if (input.status === OrderStatus.DELIVERED && (updated.customer_id || updated.customer_phone)) {
+
+  if (
+    input.status === OrderStatus.DELIVERED &&
+    (updated.customer_id || updated.customer_phone) &&
+    !usesSupabaseBackend()
+  ) {
     try {
       await awardOrderLoyaltyPoints(createServiceClient(), updated);
-    } catch {
-      // Side effects are best-effort for status updates.
+    } catch (error) {
+      console.error(`[orders] loyalty awarding failed for delivered order ${updated.id}:`, error);
     }
   }
 

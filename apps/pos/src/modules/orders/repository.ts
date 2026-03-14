@@ -21,6 +21,10 @@ const ACTIVE_KITCHEN_TICKET_STATUSES = [
   OrderStatus.READY,
 ] as const;
 
+function usesSupabaseBackend(): boolean {
+  return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+}
+
 async function findByStatus(status: OrderStatus): Promise<Order[]> {
   return baseRepo.findMany((order) => order.status === status);
 }
@@ -76,10 +80,17 @@ async function updateStatus(
   }
 
   // ===== CRM INTEGRATION START =====
-  let loyaltyPointsAwarded = 0;
+  let loyaltyPointsAwarded = status === OrderStatus.DELIVERED
+    ? (updatedOrder.loyalty_points_earned ?? 0)
+    : 0;
 
-  // Award loyalty points when order is delivered/completed
-  if (status === OrderStatus.DELIVERED && order.customer_phone) {
+  // Local-storage mode still needs app-side loyalty awarding because there is
+  // no database trigger there. Supabase environments award on the DB side.
+  if (
+    status === OrderStatus.DELIVERED &&
+    order.customer_phone &&
+    !usesSupabaseBackend()
+  ) {
     try {
       loyaltyPointsAwarded = await awardLoyaltyPoints(updatedOrder);
     } catch (error) {
