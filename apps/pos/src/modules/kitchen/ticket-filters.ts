@@ -1,8 +1,8 @@
-import { OrderStatus } from '@/types/enums';
+import { OrderStatus, PaymentMethod, PaymentStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 import type { Order } from '@/types/order';
 
-type LinkedOrder = Pick<Order, 'id' | 'status'>;
+type LinkedOrder = Pick<Order, 'id' | 'status' | 'payment_method' | 'payment_status'>;
 
 export const ACTIVE_KDS_ORDER_STATUSES = new Set<OrderStatus>([
   OrderStatus.PENDING,
@@ -32,7 +32,14 @@ export function filterKitchenTicketsByLinkedOrders(
 ): KitchenTicket[] {
   const visibleOrderIds = new Set(
     orders
-      .filter((order) => allowedStatuses.has(order.status))
+      .filter(
+        (order) =>
+          allowedStatuses.has(order.status) &&
+          !(
+            order.payment_method === PaymentMethod.ONLINE &&
+            order.payment_status !== PaymentStatus.PAID
+          )
+      )
       .map((order) => order.id)
   );
 

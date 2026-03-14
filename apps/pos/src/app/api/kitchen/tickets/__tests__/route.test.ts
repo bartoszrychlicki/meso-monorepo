@@ -65,12 +65,36 @@ describe('GET /api/kitchen/tickets', () => {
   it('hides orphaned and inactive-order tickets from the active KDS board', async () => {
     mockKitchenRepo.findMany.mockResolvedValue([
       makeTicket({ id: 'ticket-active', order_id: 'order-active', status: OrderStatus.PENDING }),
+      makeTicket({ id: 'ticket-unpaid-online', order_id: 'order-unpaid-online', status: OrderStatus.PENDING }),
+      makeTicket({ id: 'ticket-pay-on-pickup', order_id: 'order-pay-on-pickup', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-orphan', order_id: '', status: OrderStatus.PREPARING }),
       makeTicket({ id: 'ticket-cancelled', order_id: 'order-cancelled', status: OrderStatus.READY }),
     ]);
     mockOrdersRepo.findMany.mockResolvedValue([
-      { id: 'order-active', status: OrderStatus.CONFIRMED },
-      { id: 'order-cancelled', status: OrderStatus.CANCELLED },
+      {
+        id: 'order-active',
+        status: OrderStatus.CONFIRMED,
+        payment_method: 'cash',
+        payment_status: 'pending',
+      },
+      {
+        id: 'order-unpaid-online',
+        status: OrderStatus.PENDING,
+        payment_method: 'online',
+        payment_status: 'pending',
+      },
+      {
+        id: 'order-pay-on-pickup',
+        status: OrderStatus.CONFIRMED,
+        payment_method: 'pay_on_pickup',
+        payment_status: 'pay_on_pickup',
+      },
+      {
+        id: 'order-cancelled',
+        status: OrderStatus.CANCELLED,
+        payment_method: 'online',
+        payment_status: 'paid',
+      },
     ]);
 
     const response = await GET(
@@ -79,8 +103,11 @@ describe('GET /api/kitchen/tickets', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.tickets).toHaveLength(1);
-    expect(body.tickets[0].id).toBe('ticket-active');
+    expect(body.tickets).toHaveLength(2);
+    expect(body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual([
+      'ticket-active',
+      'ticket-pay-on-pickup',
+    ]);
   });
 
   it('keeps only delivered tickets with a linked delivered order in completed view', async () => {
