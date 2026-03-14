@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { buildCheckoutProfileUpdate, buildOrderCustomerFields } from '../useCheckout'
+import {
+  buildCheckoutProfileUpdate,
+  buildOrderCustomerFields,
+  buildScheduledTimestamp,
+} from '../useCheckout'
 
 describe('buildCheckoutProfileUpdate', () => {
   it('includes first_name and last_name when provided', () => {
@@ -98,5 +102,34 @@ describe('buildOrderCustomerFields', () => {
       customer_name: 'Jan Kowalski',
       customer_phone: null,
     })
+  })
+})
+
+describe('buildScheduledTimestamp', () => {
+  it('returns undefined for asap orders', () => {
+    expect(buildScheduledTimestamp({
+      time: 'asap',
+      scheduledTime: '12:30',
+    })).toBeUndefined()
+  })
+
+  it('builds ISO timestamp using explicit scheduledDate', () => {
+    expect(buildScheduledTimestamp({
+      time: 'scheduled',
+      scheduledDate: '2026-03-20',
+      scheduledTime: '12:30',
+    })).toBe(new Date(2026, 2, 20, 12, 30, 0, 0).toISOString())
+  })
+
+  it('falls back to current day when scheduledDate is missing', () => {
+    expect(
+      buildScheduledTimestamp(
+        {
+          time: 'scheduled',
+          scheduledTime: '09:15',
+        },
+        new Date(2026, 2, 19, 8, 0, 0, 0)
+      )
+    ).toBe(new Date(2026, 2, 19, 9, 15, 0, 0).toISOString())
   })
 })

@@ -29,6 +29,7 @@ export interface DeliveryConfig {
   pay_on_pickup_enabled: boolean;
   pay_on_pickup_fee: number;
   pay_on_pickup_max_order: number;
+  ordering_paused_until_date: string | null;
   created_at: string;
   updated_at: string;
 }

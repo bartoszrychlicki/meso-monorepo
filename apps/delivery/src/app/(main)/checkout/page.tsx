@@ -13,7 +13,12 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCheckout } from '@/hooks/useCheckout'
 import { formatPriceExact } from '@/lib/formatters'
 import {
+    type DeliveryConfigRecord,
+    formatDateInputValue,
+    formatOrderingPausedUntilDate,
+    generatePickupSlotsForDate,
     isPayOnPickupAvailable,
+    resolveOrderingAvailability,
     resolveCheckoutConfig,
     resolvePayOnPickupConfig,
 } from '@/lib/location-config'
@@ -26,6 +31,7 @@ import { TermsAcceptance } from '@/components/checkout/TermsAcceptance'
 import { TipSelector } from '@/components/cart/TipSelector'
 import { PromoCodeInput } from '@/components/cart/PromoCodeInput'
 import { EmptyState } from '@/components/common/EmptyState'
+import { Input } from '@/components/ui/input'
 
 // Types
 import type { ContactFormData, DeliveryFormData, PaymentFormData } from '@/lib/validators/checkout'
@@ -45,19 +51,10 @@ export default function CheckoutPage() {
     const [contactData, setContactData] = useState<ContactFormData | null>(null)
     const [addressSubmitted, setAddressSubmitted] = useState(false)
     const contactResolveRef = useRef<((data: ContactFormData | null) => void) | null>(null)
-
-    // Location hours & pickup config
-    const [locationHours, setLocationHours] = useState<{
-        open_time: string
-        close_time: string
-    } | null>(null)
-
-    const [pickupBuffers, setPickupBuffers] = useState({
-        after_open: 30,
-        before_close: 30,
-    })
-
+    const todayDate = useMemo(() => formatDateInputValue(new Date()), [])
+    const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfigRecord | null>(null)
     const [pickupEstimate, setPickupEstimate] = useState('~20')
+    const [selectedPickupDate, setSelectedPickupDate] = useState(todayDate)
 
     // Payment on pickup config
     const [payOnPickupConfig, setPayOnPickupConfig] = useState({
@@ -68,38 +65,6 @@ export default function CheckoutPage() {
 
     // Pickup time
     const [pickupTime, setPickupTime] = useState<'asap' | string>('asap')
-
-    const timeSlots = useMemo(() => {
-        if (!locationHours) return []
-
-        const now = new Date()
-
-        // Parse open/close times (format from Supabase TIME column: "HH:MM:SS" or "HH:MM")
-        const [openH, openM] = locationHours.open_time.split(':').map(Number)
-        const [closeH, closeM] = locationHours.close_time.split(':').map(Number)
-
-        // Earliest pickup = open + buffer_after_open
-        const earliest = new Date(now)
-        earliest.setHours(openH, openM, 0, 0)
-        earliest.setMinutes(earliest.getMinutes() + pickupBuffers.after_open)
-
-        // Latest pickup = close - buffer_before_close
-        const latest = new Date(now)
-        latest.setHours(closeH, closeM, 0, 0)
-        latest.setMinutes(latest.getMinutes() - pickupBuffers.before_close)
-
-        // Start from max(earliest, now + 30 min), rounded up to next 15-min slot
-        const minTime = new Date(Math.max(earliest.getTime(), now.getTime() + 30 * 60 * 1000))
-        minTime.setMinutes(Math.ceil(minTime.getMinutes() / 15) * 15, 0, 0)
-
-        const slots: string[] = []
-        let cursor = new Date(minTime)
-        while (cursor <= latest) {
-            slots.push(cursor.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }))
-            cursor = new Date(cursor.getTime() + 15 * 60 * 1000)
-        }
-        return slots
-    }, [locationHours, pickupBuffers])
 
     // Terms acceptance state
     const [termsAccepted, setTermsAccepted] = useState(false)
@@ -116,6 +81,38 @@ export default function CheckoutPage() {
         address: string
         city: string
     } | null>(null)
+    const orderingAvailability = useMemo(
+        () => resolveOrderingAvailability(deliveryConfig),
+        [deliveryConfig]
+    )
+    const minimumPickupDate = orderingAvailability.isOrderingPaused
+        ? (orderingAvailability.firstAvailableDate ?? todayDate)
+        : todayDate
+    const canChooseAsap = !orderingAvailability.isOrderingPaused && selectedPickupDate === todayDate
+    const timeSlots = useMemo(() => {
+        const forceEarliestDateTime =
+            orderingAvailability.isOrderingPaused &&
+            orderingAvailability.firstAvailableDate === selectedPickupDate &&
+            orderingAvailability.firstAvailableDate &&
+            orderingAvailability.firstAvailableTime
+                ? new Date(
+                    orderingAvailability.firstAvailableDate +
+                    `T${orderingAvailability.firstAvailableTime}:00`
+                )
+                : null
+
+        return generatePickupSlotsForDate({
+            date: selectedPickupDate,
+            config: deliveryConfig,
+            forceEarliestDateTime,
+        })
+    }, [
+        deliveryConfig,
+        orderingAvailability.firstAvailableDate,
+        orderingAvailability.firstAvailableTime,
+        orderingAvailability.isOrderingPaused,
+        selectedPickupDate,
+    ])
     const subtotal = getSubtotal()
     const deliveryFee = getDeliveryFee()
     const paymentFee = getPaymentFee()
@@ -145,33 +142,25 @@ export default function CheckoutPage() {
                 const { data: deliveryConfig } = await supabase
                     .from(Tables.deliveryConfig)
                     .select(
-                        'opening_time, closing_time, pickup_time_min, pickup_time_max, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order'
+                        'opening_time, closing_time, pickup_time_min, pickup_time_max, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order, ordering_paused_until_date'
                     )
                     .eq('location_id', locationData.id)
                     .maybeSingle()
 
-                const runtimeConfig = resolveCheckoutConfig(deliveryConfig)
                 const payOnPickupRuntimeConfig = resolvePayOnPickupConfig(deliveryConfig)
+                const runtimeConfig = resolveCheckoutConfig(deliveryConfig)
 
                 // POS stores address as JSONB; extract city/street from it
                 const addr = typeof locationData.address === 'object' && locationData.address
                     ? (locationData.address as Record<string, string>)
                     : null
 
-                setLocationHours({
-                    open_time: runtimeConfig.openTime,
-                    close_time: runtimeConfig.closeTime,
-                })
+                setDeliveryConfig(deliveryConfig)
 
                 setPickupLocation({
                     name: locationData.name,
                     address: addr?.street || String(locationData.address || ''),
                     city: addr?.city || '',
-                })
-
-                setPickupBuffers({
-                    after_open: runtimeConfig.pickupBufferAfterOpen,
-                    before_close: runtimeConfig.pickupBufferBeforeClose,
                 })
 
                 setPickupEstimate(
@@ -192,6 +181,33 @@ export default function CheckoutPage() {
         fetchLocationConfig()
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
+
+    useEffect(() => {
+        setSelectedPickupDate((current) => (
+            current < minimumPickupDate ? minimumPickupDate : current
+        ))
+    }, [minimumPickupDate])
+
+    useEffect(() => {
+        if (canChooseAsap && !pickupTime) {
+            setPickupTime('asap')
+            return
+        }
+
+        if (!canChooseAsap && pickupTime === 'asap') {
+            setPickupTime(timeSlots[0] ?? '')
+            return
+        }
+
+        if (pickupTime !== 'asap' && pickupTime && !timeSlots.includes(pickupTime)) {
+            setPickupTime(canChooseAsap ? 'asap' : (timeSlots[0] ?? ''))
+            return
+        }
+
+        if (!pickupTime && !canChooseAsap && timeSlots.length > 0) {
+            setPickupTime(timeSlots[0])
+        }
+    }, [canChooseAsap, pickupTime, timeSlots])
 
     useEffect(() => {
         if (!isPayOnPickupAvailable(payOnPickupConfig, subtotal) && paymentType === 'pay_on_pickup') {
@@ -305,6 +321,18 @@ export default function CheckoutPage() {
             return
         }
 
+        const effectivePickupTime = pickupTime || (canChooseAsap ? 'asap' : '')
+
+        if (!canChooseAsap && (!effectivePickupTime || effectivePickupTime === 'asap')) {
+            toast.error('Wybierz dostepny termin odbioru')
+            return
+        }
+
+        if (effectivePickupTime !== 'asap' && !timeSlots.includes(effectivePickupTime)) {
+            toast.error('Wybrany termin odbioru nie jest juz dostepny')
+            return
+        }
+
         // Build address data for submitOrder (it expects AddressFormData shape)
         const addressData = {
             ...resolvedContact,
@@ -317,8 +345,9 @@ export default function CheckoutPage() {
         // Build delivery data with scheduled time if selected
         const finalDeliveryData: DeliveryFormData = {
             ...deliveryData,
-            time: pickupTime === 'asap' ? 'asap' : 'scheduled',
-            scheduledTime: pickupTime !== 'asap' ? pickupTime : undefined,
+            time: effectivePickupTime === 'asap' ? 'asap' : 'scheduled',
+            scheduledTime: effectivePickupTime !== 'asap' ? effectivePickupTime : undefined,
+            scheduledDate: effectivePickupTime !== 'asap' ? selectedPickupDate : undefined,
         }
 
         const paymentData: PaymentFormData = {
@@ -380,18 +409,41 @@ export default function CheckoutPage() {
                     <Clock className="h-4 w-4 text-primary" />
                     <h3 className="font-display text-xs font-semibold uppercase tracking-wider">Czas odbioru</h3>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => setPickupTime('asap')}
-                    className={`w-full mb-2 flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-all ${
-                        pickupTime === 'asap'
-                            ? 'bg-primary text-primary-foreground neon-glow-sm'
-                            : 'bg-secondary text-foreground hover:bg-secondary/80'
-                    }`}
-                >
-                    <span>Najszybciej jak to możliwe</span>
-                    <span className="text-xs opacity-80">{pickupEstimate} min</span>
-                </button>
+                <div className="mb-3 space-y-2">
+                    <label htmlFor="pickup-date" className="block text-xs font-medium text-muted-foreground">
+                        Dzien odbioru
+                    </label>
+                    <Input
+                        id="pickup-date"
+                        type="date"
+                        min={minimumPickupDate}
+                        value={selectedPickupDate}
+                        onChange={(event) => {
+                            setSelectedPickupDate(event.target.value || minimumPickupDate)
+                            setPickupTime('')
+                        }}
+                    />
+                    {orderingAvailability.isOrderingPaused && orderingAvailability.orderingPausedUntilDate && (
+                        <p className="text-xs text-amber-300">
+                            Lokal jest chwilowo zamkniety. Przyjmujemy zamowienia z wyprzedzeniem na{' '}
+                            {formatOrderingPausedUntilDate(orderingAvailability.orderingPausedUntilDate)}.
+                        </p>
+                    )}
+                </div>
+                {canChooseAsap && (
+                    <button
+                        type="button"
+                        onClick={() => setPickupTime('asap')}
+                        className={`w-full mb-2 flex items-center justify-between rounded-lg px-4 py-3 text-sm font-medium transition-all ${
+                            pickupTime === 'asap'
+                                ? 'bg-primary text-primary-foreground neon-glow-sm'
+                                : 'bg-secondary text-foreground hover:bg-secondary/80'
+                        }`}
+                    >
+                        <span>Najszybciej jak to możliwe</span>
+                        <span className="text-xs opacity-80">{pickupEstimate} min</span>
+                    </button>
+                )}
                 <div className="max-h-40 overflow-y-auto space-y-1 scrollbar-thin">
                     {timeSlots.map((slot) => (
                         <button
@@ -408,9 +460,9 @@ export default function CheckoutPage() {
                         </button>
                     ))}
                 </div>
-                {timeSlots.length === 0 && locationHours && (
+                {timeSlots.length === 0 && (
                     <p className="text-xs text-muted-foreground text-center py-2">
-                        Brak dostępnych terminów na dziś
+                        Brak dostepnych terminow na wybrany dzien
                     </p>
                 )}
             </section>

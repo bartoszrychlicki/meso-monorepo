@@ -1003,7 +1003,8 @@ export default function ApiDocsPage() {
       "pickup_buffer_before_close": 30,
       "pay_on_pickup_enabled": false,
       "pay_on_pickup_fee": 0,
-      "pay_on_pickup_max_order": 0
+      "pay_on_pickup_max_order": 0,
+      "ordering_paused_until_date": "2026-03-20"
     },
     "receipt_config": {
       "id": "uuid",
