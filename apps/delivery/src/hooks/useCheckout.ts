@@ -57,6 +57,44 @@ export function buildOrderCustomerFields(
     }
 }
 
+export function buildScheduledTimestamp(
+    deliveryData: Pick<DeliveryFormData, 'time' | 'scheduledTime' | 'scheduledDate'>,
+    now = new Date()
+): string | undefined {
+    if (deliveryData.time !== 'scheduled' || !deliveryData.scheduledTime) {
+        return undefined
+    }
+
+    const dateSource = deliveryData.scheduledDate
+        ? deliveryData.scheduledDate
+        : [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, '0'),
+            String(now.getDate()).padStart(2, '0'),
+        ].join('-')
+
+    const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateSource)
+    const timeMatch = /^(\d{2}):(\d{2})$/.exec(deliveryData.scheduledTime)
+
+    if (!dateMatch || !timeMatch) {
+        return undefined
+    }
+
+    const [, year, month, day] = dateMatch
+    const [, hours, minutes] = timeMatch
+    const scheduledAt = new Date(
+        Number(year),
+        Number(month) - 1,
+        Number(day),
+        Number(hours),
+        Number(minutes),
+        0,
+        0
+    )
+
+    return Number.isNaN(scheduledAt.getTime()) ? undefined : scheduledAt.toISOString()
+}
+
 export async function markLoyaltyCouponAsUsed(couponId: string, orderId: string) {
     const response = await fetch('/api/loyalty/use-coupon', {
         method: 'POST',
@@ -160,14 +198,7 @@ export function useCheckout() {
                 throw new Error('Nie znaleziono aktywnej restauracji')
             }
 
-            // Build scheduled_time
-            let scheduledTimestamp: string | undefined
-            if (deliveryData.time === 'scheduled' && deliveryData.scheduledTime) {
-                const today = new Date()
-                const [hours, minutes] = deliveryData.scheduledTime.split(':').map(Number)
-                today.setHours(hours, minutes, 0, 0)
-                scheduledTimestamp = today.toISOString()
-            }
+            const scheduledTimestamp = buildScheduledTimestamp(deliveryData)
 
             const customerFields = buildOrderCustomerFields(addressData)
 

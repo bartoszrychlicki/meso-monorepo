@@ -20,6 +20,7 @@ export interface DeliveryConfig {
   min_order_amount: number;
   estimated_delivery_minutes: number;
   is_delivery_active: boolean;
+  is_pickup_active: boolean;
   opening_time: string;
   closing_time: string;
   pickup_time_min: number;
@@ -29,6 +30,7 @@ export interface DeliveryConfig {
   pay_on_pickup_enabled: boolean;
   pay_on_pickup_fee: number;
   pay_on_pickup_max_order: number;
+  ordering_paused_until_date: string | null;
   created_at: string;
   updated_at: string;
 }

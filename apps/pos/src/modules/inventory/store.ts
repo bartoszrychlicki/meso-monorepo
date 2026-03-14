@@ -312,7 +312,7 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
       set({ currentUsage: usage });
     } catch {
       set({
-        currentUsage: { in_components: [] },
+        currentUsage: { in_components: [], in_recipes: [] },
         detailLoadError: 'Nie udalo sie zaladowac uzycia pozycji magazynowej. Sprobuj ponownie.',
       });
     }

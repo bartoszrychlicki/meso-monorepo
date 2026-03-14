@@ -1,6 +1,9 @@
 import { BaseEntity } from '@/types/common';
 
-export type WebhookEvent = 'order.status_changed' | 'order.cancelled';
+export type WebhookEvent =
+  | 'order.created'
+  | 'order.status_changed'
+  | 'order.cancelled';
 
 export interface WebhookSubscription extends BaseEntity {
   url: string;

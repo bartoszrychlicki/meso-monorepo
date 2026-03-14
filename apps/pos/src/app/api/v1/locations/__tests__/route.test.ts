@@ -115,12 +115,14 @@ describe('GET /api/v1/locations/:id', () => {
     id: 'dc-1',
     location_id: 'loc-1',
     is_delivery_active: true,
+    is_pickup_active: true,
     delivery_radius_km: 5,
     delivery_fee: 10,
     min_order_amount: 30,
     estimated_delivery_minutes: 45,
     opening_time: '11:00',
     closing_time: '21:00',
+    ordering_paused_until_date: null,
   };
 
   const mockReceiptConfig = {
@@ -194,6 +196,8 @@ describe('GET /api/v1/locations/:id', () => {
     expect(body.data.name).toBe('Kuchnia Centralna');
     expect(body.data.delivery_config).toBeTruthy();
     expect(body.data.delivery_config.is_delivery_active).toBe(true);
+    expect(body.data.delivery_config.is_pickup_active).toBe(true);
+    expect(body.data.delivery_config.ordering_paused_until_date).toBeNull();
     expect(body.data.receipt_config).toBeTruthy();
     expect(body.data.receipt_config.receipt_header).toBe('MESO');
     expect(body.data.kds_config).toBeTruthy();

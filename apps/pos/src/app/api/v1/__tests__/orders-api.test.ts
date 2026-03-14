@@ -143,6 +143,7 @@ describe('GET /api/v1/orders', () => {
 describe('POST /api/v1/orders', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
     mockScheduleWebhookDispatch.mockReset()
@@ -201,6 +202,103 @@ describe('POST /api/v1/orders', () => {
     })
   })
 
+  it('rejects ASAP orders when temporary ordering pause is active', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
+
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'orders_delivery_config') {
+        return chain({
+          data: {
+            opening_time: '11:00:00',
+            is_pickup_active: true,
+            ordering_paused_until_date: '2026-03-20',
+          },
+          error: null,
+        })
+      }
+
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify(validOrderBody),
+      })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.details).toEqual([
+      expect.objectContaining({
+        field: 'scheduled_time',
+      }),
+    ])
+  })
+
+  it('rejects scheduled orders earlier than reopen opening time', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
+
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'orders_delivery_config') {
+        return chain({
+          data: {
+            opening_time: '11:00:00',
+            is_pickup_active: true,
+            ordering_paused_until_date: '2026-03-20',
+          },
+          error: null,
+        })
+      }
+
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validOrderBody,
+          scheduled_time: '2026-03-20T09:30:00.000Z',
+        }),
+      })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.details).toEqual([
+      expect.objectContaining({
+        field: 'scheduled_time',
+      }),
+    ])
+  })
+
   it('creates an order successfully', async () => {
     const res = await POST(
       makeRequest('http://localhost:3000/api/v1/orders', {
@@ -248,6 +346,53 @@ describe('POST /api/v1/orders', () => {
       })
     )
     expect(mockSubmitPosbistroOrder).not.toHaveBeenCalled()
+  })
+
+  it('rejects pickup orders when pickup is disabled for the location', async () => {
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'orders_delivery_config') {
+        return chain({
+          data: {
+            opening_time: '11:00:00',
+            is_pickup_active: false,
+            ordering_paused_until_date: null,
+          },
+          error: null,
+        })
+      }
+
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validOrderBody,
+          delivery_type: 'pickup',
+        }),
+      })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.details).toEqual([
+      expect.objectContaining({
+        field: 'delivery_type',
+      }),
+    ])
   })
 
   it('awaits POSBistro submit for delivery_app orders already confirmed on create', async () => {

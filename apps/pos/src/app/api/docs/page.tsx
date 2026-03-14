@@ -991,6 +991,7 @@ export default function ApiDocsPage() {
       "id": "uuid",
       "location_id": "uuid",
       "is_delivery_active": true,
+      "is_pickup_active": true,
       "delivery_radius_km": 5,
       "delivery_fee": 10.00,
       "min_order_amount": 30.00,
@@ -1003,7 +1004,8 @@ export default function ApiDocsPage() {
       "pickup_buffer_before_close": 30,
       "pay_on_pickup_enabled": false,
       "pay_on_pickup_fee": 0,
-      "pay_on_pickup_max_order": 0
+      "pay_on_pickup_max_order": 0,
+      "ordering_paused_until_date": "2026-03-20"
     },
     "receipt_config": {
       "id": "uuid",

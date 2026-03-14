@@ -83,6 +83,7 @@ export function buildCheckoutFingerprint(input: CheckoutFingerprintInput): strin
       type: input.deliveryData.type,
       time: input.deliveryData.time,
       scheduledTime: input.deliveryData.scheduledTime ?? null,
+      scheduledDate: input.deliveryData.scheduledDate ?? null,
     },
     addressData: {
       firstName: input.addressData.firstName.trim(),

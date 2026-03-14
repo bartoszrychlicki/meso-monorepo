@@ -48,6 +48,12 @@ const NUMERIC_FIELDS = new Set([
 const READ_RETRY_ATTEMPTS = 2;
 const READ_RETRY_DELAY_MS = 120;
 
+type ReadQueryResult<R> = {
+  data: R;
+  error: { message: string } | null;
+  count?: number | null;
+};
+
 export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> {
   private collectionName: string;
   private client: SupabaseClient;
@@ -97,19 +103,19 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   private async executeReadQuery<R>(
     operation: string,
     table: string,
-    run: () => Promise<{ data: R; error: { message: string } | null }>
-  ): Promise<R> {
+    run: () => Promise<ReadQueryResult<R>>
+  ): Promise<ReadQueryResult<R>> {
     let lastErrorMessage = 'Unknown error';
 
     for (let attempt = 1; attempt <= READ_RETRY_ATTEMPTS; attempt++) {
-      const { data, error } = await run();
+      const result = await run();
 
-      if (!error) {
-        return data;
+      if (!result.error) {
+        return result;
       }
 
-      lastErrorMessage = error.message;
-      const shouldRetry = this.isRetryableReadError(error.message) && attempt < READ_RETRY_ATTEMPTS;
+      lastErrorMessage = result.error.message;
+      const shouldRetry = this.isRetryableReadError(result.error.message) && attempt < READ_RETRY_ATTEMPTS;
       if (!shouldRetry) break;
 
       await this.sleep(READ_RETRY_DELAY_MS * attempt);
@@ -169,7 +175,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
   async findById(id: string): Promise<T | null> {
     const table = this.getTableName();
 
-    const data = await this.executeReadQuery('findById', table, async () => {
+    const { data } = await this.executeReadQuery('findById', table, async () => {
       return this.client
         .from(table)
         .select('*')
@@ -186,7 +192,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
 
     if (typeof filter === 'function') {
       // Function filter: fetch all rows, then filter in JS
-      const data = await this.executeReadQuery('findMany', table, async () => {
+      const { data } = await this.executeReadQuery('findMany', table, async () => {
         return this.client.from(table).select('*');
       });
 
@@ -197,7 +203,7 @@ export class SupabaseRepository<T extends BaseEntity> extends BaseRepository<T> 
     }
 
     // Object filter: build .eq() chains
-    const data = await this.executeReadQuery('findMany', table, async () => {
+    const { data } = await this.executeReadQuery('findMany', table, async () => {
       let query = this.client.from(table).select('*');
 
       for (const [key, value] of Object.entries(filter)) {
