@@ -1,9 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const mockGetUser = vi.fn();
 const mockListApiKeys = vi.fn();
 const mockCreateApiKey = vi.fn();
 const mockRevokeApiKey = vi.fn();
 const mockDeleteApiKey = vi.fn();
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getUser: mockGetUser,
+    },
+  })),
+}));
 
 vi.mock('@/lib/api-keys', () => ({
   listApiKeys: mockListApiKeys,
@@ -12,9 +21,15 @@ vi.mock('@/lib/api-keys', () => ({
   deleteApiKey: mockDeleteApiKey,
 }));
 
+async function loadRoute() {
+  vi.resetModules();
+  return import('../api-keys/route');
+}
+
 describe('GET /api/v1/api-keys', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetUser.mockResolvedValue({ data: { user: { id: 'user-123' } } });
   });
 
   it('returns keys without exposing hashes', async () => {
@@ -32,7 +47,7 @@ describe('GET /api/v1/api-keys', () => {
       },
     ]);
 
-    const { GET } = await import('../api-keys/route');
+    const { GET } = await loadRoute();
     const response = await GET();
     const body = await response.json();
 
@@ -46,7 +61,7 @@ describe('GET /api/v1/api-keys', () => {
   it('returns a structured error when listing fails', async () => {
     mockListApiKeys.mockRejectedValue(new Error('permission denied for table integrations_api_keys'));
 
-    const { GET } = await import('../api-keys/route');
+    const { GET } = await loadRoute();
     const response = await GET();
     const body = await response.json();
 
