@@ -66,6 +66,7 @@ describe('GET /api/kitchen/tickets', () => {
     mockKitchenRepo.findMany.mockResolvedValue([
       makeTicket({ id: 'ticket-active', order_id: 'order-active', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-unpaid-online', order_id: 'order-unpaid-online', status: OrderStatus.PENDING }),
+      makeTicket({ id: 'ticket-unpaid-blik', order_id: 'order-unpaid-blik', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-pay-on-pickup', order_id: 'order-pay-on-pickup', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-orphan', order_id: '', status: OrderStatus.PREPARING }),
       makeTicket({ id: 'ticket-cancelled', order_id: 'order-cancelled', status: OrderStatus.READY }),
@@ -81,6 +82,12 @@ describe('GET /api/kitchen/tickets', () => {
         id: 'order-unpaid-online',
         status: OrderStatus.PENDING,
         payment_method: 'online',
+        payment_status: 'pending',
+      },
+      {
+        id: 'order-unpaid-blik',
+        status: OrderStatus.PENDING,
+        payment_method: 'blik',
         payment_status: 'pending',
       },
       {
@@ -125,6 +132,12 @@ describe('GET /api/kitchen/tickets', () => {
         completed_at: '2026-03-12T10:20:00.000Z',
       }),
       makeTicket({
+        id: 'ticket-refunded-online',
+        order_id: 'order-refunded-online',
+        status: OrderStatus.DELIVERED,
+        completed_at: '2026-03-12T10:25:00.000Z',
+      }),
+      makeTicket({
         id: 'ticket-no-order',
         order_id: '',
         status: OrderStatus.DELIVERED,
@@ -132,8 +145,24 @@ describe('GET /api/kitchen/tickets', () => {
       }),
     ]);
     mockOrdersRepo.findMany.mockResolvedValue([
-      { id: 'order-delivered', status: OrderStatus.DELIVERED },
-      { id: 'order-stale', status: OrderStatus.CANCELLED },
+      {
+        id: 'order-delivered',
+        status: OrderStatus.DELIVERED,
+        payment_method: 'cash',
+        payment_status: 'pending',
+      },
+      {
+        id: 'order-stale',
+        status: OrderStatus.CANCELLED,
+        payment_method: 'online',
+        payment_status: 'paid',
+      },
+      {
+        id: 'order-refunded-online',
+        status: OrderStatus.DELIVERED,
+        payment_method: 'online',
+        payment_status: 'failed',
+      },
     ]);
 
     const response = await GET(
@@ -144,7 +173,10 @@ describe('GET /api/kitchen/tickets', () => {
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(body.tickets).toHaveLength(1);
-    expect(body.tickets[0].id).toBe('ticket-delivered');
+    expect(body.tickets).toHaveLength(2);
+    expect(body.tickets.map((ticket: { id: string }) => ticket.id)).toEqual([
+      'ticket-delivered',
+      'ticket-refunded-online',
+    ]);
   });
 });

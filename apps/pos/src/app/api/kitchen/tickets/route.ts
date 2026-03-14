@@ -76,7 +76,10 @@ export async function GET(request: NextRequest) {
       linkedOrders,
       filter === 'completed_today'
         ? COMPLETED_KDS_ORDER_STATUSES
-        : ACTIVE_KDS_ORDER_STATUSES
+        : ACTIVE_KDS_ORDER_STATUSES,
+      {
+        excludeUnpaidPrepaidOrders: filter !== 'completed_today',
+      }
     );
 
     return NextResponse.json({ tickets });

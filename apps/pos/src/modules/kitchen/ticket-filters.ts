@@ -3,6 +3,14 @@ import type { KitchenTicket } from '@/types/kitchen';
 import type { Order } from '@/types/order';
 
 type LinkedOrder = Pick<Order, 'id' | 'status' | 'payment_method' | 'payment_status'>;
+type FilterKitchenTicketsOptions = {
+  excludeUnpaidPrepaidOrders?: boolean;
+};
+
+const PREPAID_KDS_PAYMENT_METHODS = new Set<PaymentMethod>([
+  PaymentMethod.ONLINE,
+  PaymentMethod.BLIK,
+]);
 
 export const ACTIVE_KDS_ORDER_STATUSES = new Set<OrderStatus>([
   OrderStatus.PENDING,
@@ -28,7 +36,8 @@ export function extractKitchenTicketOrderIds(tickets: KitchenTicket[]): string[]
 export function filterKitchenTicketsByLinkedOrders(
   tickets: KitchenTicket[],
   orders: LinkedOrder[],
-  allowedStatuses: ReadonlySet<OrderStatus>
+  allowedStatuses: ReadonlySet<OrderStatus>,
+  options: FilterKitchenTicketsOptions = {}
 ): KitchenTicket[] {
   const visibleOrderIds = new Set(
     orders
@@ -36,7 +45,9 @@ export function filterKitchenTicketsByLinkedOrders(
         (order) =>
           allowedStatuses.has(order.status) &&
           !(
-            order.payment_method === PaymentMethod.ONLINE &&
+            options.excludeUnpaidPrepaidOrders &&
+            order.payment_method &&
+            PREPAID_KDS_PAYMENT_METHODS.has(order.payment_method) &&
             order.payment_status !== PaymentStatus.PAID
           )
       )
