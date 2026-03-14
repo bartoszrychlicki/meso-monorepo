@@ -61,10 +61,20 @@ vi.mock('@/lib/supabase/client', () => ({
 }));
 
 import { ordersRepository } from '../repository';
+import { crmRepository } from '@/modules/crm/repository';
+import { sendSMS } from '@/lib/sms/sms-provider';
+import { getOrderStatusSMS } from '@/lib/sms/templates';
+
+const mockFindCustomerByPhone = crmRepository.findCustomerByPhone as ReturnType<typeof vi.fn>;
+const mockAddLoyaltyTransaction = crmRepository.addLoyaltyTransaction as ReturnType<typeof vi.fn>;
+const mockUpdateOrderStats = crmRepository.updateOrderStats as ReturnType<typeof vi.fn>;
+const mockSendSMS = sendSMS as ReturnType<typeof vi.fn>;
+const mockGetOrderStatusSMS = getOrderStatusSMS as ReturnType<typeof vi.fn>;
 
 describe('ordersRepository.updateStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
     mockKitchenTicketsUpdate.mockReturnValue({ eq: mockKitchenTicketsEq });
     mockKitchenTicketsEq.mockReturnValue({ in: mockKitchenTicketsIn });
     mockKitchenTicketsIn.mockResolvedValue({ error: null });
@@ -100,5 +110,41 @@ describe('ordersRepository.updateStatus', () => {
     );
     expect(mockKitchenTicketsEq).toHaveBeenCalledWith('order_id', 'order-1');
     expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready']);
+  });
+
+  it('does not award loyalty twice in supabase mode when an order becomes delivered', async () => {
+    mockOrderFindById.mockResolvedValue({
+      id: 'order-1',
+      order_number: 'WEB-20260303-001',
+      status: OrderStatus.READY,
+      status_history: [{ status: OrderStatus.READY, timestamp: '2026-03-03T10:00:00.000Z' }],
+      customer_phone: '+48500100100',
+      loyalty_points_earned: 87,
+    });
+    mockOrderUpdate.mockResolvedValue({
+      id: 'order-1',
+      order_number: 'WEB-20260303-001',
+      status: OrderStatus.DELIVERED,
+      status_history: [
+        { status: OrderStatus.READY, timestamp: '2026-03-03T10:00:00.000Z' },
+        { status: OrderStatus.DELIVERED, timestamp: '2026-03-03T10:05:00.000Z' },
+      ],
+      customer_phone: '+48500100100',
+      loyalty_points_earned: 87,
+    });
+    mockGetOrderStatusSMS.mockReturnValue('sms');
+    mockSendSMS.mockResolvedValue({ success: true });
+    mockFindCustomerByPhone.mockResolvedValue({ marketing_consent: true });
+
+    await ordersRepository.updateStatus('order-1', OrderStatus.DELIVERED, 'Wydano');
+
+    expect(mockAddLoyaltyTransaction).not.toHaveBeenCalled();
+    expect(mockUpdateOrderStats).not.toHaveBeenCalled();
+    expect(mockSendSMS).toHaveBeenCalledTimes(1);
+    expect(mockGetOrderStatusSMS).toHaveBeenCalledWith(
+      expect.objectContaining({ status: OrderStatus.DELIVERED }),
+      OrderStatus.DELIVERED,
+      87
+    );
   });
 });
