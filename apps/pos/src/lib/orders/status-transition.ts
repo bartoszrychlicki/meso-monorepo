@@ -7,6 +7,7 @@ import {
 import { createServiceClient } from '@/lib/supabase/server';
 import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
 import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
+import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { OrderStatus, PaymentStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
 
@@ -19,6 +20,10 @@ type OrderRepo = Pick<
   ReturnType<typeof createServerRepository<Order>>,
   'findById' | 'update'
 >;
+
+function usesSupabaseBackend(): boolean {
+  return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+}
 
 async function cancelKitchenTicketsForOrder(
   orderId: string,
@@ -166,6 +171,19 @@ export async function transitionOrderStatus(
       console.error('[KDS] cancel tickets on order cancellation failed:', error);
     }
   }
+
+  if (
+    input.status === OrderStatus.DELIVERED &&
+    (updated.customer_id || updated.customer_phone) &&
+    !usesSupabaseBackend()
+  ) {
+    try {
+      await awardOrderLoyaltyPoints(createServiceClient(), updated);
+    } catch (error) {
+      console.error(`[orders] loyalty awarding failed for delivered order ${updated.id}:`, error);
+    }
+  }
+
   const webhookData = buildOrderStatusChangedWebhookData(updated, {
     status: input.status,
     previousStatus: order.status,

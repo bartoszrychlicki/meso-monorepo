@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { OrderStatus } from '@/types/enums';
 
+vi.mock('@/modules/orders/server-loyalty', () => ({
+  awardOrderLoyaltyPoints: vi.fn(),
+}))
+
 const { mockScheduleWebhookDispatch } = vi.hoisted(() => ({
   mockScheduleWebhookDispatch: vi.fn(),
 }))
@@ -116,6 +120,8 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
     mockKitchenRepo.findById.mockResolvedValue(baseTicket);
     mockKitchenRepo.update.mockResolvedValue({
       ...baseTicket,
