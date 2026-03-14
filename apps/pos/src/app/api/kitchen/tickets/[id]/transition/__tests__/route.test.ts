@@ -2,14 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { OrderStatus } from '@/types/enums';
 
-vi.mock('@/modules/orders/server-loyalty', () => ({
-  awardOrderLoyaltyPoints: vi.fn(),
-}))
-
-vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: vi.fn(() => ({ mocked: true })),
-}))
-
 const { mockScheduleWebhookDispatch } = vi.hoisted(() => ({
   mockScheduleWebhookDispatch: vi.fn(),
 }))
@@ -53,13 +45,11 @@ vi.mock('@/lib/data/server-repository-factory', () => ({
 }));
 
 import { createServerRepository } from '@/lib/data/server-repository-factory';
-import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { POST } from '../route';
 
 const mockCreateServerRepo = createServerRepository as unknown as ReturnType<
   typeof vi.fn
 >;
-const mockAwardOrderLoyaltyPoints = awardOrderLoyaltyPoints as ReturnType<typeof vi.fn>;
 
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest(
@@ -144,7 +134,6 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
         },
       ],
     });
-    mockAwardOrderLoyaltyPoints.mockResolvedValue(100);
   });
 
   it('transitions pending ticket to preparing and updates linked order status', async () => {
@@ -214,7 +203,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     expect(mockOrdersRepo.update).not.toHaveBeenCalled();
   });
 
-  it('delegates delivered transition through shared side effects', async () => {
+  it('delegates delivered transition through shared status logic', async () => {
     mockKitchenRepo.update.mockResolvedValueOnce({
       ...baseTicket,
       status: OrderStatus.DELIVERED,
@@ -249,7 +238,6 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
         delivered_at: expect.any(String),
       })
     );
-    expect(mockAwardOrderLoyaltyPoints).toHaveBeenCalledTimes(1);
     expect(mockScheduleWebhookDispatch).toHaveBeenCalledWith(
       'order.status_changed',
       expect.objectContaining({

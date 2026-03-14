@@ -6,10 +6,6 @@ vi.mock('@/lib/api/auth', () => ({
   isApiKey: vi.fn(),
 }))
 
-vi.mock('@/modules/orders/server-loyalty', () => ({
-  awardOrderLoyaltyPoints: vi.fn(),
-}))
-
 const { mockKitchenTicketsIn, mockKitchenTicketsEq, mockKitchenTicketsUpdate } = vi.hoisted(() => ({
   mockKitchenTicketsIn: vi.fn(),
   mockKitchenTicketsEq: vi.fn(),
@@ -63,13 +59,11 @@ vi.mock('@/lib/integrations/posbistro/service', () => ({
 }))
 
 import { authorizeRequest, isApiKey } from '@/lib/api/auth'
-import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty'
 import { PATCH } from '../orders/[id]/status/route'
 
 const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>
 const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>
 const mockFindById = mockServerRepo.findById as ReturnType<typeof vi.fn>
-const mockAwardOrderLoyaltyPoints = awardOrderLoyaltyPoints as ReturnType<typeof vi.fn>
 
 const validApiKey = {
   id: 'key-1',
@@ -289,7 +283,7 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready'])
   })
 
-  it('awards loyalty points through the server helper when order is delivered', async () => {
+  it('updates delivered orders without invoking app-side loyalty awarding', async () => {
     mockFindById.mockResolvedValue({
       ...baseOrder,
       status: 'ready',
@@ -305,8 +299,6 @@ describe('PATCH /api/v1/orders/:id/status', () => {
         { status: 'delivered', timestamp: '2026-03-03T10:10:00.000Z' },
       ],
     })
-    mockAwardOrderLoyaltyPoints.mockResolvedValue(120)
-
     const res = await PATCH(
       makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
         status: 'delivered',
@@ -316,7 +308,6 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     )
 
     expect(res.status).toBe(200)
-    expect(mockAwardOrderLoyaltyPoints).toHaveBeenCalledTimes(1)
     expect(mockServerRepo.update).toHaveBeenCalledWith(
       'order-1',
       expect.objectContaining({

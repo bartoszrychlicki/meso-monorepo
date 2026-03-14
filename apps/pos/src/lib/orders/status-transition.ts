@@ -7,7 +7,6 @@ import {
 import { createServiceClient } from '@/lib/supabase/server';
 import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
 import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
-import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { OrderStatus, PaymentStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
 
@@ -167,14 +166,6 @@ export async function transitionOrderStatus(
     } catch (error) {
       // Keep status updates resilient even if KDS cleanup fails.
       console.error('[KDS] cancel tickets on order cancellation failed:', error);
-    }
-  }
-
-  if (input.status === OrderStatus.DELIVERED && (updated.customer_id || updated.customer_phone)) {
-    try {
-      await awardOrderLoyaltyPoints(createServiceClient(), updated);
-    } catch {
-      // Side effects are best-effort for status updates.
     }
   }
 
