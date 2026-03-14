@@ -20,6 +20,7 @@ export interface DeliveryConfig {
   min_order_amount: number;
   estimated_delivery_minutes: number;
   is_delivery_active: boolean;
+  is_pickup_active: boolean;
   opening_time: string;
   closing_time: string;
   pickup_time_min: number;

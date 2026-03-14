@@ -35,6 +35,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     resolver: zodResolver(UpdateDeliveryConfigSchema) as Resolver<UpdateDeliveryConfigInput>,
     defaultValues: {
       is_delivery_active: deliveryConfig?.is_delivery_active ?? false,
+      is_pickup_active: deliveryConfig?.is_pickup_active ?? true,
       delivery_radius_km: deliveryConfig?.delivery_radius_km ?? 5,
       delivery_fee: deliveryConfig?.delivery_fee ?? 0,
       min_order_amount: deliveryConfig?.min_order_amount ?? 0,
@@ -56,6 +57,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     if (deliveryConfig) {
       form.reset({
         is_delivery_active: deliveryConfig.is_delivery_active,
+        is_pickup_active: deliveryConfig.is_pickup_active,
         delivery_radius_km: deliveryConfig.delivery_radius_km,
         delivery_fee: deliveryConfig.delivery_fee,
         min_order_amount: deliveryConfig.min_order_amount,
@@ -256,6 +258,23 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
           <CardTitle>Odbior osobisty</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="is_pickup_active">Odbior osobisty aktywny</Label>
+              <p className="text-sm text-muted-foreground">
+                Wylacz, aby ukryc odbior osobisty jako dostepna metode skladania zamowienia.
+              </p>
+            </div>
+            <Switch
+              id="is_pickup_active"
+              checked={form.watch('is_pickup_active')}
+              onCheckedChange={(checked) =>
+                form.setValue('is_pickup_active', checked, { shouldValidate: true })
+              }
+              data-field="is_pickup_active"
+            />
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="pickup_time_min">Minimalny czas odbioru (min)</Label>
