@@ -41,6 +41,7 @@ export const UpdateDeliveryConfigSchema = z.object({
   pay_on_pickup_enabled: z.boolean(),
   pay_on_pickup_fee: z.number().min(0),
   pay_on_pickup_max_order: z.number().min(0),
+  ordering_paused_until_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format RRRR-MM-DD').nullable(),
 }).partial();
 
 // --- Receipt Config ---

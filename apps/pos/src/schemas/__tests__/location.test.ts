@@ -355,6 +355,31 @@ describe('UpdateDeliveryConfigSchema', () => {
       expect(result.data.pickup_buffer_after_open).toBe(0);
     }
   });
+
+  it('accepts ordering_paused_until_date as null', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({ ordering_paused_until_date: null });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ordering_paused_until_date).toBeNull();
+    }
+  });
+
+  it('accepts ordering_paused_until_date in YYYY-MM-DD format', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({
+      ordering_paused_until_date: '2026-03-20',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.ordering_paused_until_date).toBe('2026-03-20');
+    }
+  });
+
+  it('rejects ordering_paused_until_date in invalid format', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({
+      ordering_paused_until_date: '20-03-2026',
+    });
+    expect(result.success).toBe(false);
+  });
 });
 
 // --- UpdateReceiptConfigSchema ---

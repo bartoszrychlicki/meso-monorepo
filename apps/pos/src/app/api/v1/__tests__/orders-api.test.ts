@@ -33,6 +33,13 @@ vi.mock('@/lib/integrations/posbistro/service', () => ({
   submitPosbistroOrder: mockSubmitPosbistroOrder,
 }))
 
+const { mockScheduleWebhookDispatch } = vi.hoisted(() => ({
+  mockScheduleWebhookDispatch: vi.fn(),
+}))
+vi.mock('@/lib/webhooks/schedule', () => ({
+  scheduleWebhookDispatch: mockScheduleWebhookDispatch,
+}))
+
 const mockRpc = vi.fn()
 const mockServiceFrom = vi.fn()
 vi.mock('@/lib/supabase/server', () => ({
@@ -136,8 +143,10 @@ describe('GET /api/v1/orders', () => {
 describe('POST /api/v1/orders', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.useRealTimers()
     mockAuth.mockResolvedValue(validApiKey)
     mockIsApiKey.mockReturnValue(true)
+    mockScheduleWebhookDispatch.mockReset()
     mockEnsureCustomerForOrderDraft.mockImplementation(async (input) => input)
     mockSubmitPosbistroOrder.mockResolvedValue(null)
     mockServerRepo.findById.mockResolvedValue(mockProduct)
@@ -168,12 +177,124 @@ describe('POST /api/v1/orders', () => {
             id: 'new-order-id',
             order_number: 'ZAM-20260226-001',
             status: 'pending',
+            channel: 'online',
+            source: 'delivery',
+            customer_name: 'Jan Kowalski',
+            customer_phone: '+48123456789',
+            items: [
+              {
+                id: 'item-1',
+                product_id: '550e8400-e29b-41d4-a716-446655440001',
+                product_name: 'Burger Classic',
+                quantity: 2,
+                unit_price: 29.9,
+                modifiers: [],
+                subtotal: 59.8,
+              },
+            ],
+            total: 59.8,
+            created_at: '2026-02-26T12:00:00.000Z',
           },
           error: null,
         })
       }
       return Promise.resolve({ data: null, error: null })
     })
+  })
+
+  it('rejects ASAP orders when temporary ordering pause is active', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
+
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'orders_delivery_config') {
+        return chain({
+          data: {
+            opening_time: '11:00:00',
+            ordering_paused_until_date: '2026-03-20',
+          },
+          error: null,
+        })
+      }
+
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify(validOrderBody),
+      })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.details).toEqual([
+      expect.objectContaining({
+        field: 'scheduled_time',
+      }),
+    ])
+  })
+
+  it('rejects scheduled orders earlier than reopen opening time', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
+
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'orders_delivery_config') {
+        return chain({
+          data: {
+            opening_time: '11:00:00',
+            ordering_paused_until_date: '2026-03-20',
+          },
+          error: null,
+        })
+      }
+
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validOrderBody,
+          scheduled_time: '2026-03-20T09:30:00.000Z',
+        }),
+      })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.details).toEqual([
+      expect.objectContaining({
+        field: 'scheduled_time',
+      }),
+    ])
   })
 
   it('creates an order successfully', async () => {
@@ -197,6 +318,31 @@ describe('POST /api/v1/orders', () => {
         p_kitchen_ticket: expect.any(Object),
       })
     )
+    expect(mockScheduleWebhookDispatch).toHaveBeenCalledWith(
+      'order.status_changed',
+      expect.objectContaining({
+        pos_order_id: 'new-order-id',
+        order_number: 'ZAM-20260226-001',
+        status: 'pending',
+        previous_status: '',
+        channel: 'online',
+        order_type: 'delivery',
+        source: 'online',
+        total: 5980,
+        currency: 'PLN',
+        customer_name: 'Jan Kowalski',
+        customer_phone: '+48123456789',
+        created_at: '2026-02-26T12:00:00.000Z',
+        items: [
+          {
+            name: 'Burger Classic',
+            quantity: 2,
+            unit_price: 2990,
+            notes: undefined,
+          },
+        ],
+      })
+    )
     expect(mockSubmitPosbistroOrder).not.toHaveBeenCalled()
   })
 
@@ -214,6 +360,23 @@ describe('POST /api/v1/orders', () => {
             id: 'new-order-id',
             order_number: 'WEB-20260310-100',
             status: 'confirmed',
+            channel: 'delivery_app',
+            source: 'delivery',
+            customer_name: 'Jan Kowalski',
+            customer_phone: '+48123456789',
+            items: [
+              {
+                id: 'item-1',
+                product_id: '550e8400-e29b-41d4-a716-446655440001',
+                product_name: 'Burger Classic',
+                quantity: 2,
+                unit_price: 29.9,
+                modifiers: [],
+                subtotal: 59.8,
+              },
+            ],
+            total: 59.8,
+            created_at: '2026-03-10T12:00:00.000Z',
           },
           error: null,
         })

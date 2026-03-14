@@ -3,6 +3,7 @@
 import { DesktopNav } from './DesktopNav'
 import { MobileNav } from './MobileNav'
 import { Footer } from './Footer'
+import { OrderingClosureBannerContainer } from './ordering-closure-banner'
 import { cn } from '@/lib/utils'
 
 interface AppLayoutProps {
@@ -26,6 +27,7 @@ export function AppLayout({
         'flex-1 lg:pt-16',
         !hideBottomNav && 'pb-20 lg:pb-0'
       )}>
+        <OrderingClosureBannerContainer />
         {children}
       </main>
 

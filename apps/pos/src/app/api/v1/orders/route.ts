@@ -12,6 +12,9 @@ import {
   ensureCustomerForOrderDraft,
   submitPosbistroOrder,
 } from '@/lib/integrations/posbistro/service';
+import { calculateOrderTotal, readMetadataPaymentFee, roundCurrency } from '@/lib/orders/financials';
+import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
+import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
 import { createServiceClient } from '@/lib/supabase/server';
 import { estimateOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { CreateOrderSchema } from '@/schemas/order';
@@ -45,6 +48,11 @@ type RpcErrorLike = {
   hint?: string | null;
 };
 
+type DeliveryAvailabilityConfig = {
+  opening_time?: string | null;
+  ordering_paused_until_date?: string | null;
+};
+
 function asRpcError(value: unknown): RpcErrorLike {
   return (value ?? {}) as RpcErrorLike;
 }
@@ -60,14 +68,85 @@ function isExternalIdUniqueViolation(error: unknown): boolean {
 }
 
 const VAT_RATE = 0.08;
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+const ORDERING_TIME_ZONE = 'Europe/Warsaw';
 
 function calculateIncludedTaxFromGross(grossAmount: number, rate: number): number {
   if (grossAmount <= 0) return 0;
   return roundCurrency(grossAmount - grossAmount / (1 + rate));
+}
+
+function normalizeTime(value: string | null | undefined, fallback = '11:00'): string {
+  if (typeof value !== 'string') return fallback;
+  const match = /^(\d{2}:\d{2})/.exec(value);
+  return match?.[1] ?? fallback;
+}
+
+function formatDateInTimeZone(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  const parts = formatter.formatToParts(date);
+  const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+  const month = parts.find((part) => part.type === 'month')?.value ?? '01';
+  const day = parts.find((part) => part.type === 'day')?.value ?? '01';
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatTimeInTimeZone(date: Date, timeZone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  return formatter.format(date);
+}
+
+function isOrderingPaused(
+  config: DeliveryAvailabilityConfig | null,
+  now = new Date()
+): { paused: boolean; orderingPausedUntilDate: string | null; openingTime: string } {
+  const orderingPausedUntilDate =
+    typeof config?.ordering_paused_until_date === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(config.ordering_paused_until_date)
+      ? config.ordering_paused_until_date
+      : null;
+  const openingTime = normalizeTime(config?.opening_time);
+
+  if (!orderingPausedUntilDate) {
+    return { paused: false, orderingPausedUntilDate: null, openingTime };
+  }
+
+  const currentDate = formatDateInTimeZone(now, ORDERING_TIME_ZONE);
+  const currentTime = formatTimeInTimeZone(now, ORDERING_TIME_ZONE);
+  const paused =
+    currentDate < orderingPausedUntilDate ||
+    (currentDate === orderingPausedUntilDate && currentTime < openingTime);
+
+  return { paused, orderingPausedUntilDate, openingTime };
+}
+
+function isScheduledTimeAllowed(
+  scheduledTime: string,
+  orderingPausedUntilDate: string,
+  openingTime: string
+): boolean {
+  const parsed = new Date(scheduledTime);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  const scheduledDate = formatDateInTimeZone(parsed, ORDERING_TIME_ZONE);
+  const scheduledLocalTime = formatTimeInTimeZone(parsed, ORDERING_TIME_ZONE);
+
+  return (
+    scheduledDate > orderingPausedUntilDate ||
+    (scheduledDate === orderingPausedUntilDate && scheduledLocalTime >= openingTime)
+  );
 }
 
 async function findExistingByExternalOrderId(
@@ -190,6 +269,50 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  const { data: deliveryAvailabilityConfig, error: deliveryAvailabilityError } = await serviceClient
+    .from('orders_delivery_config')
+    .select('opening_time, ordering_paused_until_date')
+    .eq('location_id', input.location_id)
+    .maybeSingle();
+
+  if (deliveryAvailabilityError) {
+    return apiError(
+      'DELIVERY_CONFIG_ERROR',
+      'Nie udało się pobrać konfiguracji dostawy dla lokalizacji',
+      500,
+      [deliveryAvailabilityError]
+    );
+  }
+
+  const orderingPause = isOrderingPaused(
+    (deliveryAvailabilityConfig as DeliveryAvailabilityConfig | null) ?? null
+  );
+  if (orderingPause.paused && orderingPause.orderingPausedUntilDate) {
+    if (!input.scheduled_time) {
+      return apiValidationError([
+        {
+          field: 'scheduled_time',
+          message: `Lokal czasowo nie przyjmuje zamówień ASAP. Wybierz termin od ${orderingPause.orderingPausedUntilDate} ${orderingPause.openingTime}.`,
+        },
+      ]);
+    }
+
+    if (
+      !isScheduledTimeAllowed(
+        input.scheduled_time,
+        orderingPause.orderingPausedUntilDate,
+        orderingPause.openingTime
+      )
+    ) {
+      return apiValidationError([
+        {
+          field: 'scheduled_time',
+          message: `Najblizszy dostepny termin to ${orderingPause.orderingPausedUntilDate} ${orderingPause.openingTime}.`,
+        },
+      ]);
+    }
+  }
+
   // Validate that all products exist and are available
   const uniqueProductIds = [...new Set(input.items.map((item) => item.product_id))];
   const productMap = new Map<string, Product>();
@@ -273,9 +396,16 @@ export async function POST(request: NextRequest) {
   const tax = calculateIncludedTaxFromGross(subtotal, VAT_RATE);
   const discount = input.discount ?? 0;
   const deliveryFee = input.delivery_fee ?? 0;
+  const paymentFee = readMetadataPaymentFee(input.metadata);
   const tip = input.tip ?? 0;
   const loyaltyPointsUsed = input.loyalty_points_used ?? 0;
-  const total = roundCurrency(subtotal - discount + deliveryFee + tip);
+  const total = calculateOrderTotal({
+    subtotal,
+    discount,
+    deliveryFee,
+    paymentFee,
+    tip,
+  });
   const loyaltyPointsEarned = await estimateOrderLoyaltyPoints(
     serviceClient,
     input.customer_id,
@@ -402,23 +532,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (initialStatus === OrderStatus.CONFIRMED) {
-      const orderForExport = {
-        ...orderPayload,
-        ...order,
-        id: order.id,
-        status: initialStatus,
-        items,
-      } as Order;
+    const orderForSideEffects = {
+      ...orderPayload,
+      ...order,
+      id: order.id,
+      status: order.status,
+      items,
+    } as Order;
 
+    if (initialStatus === OrderStatus.CONFIRMED) {
       try {
-        await submitPosbistroOrder(orderForExport, {
+        await submitPosbistroOrder(orderForSideEffects, {
           confirmBaseUrl: buildPosbistroConfirmBaseUrl(request.nextUrl.origin),
         });
       } catch (error) {
         console.error('[POSBistro] submit on create failed:', error);
       }
     }
+
+    const webhookData = buildOrderStatusChangedWebhookData(orderForSideEffects, {
+      status: order.status,
+      previousStatus: '',
+    });
+
+    scheduleWebhookDispatch(
+      'order.status_changed',
+      webhookData as unknown as Record<string, unknown>
+    );
 
     return apiCreated(order);
   } catch (error) {

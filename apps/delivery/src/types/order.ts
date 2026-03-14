@@ -37,11 +37,13 @@ export interface Order {
   payment_method: PaymentMethod
   payment_status: string
   subtotal: number
+  discount?: number
   delivery_fee: number
   promo_code?: string
-  promo_discount: number
+  promo_discount?: number
   tip: number
   total: number
+  metadata?: Record<string, unknown>
   loyalty_points_earned: number
   loyalty_points_used: number
   notes?: string

@@ -29,6 +29,7 @@ export const deliverySchema = z.object({
     type: z.enum(['delivery', 'pickup']),
     time: z.enum(['asap', 'scheduled']),
     scheduledTime: z.string().optional(),
+    scheduledDate: z.string().optional(),
 })
 
 export type DeliveryFormData = z.infer<typeof deliverySchema>

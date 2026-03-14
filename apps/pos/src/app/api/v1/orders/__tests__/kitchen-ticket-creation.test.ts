@@ -70,6 +70,9 @@ const validOrderInput = {
   payment_method: 'pay_on_pickup',
   payment_status: 'pay_on_pickup',
   delivery_type: 'pickup' as const,
+  metadata: {
+    payment_fee: 2,
+  },
   items: [
     {
       product_id: 'prod-1',
@@ -153,7 +156,8 @@ describe('POST /api/v1/orders — transactional create payload', () => {
 
     expect(payload).toBeDefined()
     expect(payload.p_order.order_number).toBe('WEB-20260303-001')
-    expect(payload.p_order.loyalty_points_earned).toBe(136)
+    expect(payload.p_order.total).toBe(88)
+    expect(payload.p_order.loyalty_points_earned).toBe(138)
     expect(payload.p_order_items).toHaveLength(1)
     expect(payload.p_order_items[0]).toMatchObject({
       product_id: 'prod-1',

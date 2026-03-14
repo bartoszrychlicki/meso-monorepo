@@ -48,6 +48,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
       pay_on_pickup_enabled: deliveryConfig?.pay_on_pickup_enabled ?? false,
       pay_on_pickup_fee: deliveryConfig?.pay_on_pickup_fee ?? 0,
       pay_on_pickup_max_order: deliveryConfig?.pay_on_pickup_max_order ?? 0,
+      ordering_paused_until_date: deliveryConfig?.ordering_paused_until_date ?? null,
     },
   });
 
@@ -68,6 +69,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
         pay_on_pickup_enabled: deliveryConfig.pay_on_pickup_enabled,
         pay_on_pickup_fee: deliveryConfig.pay_on_pickup_fee,
         pay_on_pickup_max_order: deliveryConfig.pay_on_pickup_max_order,
+        ordering_paused_until_date: deliveryConfig.ordering_paused_until_date,
       });
     }
   }, [deliveryConfig, form]);
@@ -218,6 +220,33 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="ordering_paused_until_date">Wznowienie zamowień online</Label>
+            <Input
+              id="ordering_paused_until_date"
+              type="date"
+              disabled={!isDeliveryActive}
+              value={form.watch('ordering_paused_until_date') ?? ''}
+              onChange={(event) =>
+                form.setValue(
+                  'ordering_paused_until_date',
+                  event.target.value ? event.target.value : null,
+                  { shouldValidate: true }
+                )
+              }
+              data-field="ordering_paused_until_date"
+            />
+            <p className="text-sm text-muted-foreground">
+              Po ustawieniu tej daty aplikacja zablokuje zamowienia ASAP i pozwoli skladac tylko
+              zamowienia na przyszlosc od godziny otwarcia wskazanego dnia.
+            </p>
+            {form.formState.errors.ordering_paused_until_date && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.ordering_paused_until_date.message}
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
