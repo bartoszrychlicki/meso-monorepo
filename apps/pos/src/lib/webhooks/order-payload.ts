@@ -59,5 +59,5 @@ export function buildOrderStatusChangedWebhookData(
     note: options.note,
     estimated_ready_at: order.estimated_ready_at,
     created_at: order.created_at,
-  } as OrderStatusChangedData;
+  };
 }

@@ -288,7 +288,6 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     expect(body.data.status).toBe('cancelled')
     expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready'])
   })
-
   it('awards loyalty points through the server helper when order is delivered', async () => {
     mockFindById.mockResolvedValue({
       ...baseOrder,

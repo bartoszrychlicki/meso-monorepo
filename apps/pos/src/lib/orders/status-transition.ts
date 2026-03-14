@@ -16,7 +16,6 @@ const ACTIVE_KITCHEN_TICKET_STATUSES = [
   OrderStatus.PREPARING,
   OrderStatus.READY,
 ] as const;
-
 type OrderRepo = Pick<
   ReturnType<typeof createServerRepository<Order>>,
   'findById' | 'update'
@@ -40,7 +39,6 @@ async function cancelKitchenTicketsForOrder(
     throw new Error(`Failed to cancel kitchen tickets for order ${orderId}: ${error.message}`);
   }
 }
-
 export interface TransitionOrderStatusInput {
   orderId: string;
   status: OrderStatus;
@@ -169,7 +167,6 @@ export async function transitionOrderStatus(
       console.error('[KDS] cancel tickets on order cancellation failed:', error);
     }
   }
-
   if (input.status === OrderStatus.DELIVERED && (updated.customer_id || updated.customer_phone)) {
     try {
       await awardOrderLoyaltyPoints(createServiceClient(), updated);
