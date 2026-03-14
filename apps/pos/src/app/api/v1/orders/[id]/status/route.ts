@@ -7,6 +7,7 @@ import {
   apiError,
 } from '@/lib/api/response';
 import {
+  InvalidOrderCancellationReasonError,
   InvalidOrderStatusTransitionError,
   OrderNotFoundError,
   transitionOrderStatus,
@@ -49,6 +50,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       orderId: id,
       status: validation.data.status,
       note: validation.data.note,
+      closure_reason_code: validation.data.closure_reason_code,
+      closure_reason: validation.data.closure_reason,
       changed_by: validation.data.changed_by,
       payment_status: validation.data.payment_status,
       requestOrigin: request.nextUrl.origin,
@@ -64,6 +67,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return apiError(
         'INVALID_STATUS_TRANSITION',
         `Nie można zmienić statusu z "${error.currentStatus}" na "${error.requestedStatus}". Dozwolone przejścia: ${error.allowedTransitions.join(', ') || 'brak'}`,
+        422
+      );
+    }
+
+    if (error instanceof InvalidOrderCancellationReasonError) {
+      return apiError(
+        'INVALID_CANCELLATION_REASON',
+        'Powód anulowania jest wymagany',
         422
       );
     }

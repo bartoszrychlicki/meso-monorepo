@@ -16,6 +16,7 @@ import { OrderStatusBadge } from './order-status-badge';
 import { OrderTimeline } from './order-timeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Table,
   TableBody,
@@ -25,16 +26,10 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  OrderCancelDialog,
+  type OrderCancelInput,
+} from '@/components/shared/order-cancel-dialog';
 import {
   ArrowRight,
   XCircle,
@@ -44,6 +39,7 @@ import {
   FileText,
   Clock,
   ShoppingBag,
+  AlertTriangle,
 } from 'lucide-react';
 
 const CHANNEL_LABELS: Record<OrderChannel, string> = {
@@ -100,7 +96,7 @@ const NEXT_STATUS_PICKUP: Partial<Record<OrderStatus, OrderStatus>> = {
 interface OrderDetailProps {
   order: Order;
   onStatusChange: (status: OrderStatus, note?: string) => Promise<void>;
-  onCancel: (reason: string) => Promise<void>;
+  onCancel: (input: OrderCancelInput) => Promise<void>;
 }
 
 interface TimestampField {
@@ -132,7 +128,6 @@ export function OrderDetail({
   onCancel,
 }: OrderDetailProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [cancelReason, setCancelReason] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
   const isDelivery = order.source === OrderSource.DELIVERY;
@@ -153,13 +148,11 @@ export function OrderDetail({
     }
   };
 
-  const handleCancel = async () => {
-    if (!cancelReason.trim()) return;
+  const handleCancel = async (input: OrderCancelInput) => {
     setIsUpdating(true);
     try {
-      await onCancel(cancelReason);
+      await onCancel(input);
       setCancelDialogOpen(false);
-      setCancelReason('');
     } finally {
       setIsUpdating(false);
     }
@@ -206,6 +199,14 @@ export function OrderDetail({
           </Button>
         )}
       </div>
+
+      {order.status === OrderStatus.CANCELLED && order.closure_reason && (
+        <Alert className="border-red-200 bg-red-50 text-red-950" data-field="closure-reason-alert">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Powód anulowania</AlertTitle>
+          <AlertDescription>{order.closure_reason}</AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left column - items */}
@@ -540,55 +541,13 @@ export function OrderDetail({
         </div>
       </div>
 
-      {/* Cancel dialog with reason */}
-      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
-        <DialogContent data-component="cancel-order-dialog">
-          <DialogHeader>
-            <DialogTitle>Anuluj zamowienie</DialogTitle>
-            <DialogDescription>
-              Podaj powod anulowania zamowienia {order.order_number}.
-            </DialogDescription>
-          </DialogHeader>
-          {(order.status === OrderStatus.PREPARING || order.status === OrderStatus.READY) && (
-            <div className="rounded-lg border-2 border-amber-400 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-              <div className="flex items-center gap-2">
-                <XCircle className="h-4 w-4 shrink-0" />
-                {order.status === OrderStatus.PREPARING
-                  ? 'To zamowienie jest w trakcie przygotowania! Kuchnia juz nad nim pracuje.'
-                  : 'To zamowienie jest juz gotowe do wydania!'}
-              </div>
-            </div>
-          )}
-          <div className="py-4">
-            <Label htmlFor="cancel-reason">Powod anulowania</Label>
-            <Input
-              id="cancel-reason"
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              placeholder="Np. Zmiana planow klienta..."
-              className="mt-1.5"
-              data-field="cancel-reason"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setCancelDialogOpen(false)}
-              data-action="cancel-dialog-close"
-            >
-              Zamknij
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleCancel}
-              disabled={!cancelReason.trim() || isUpdating}
-              data-action="confirm-cancel"
-            >
-              Anuluj zamowienie
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <OrderCancelDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        onConfirm={handleCancel}
+        orderNumber={order.order_number}
+        isSubmitting={isUpdating}
+      />
     </div>
   );
 }

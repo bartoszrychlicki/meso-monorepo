@@ -1,5 +1,6 @@
 // Re-export all enums from shared package
 export {
+  OrderClosureReasonCode,
   OrderStatus,
   OrderChannel,
   OrderSource,

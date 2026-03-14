@@ -191,11 +191,6 @@ describe('PATCH /api/v1/orders/:id/status', () => {
       to: 'out_for_delivery',
       field: 'picked_up_at',
     },
-    {
-      from: 'confirmed',
-      to: 'cancelled',
-      field: 'cancelled_at',
-    },
   ])('sets $field when transitioning from $from to $to', async ({ from, to, field }) => {
     mockFindById.mockResolvedValue({
       ...baseOrder,
@@ -233,6 +228,8 @@ describe('PATCH /api/v1/orders/:id/status', () => {
       ...baseOrder,
       status: 'cancelled',
       cancelled_at: '2026-03-03T10:05:00.000Z',
+      closure_reason_code: 'custom',
+      closure_reason: 'Klient anulował',
       status_history: [
         ...baseOrder.status_history,
         { status: 'cancelled', timestamp: '2026-03-03T10:05:00.000Z', note: 'Klient anulował' },
@@ -255,6 +252,15 @@ describe('PATCH /api/v1/orders/:id/status', () => {
         updated_at: expect.any(String),
       })
     )
+    expect(mockServerRepo.update).toHaveBeenCalledWith(
+      'order-1',
+      expect.objectContaining({
+        status: 'cancelled',
+        cancelled_at: expect.any(String),
+        closure_reason_code: 'custom',
+        closure_reason: 'Klient anulował',
+      })
+    )
     expect(mockKitchenTicketsEq).toHaveBeenCalledWith('order_id', 'order-1')
     expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready'])
   })
@@ -268,9 +274,11 @@ describe('PATCH /api/v1/orders/:id/status', () => {
       ...baseOrder,
       status: 'cancelled',
       cancelled_at: '2026-03-03T10:05:00.000Z',
+      closure_reason_code: 'location_closed',
+      closure_reason: 'Lokal nieczynny',
       status_history: [
         ...baseOrder.status_history,
-        { status: 'cancelled', timestamp: '2026-03-03T10:05:00.000Z' },
+        { status: 'cancelled', timestamp: '2026-03-03T10:05:00.000Z', note: 'Lokal nieczynny' },
       ],
     })
     mockKitchenTicketsIn.mockResolvedValueOnce({
@@ -280,6 +288,7 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     const res = await PATCH(
       makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
         status: 'cancelled',
+        closure_reason_code: 'location_closed',
       }),
       makeParams('order-1')
     )
@@ -288,6 +297,19 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     expect(res.status).toBe(200)
     expect(body.data.status).toBe('cancelled')
     expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready'])
+  })
+
+  it('returns 422 when cancelled status is requested without any reason', async () => {
+    const res = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/orders/order-1/status', {
+        status: 'cancelled',
+      }),
+      makeParams('order-1')
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
   })
   it('updates delivered orders without invoking app-side loyalty awarding in supabase mode', async () => {
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase')

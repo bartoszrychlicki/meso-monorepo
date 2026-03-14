@@ -10,6 +10,15 @@ export enum OrderStatus {
   CANCELLED = 'cancelled',
 }
 
+export enum OrderClosureReasonCode {
+  MISSING_INGREDIENTS = 'missing_ingredients',
+  MISSING_PACKAGING = 'missing_packaging',
+  DELIVERY_UNAVAILABLE = 'delivery_unavailable',
+  HIGH_LOAD = 'high_load',
+  LOCATION_CLOSED = 'location_closed',
+  CUSTOM = 'custom',
+}
+
 export enum OrderChannel {
   POS = 'pos',
   ONLINE = 'online',

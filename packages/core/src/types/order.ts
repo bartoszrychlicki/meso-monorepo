@@ -1,5 +1,6 @@
 import {
   ModifierAction,
+  OrderClosureReasonCode,
   OrderChannel,
   OrderSource,
   OrderStatus,
@@ -70,6 +71,8 @@ export interface Order extends BaseEntity {
   delivery_type?: 'delivery' | 'pickup';
   loyalty_points_earned?: number;
   loyalty_points_used?: number;
+  closure_reason_code?: OrderClosureReasonCode | null;
+  closure_reason?: string | null;
   // Lifecycle timestamps
   paid_at?: string;
   confirmed_at?: string;

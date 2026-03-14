@@ -4,7 +4,12 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, MapPin, Phone, Clock, CreditCard, Store, Radio } from 'lucide-react'
 import { useOrderDetails } from '@/hooks/useOrderDetails'
-import { OrderTimeline, OrderStatusBadge, OrderItemsList } from '@/components/orders'
+import {
+  OrderCancellationReason,
+  OrderTimeline,
+  OrderStatusBadge,
+  OrderItemsList,
+} from '@/components/orders'
 import { formatOrderDate, getOrderStatusMessage } from '@/types/order'
 import { formatPrice } from '@/lib/formatters'
 import { Button } from '@/components/ui/button'
@@ -101,6 +106,10 @@ export default function OrderDetailsPage() {
                     </Link>
                 )}
             </section>
+
+            {order.status === 'cancelled' && (
+                <OrderCancellationReason reason={order.closure_reason} />
+            )}
 
             {/* Timeline */}
             <section className="rounded-xl border border-border bg-card p-4">

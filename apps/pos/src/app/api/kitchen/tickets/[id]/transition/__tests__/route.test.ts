@@ -251,4 +251,57 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
       })
     );
   });
+
+  it('cancels a pending ticket and stores the selected rejection reason', async () => {
+    mockKitchenRepo.update.mockResolvedValueOnce({
+      ...baseTicket,
+      status: OrderStatus.CANCELLED,
+      completed_at: '2026-03-01T10:05:00.000Z',
+    });
+    mockOrdersRepo.findById.mockResolvedValueOnce({
+      ...baseOrder,
+      status: OrderStatus.PENDING,
+    });
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      status: OrderStatus.CANCELLED,
+      cancelled_at: '2026-03-01T10:05:00.000Z',
+      closure_reason_code: 'high_load',
+      closure_reason: 'Za duży ruch',
+      status_history: [
+        {
+          status: OrderStatus.CANCELLED,
+          timestamp: '2026-03-01T10:05:00.000Z',
+          note: 'Za duży ruch',
+        },
+      ],
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'cancel_order', reasonCode: 'high_load' }),
+      makeParams('ticket-1')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockOrdersRepo.update).toHaveBeenCalledWith(
+      orderId,
+      expect.objectContaining({
+        status: OrderStatus.CANCELLED,
+        closure_reason_code: 'high_load',
+        closure_reason: 'Za duży ruch',
+      })
+    );
+  });
+
+  it('rejects cancel_order when no reason is provided', async () => {
+    const response = await POST(
+      makeRequest({ action: 'cancel_order' }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('Missing cancellation reason');
+    expect(mockKitchenRepo.update).not.toHaveBeenCalled();
+  });
 });

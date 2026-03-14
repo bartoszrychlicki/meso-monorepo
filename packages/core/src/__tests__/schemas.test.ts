@@ -77,4 +77,21 @@ describe('UpdateOrderStatusSchema', () => {
     const result = UpdateOrderStatusSchema.safeParse(input);
     expect(result.success).toBe(true);
   });
+
+  it('accepts cancelled status with closure reason code', () => {
+    const result = UpdateOrderStatusSchema.safeParse({
+      status: 'cancelled',
+      closure_reason_code: 'high_load',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects cancelled status without any reason', () => {
+    const result = UpdateOrderStatusSchema.safeParse({
+      status: 'cancelled',
+    });
+
+    expect(result.success).toBe(false);
+  });
 });

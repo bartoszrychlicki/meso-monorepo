@@ -1,5 +1,10 @@
 import { Order } from '@/types/order';
-import { OrderStatus, OrderChannel, LoyaltyPointReason } from '@/types/enums';
+import {
+  OrderChannel,
+  OrderClosureReasonCode,
+  OrderStatus,
+  LoyaltyPointReason,
+} from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
 import { crmRepository } from '@/modules/crm/repository';
 import {
@@ -13,6 +18,7 @@ import {
   formatPhoneForSMS,
 } from '@/lib/sms/templates';
 import { supabase } from '@/lib/supabase/client';
+import { normalizeOrderClosureReason } from '@meso/core';
 
 const baseRepo = createRepository<Order>('orders');
 const ACTIVE_KITCHEN_TICKET_STATUSES = [
@@ -47,20 +53,45 @@ async function findByCustomer(name: string): Promise<Order[]> {
 async function updateStatus(
   id: string,
   status: OrderStatus,
-  note?: string
+  note?: string,
+  closureReasonCode?: OrderClosureReasonCode | null,
+  closureReason?: string | null
 ): Promise<Order> {
   const order = await baseRepo.findById(id);
   if (!order) throw new Error(`Order with id ${id} not found`);
 
+  const normalizedCancellation = status === OrderStatus.CANCELLED
+    ? normalizeOrderClosureReason({
+        closure_reason_code: closureReasonCode,
+        closure_reason: closureReason,
+        note,
+      })
+    : null;
+
+  if (
+    status === OrderStatus.CANCELLED &&
+    !normalizedCancellation?.closure_reason &&
+    !normalizedCancellation?.note
+  ) {
+    throw new Error('Powód anulowania jest wymagany');
+  }
+
   const statusEntry = {
     status,
     timestamp: new Date().toISOString(),
-    note,
+    note: normalizedCancellation?.note ?? note,
   };
 
   const updatedOrder = await baseRepo.update(id, {
     status,
     status_history: [...order.status_history, statusEntry],
+    ...(status === OrderStatus.CANCELLED
+      ? {
+          cancelled_at: statusEntry.timestamp,
+          closure_reason_code: normalizedCancellation?.closure_reason_code,
+          closure_reason: normalizedCancellation?.closure_reason,
+        }
+      : {}),
   } as Partial<Order>);
 
   if (status === OrderStatus.CANCELLED) {
