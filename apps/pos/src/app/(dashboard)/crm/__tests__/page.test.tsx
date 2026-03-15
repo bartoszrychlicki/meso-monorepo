@@ -32,8 +32,14 @@ vi.mock('@/components/ui/tabs', () => ({
   TabsContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/modules/crm/components/customer-card', () => ({
-  CustomerCard: ({ customer }: { customer: { first_name: string } }) => <div>{customer.first_name}</div>,
+vi.mock('@/modules/crm/components/customer-table', () => ({
+  CustomerTable: ({ customers }: { customers: Array<{ first_name: string }> }) => (
+    <div>CustomerTable:{customers.map((customer) => customer.first_name).join(',')}</div>
+  ),
+}));
+
+vi.mock('@/modules/crm/components/customer-details-sheet', () => ({
+  CustomerDetailsSheet: () => <div>CustomerDetailsSheet</div>,
 }));
 
 vi.mock('@/modules/crm/components/rewards-manager', () => ({
@@ -50,9 +56,13 @@ vi.mock('@/seed', () => ({
 
 vi.mock('@/modules/crm/store', () => ({
   useCRMStore: () => ({
+    customers: [{ id: '1', first_name: 'Jan' }],
     loadCustomers: vi.fn(),
     getFilteredCustomers: () => [{ id: '1', first_name: 'Jan' }],
+    getSelectedCustomer: () => null,
     getCustomerStats: () => ({ total: 1, bronze: 1, silver: 0, gold: 0 }),
+    selectedCustomerId: null,
+    setSelectedCustomerId: vi.fn(),
     searchQuery: '',
     setSearchQuery: vi.fn(),
     tierFilter: 'all',
@@ -75,6 +85,8 @@ describe('CRM page', () => {
     expect(screen.getByText('Klienci')).toBeInTheDocument();
     expect(screen.getByText('Nagrody')).toBeInTheDocument();
     expect(screen.getByText('Kody promocyjne')).toBeInTheDocument();
+    expect(screen.getByText('CustomerTable:Jan')).toBeInTheDocument();
+    expect(screen.getByText('CustomerDetailsSheet')).toBeInTheDocument();
     expect(screen.getByText('RewardsManager')).toBeInTheDocument();
     expect(screen.getByText('PromoCodesManager')).toBeInTheDocument();
   });
