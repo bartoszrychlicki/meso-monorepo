@@ -46,6 +46,14 @@ function isActiveKitchenTicketStatus(status: OrderStatus): status is ActiveKitch
   return ACTIVE_KITCHEN_TICKET_STATUSES.includes(status as ActiveKitchenTicketStatus);
 }
 
+function buildAppUrl(path: string): string {
+  const origin = typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : 'http://localhost:3000';
+
+  return new URL(path, origin).toString();
+}
+
 async function cancelOrderViaApi(
   id: string,
   payload: {
@@ -54,7 +62,7 @@ async function cancelOrderViaApi(
     requestRefund?: boolean;
   }
 ): Promise<OrderCancellationResult> {
-  const response = await fetch(`/api/v1/orders/${id}/cancel`, {
+  const response = await fetch(buildAppUrl(`/api/v1/orders/${id}/cancel`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -84,7 +92,7 @@ async function updateStatusViaApi(
     closureReason?: string | null;
   }
 ): Promise<Order> {
-  const response = await fetch(`/api/v1/orders/${id}/status`, {
+  const response = await fetch(buildAppUrl(`/api/v1/orders/${id}/status`), {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -116,7 +124,7 @@ async function updateStatusViaApi(
 }
 
 async function rollbackStatusViaApi(id: string, note?: string): Promise<Order> {
-  const response = await fetch(`/api/v1/orders/${id}/status/rollback`, {
+  const response = await fetch(buildAppUrl(`/api/v1/orders/${id}/status/rollback`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
