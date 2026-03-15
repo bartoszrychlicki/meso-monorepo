@@ -6,6 +6,10 @@ import {
   InvalidOrderCancellationReasonError,
   transitionOrderStatus,
 } from '@/lib/orders/status-transition';
+import {
+  loadKitchenLinkedOrder,
+  mergeKitchenTicketWithLinkedOrder,
+} from '@/modules/kitchen/server-enrichment';
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 
@@ -79,6 +83,16 @@ function getTicketStatusPatch(action: TransitionAction, now: string): Partial<Ki
   }
 }
 
+async function enrichKitchenTicket(ticket: KitchenTicket): Promise<KitchenTicket> {
+  const orderId = ticket.order_id?.trim();
+  if (!orderId || !UUID_REGEX.test(orderId)) {
+    return ticket;
+  }
+
+  const linkedOrder = await loadKitchenLinkedOrder(orderId);
+  return mergeKitchenTicketWithLinkedOrder(ticket, linkedOrder);
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const body = (await request.json()) as TransitionBody;
@@ -113,7 +127,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
 
       updatedTicket = await kitchenRepo.update(id, { items: updatedItems } as Partial<KitchenTicket>);
-      return NextResponse.json({ ticket: updatedTicket });
+      return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
     }
 
     if (body.action === 'set_priority') {
@@ -122,7 +136,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       }
 
       updatedTicket = await kitchenRepo.update(id, { priority: body.priority } as Partial<KitchenTicket>);
-      return NextResponse.json({ ticket: updatedTicket });
+      return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
     }
 
     const normalizedCancellation = body.action === 'cancel_order'
@@ -145,12 +159,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const statusUpdate = getStatusUpdate(body.action);
     if (!statusUpdate) {
-      return NextResponse.json({ ticket: updatedTicket });
+      return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
     }
 
     const orderId = currentTicket.order_id?.trim();
     if (!orderId || !UUID_REGEX.test(orderId)) {
-      return NextResponse.json({ ticket: updatedTicket });
+      return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
     }
 
     try {
@@ -179,7 +193,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    return NextResponse.json({ ticket: updatedTicket });
+    return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
   } catch (error) {
     console.error('[KDS transition] Failed:', error);
     return NextResponse.json(

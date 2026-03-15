@@ -77,8 +77,11 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     order_number: 'WEB-20260301-001',
     status: OrderStatus.PENDING,
     payment_status: 'pending',
+    payment_method: 'pay_on_pickup',
     channel: 'delivery_app',
     source: 'delivery',
+    delivery_type: 'pickup',
+    scheduled_time: '2026-03-01T11:30:00.000Z',
     customer_name: 'Jan Kowalski',
     customer_phone: '+48500100100',
     total: 42,
@@ -149,6 +152,8 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
 
     expect(response.status).toBe(200);
     expect(body.ticket.status).toBe(OrderStatus.PREPARING);
+    expect(body.ticket.scheduled_time).toBe('2026-03-01T11:30:00.000Z');
+    expect(body.ticket.delivery_type).toBe('pickup');
 
     expect(mockCreateServerRepo).toHaveBeenCalledWith('kitchen_tickets');
     expect(mockCreateServerRepo).toHaveBeenCalledWith('orders');
@@ -193,10 +198,39 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     expect(body.error).toBe('Missing itemId or isDone for toggle_item');
   });
 
+  it('keeps enriched schedule fields after toggle_item', async () => {
+    mockKitchenRepo.update.mockResolvedValueOnce({
+      ...baseTicket,
+      items: [
+        {
+          ...baseTicket.items[0],
+          is_done: true,
+        },
+      ],
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'toggle_item', itemId: 'item-1', isDone: true }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.items[0].is_done).toBe(true);
+    expect(body.ticket.scheduled_time).toBe('2026-03-01T11:30:00.000Z');
+    expect(body.ticket.delivery_type).toBe('pickup');
+  });
+
   it('still transitions ticket when order_id is missing (legacy tickets)', async () => {
     mockKitchenRepo.findById.mockResolvedValueOnce({
       ...baseTicket,
       order_id: null as unknown as string,
+    });
+    mockKitchenRepo.update.mockResolvedValueOnce({
+      ...baseTicket,
+      status: OrderStatus.PREPARING,
+      order_id: null as unknown as string,
+      started_at: '2026-03-01T10:05:00.000Z',
     });
 
     const request = makeRequest({ action: 'start_preparing' });

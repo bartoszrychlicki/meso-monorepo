@@ -7,18 +7,14 @@ import {
   extractKitchenTicketOrderIds,
   filterKitchenTicketsByLinkedOrders,
 } from '@/modules/kitchen/ticket-filters';
+import { mergeKitchenTicketsWithLinkedOrders, type KitchenLinkedOrder } from '@/modules/kitchen/server-enrichment';
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 import type { Order } from '@/types/order';
 
-type LinkedOrder = Pick<
-  Order,
-  'id' | 'status' | 'channel' | 'payment_method' | 'payment_status' | 'scheduled_time' | 'delivery_type'
->;
-
 const isSupabaseBackend = process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
 
-async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
+async function loadLinkedOrders(orderIds: string[]): Promise<KitchenLinkedOrder[]> {
   if (orderIds.length === 0) {
     return [];
   }
@@ -33,7 +29,7 @@ async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
       throw new Error(`[orders_orders] linked order lookup failed: ${error.message}`);
     }
 
-    return (data ?? []) as LinkedOrder[];
+    return (data ?? []) as KitchenLinkedOrder[];
   }
 
   const ordersRepo = createServerRepository<Order>('orders');
@@ -88,19 +84,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const linkedOrdersById = new Map(linkedOrders.map((order) => [order.id, order]));
-    tickets = tickets.map((ticket) => {
-      const linkedOrder = linkedOrdersById.get(ticket.order_id);
-      if (!linkedOrder) {
-        return ticket;
-      }
-
-      return {
-        ...ticket,
-        scheduled_time: linkedOrder.scheduled_time,
-        delivery_type: linkedOrder.delivery_type,
-      };
-    });
+    tickets = mergeKitchenTicketsWithLinkedOrders(tickets, linkedOrders);
 
     return NextResponse.json({ tickets });
   } catch (error) {
