@@ -8,6 +8,7 @@ export interface ApiResponseBody<T = unknown> {
     page?: number;
     per_page?: number;
     timestamp: string;
+    warnings?: ApiResponseWarning[];
   };
   error?: {
     code: string;
@@ -16,9 +17,19 @@ export interface ApiResponseBody<T = unknown> {
   };
 }
 
+export interface ApiResponseWarning {
+  code: string;
+  message: string;
+}
+
 export function apiSuccess<T>(
   data: T,
-  meta?: { total?: number; page?: number; per_page?: number }
+  meta?: {
+    total?: number;
+    page?: number;
+    per_page?: number;
+    warnings?: ApiResponseWarning[];
+  }
 ): NextResponse<ApiResponseBody<T>> {
   return NextResponse.json(
     {

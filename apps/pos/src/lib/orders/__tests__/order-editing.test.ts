@@ -99,6 +99,31 @@ describe('buildKitchenItemsFromOrderItems', () => {
       is_done: false,
     });
   });
+
+  it('resets completion state for unchanged items when rollback requires re-review', () => {
+    const previousKitchenItems: KitchenItem[] = [
+      {
+        id: 'k-item-1',
+        order_item_id: 'item-1',
+        product_name: 'Ramen',
+        quantity: 1,
+        modifiers: ['Extra Chashu'],
+        is_done: true,
+      },
+    ];
+
+    const nextItems = buildKitchenItemsFromOrderItems(
+      [baseOrderItem],
+      previousKitchenItems,
+      { resetCompletionState: true }
+    );
+
+    expect(nextItems[0]).toMatchObject({
+      id: 'k-item-1',
+      order_item_id: 'item-1',
+      is_done: false,
+    });
+  });
 });
 
 describe('buildKitchenTicketStatusPatch', () => {

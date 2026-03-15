@@ -211,7 +211,11 @@ function buildEditRollbackNote(itemsChanged: boolean, notesChanged: boolean): st
   return `${reasonLabel}${buildRollbackStatusNote(OrderStatus.READY, OrderStatus.PREPARING)}`;
 }
 
-async function syncLocalKitchenTicket(order: Order, shouldSyncContents: boolean): Promise<void> {
+async function syncLocalKitchenTicket(
+  order: Order,
+  shouldSyncContents: boolean,
+  options: { resetCompletionState?: boolean } = {}
+): Promise<void> {
   if (!shouldSyncContents) {
     return;
   }
@@ -233,7 +237,10 @@ async function syncLocalKitchenTicket(order: Order, shouldSyncContents: boolean)
         ...ticketStatusPatch,
         items: buildKitchenItemsFromOrderItems(
           order.items,
-          Array.isArray(ticket.items) ? ticket.items : []
+          Array.isArray(ticket.items) ? ticket.items : [],
+          {
+            resetCompletionState: options.resetCompletionState,
+          }
         ),
         notes: order.notes,
         estimated_minutes: estimateKitchenTicketMinutes(order.items),
@@ -503,6 +510,7 @@ async function updateOrder(id: string, input: UpdateOrderInput): Promise<Order> 
     : false;
   const shouldRollbackReady = existing.status === OrderStatus.READY && (itemsChanged || notesChanged);
   const shouldSyncKitchenContents = itemsChanged || notesChanged;
+  const shouldResetKitchenCompletionState = shouldRollbackReady && notesChanged;
   const nextStatus = shouldRollbackReady ? OrderStatus.PREPARING : existing.status;
 
   const patch: Partial<Order> = {};
@@ -571,8 +579,27 @@ async function updateOrder(id: string, input: UpdateOrderInput): Promise<Order> 
   }
 
   const updatedOrder = await baseRepo.update(id, patch);
-  await syncLocalKitchenTicket(updatedOrder, shouldSyncKitchenContents);
-  await syncLocalCustomerPhone(existing, normalizedPhone);
+
+  try {
+    await syncLocalKitchenTicket(updatedOrder, shouldSyncKitchenContents, {
+      resetCompletionState: shouldResetKitchenCompletionState,
+    });
+  } catch (error) {
+    console.error('[ordersRepository.updateOrder] Kitchen ticket sync failed', {
+      orderId: updatedOrder.id,
+      error,
+    });
+  }
+
+  try {
+    await syncLocalCustomerPhone(existing, normalizedPhone);
+  } catch (error) {
+    console.error('[ordersRepository.updateOrder] Customer phone sync failed', {
+      orderId: updatedOrder.id,
+      customerId: existing.customer_id,
+      error,
+    });
+  }
 
   return updatedOrder;
 }

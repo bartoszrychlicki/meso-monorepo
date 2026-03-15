@@ -1,8 +1,14 @@
+export interface ApiResponseWarning {
+  code: string;
+  message: string;
+}
+
 export interface ApiResponseMeta {
   total?: number;
   page?: number;
   per_page?: number;
   timestamp: string;
+  warnings?: ApiResponseWarning[];
 }
 
 export interface ApiError {

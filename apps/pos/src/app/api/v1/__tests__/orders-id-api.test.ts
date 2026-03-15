@@ -29,6 +29,8 @@ const mockRpc = vi.fn();
 const mockKitchenTicketsIn = vi.fn();
 const mockKitchenTicketsEq = vi.fn();
 const mockKitchenTicketsSelect = vi.fn();
+const mockKitchenTicketsUpdateEq = vi.fn();
+const mockKitchenTicketsUpdate = vi.fn();
 vi.mock('@/lib/supabase/server', () => ({
   createClient: () => ({
     auth: {
@@ -44,6 +46,7 @@ vi.mock('@/lib/supabase/server', () => ({
 
       return {
         select: mockKitchenTicketsSelect,
+        update: mockKitchenTicketsUpdate,
       };
     }),
   }),
@@ -108,6 +111,8 @@ describe('GET /api/v1/orders/:id', () => {
     mockKitchenTicketsSelect.mockReturnValue({ eq: mockKitchenTicketsEq });
     mockKitchenTicketsEq.mockReturnValue({ in: mockKitchenTicketsIn });
     mockKitchenTicketsIn.mockResolvedValue({ data: [], error: null });
+    mockKitchenTicketsUpdate.mockReturnValue({ eq: mockKitchenTicketsUpdateEq });
+    mockKitchenTicketsUpdateEq.mockResolvedValue({ error: null });
   });
 
   it('returns an order by ID', async () => {
@@ -144,6 +149,8 @@ describe('PUT /api/v1/orders/:id', () => {
     mockKitchenTicketsSelect.mockReturnValue({ eq: mockKitchenTicketsEq });
     mockKitchenTicketsEq.mockReturnValue({ in: mockKitchenTicketsIn });
     mockKitchenTicketsIn.mockResolvedValue({ data: [], error: null });
+    mockKitchenTicketsUpdate.mockReturnValue({ eq: mockKitchenTicketsUpdateEq });
+    mockKitchenTicketsUpdateEq.mockResolvedValue({ error: null });
   });
 
   it('updates an order', async () => {
@@ -332,6 +339,163 @@ describe('PUT /api/v1/orders/:id', () => {
       'customer-1',
       expect.objectContaining({
         phone: '+48 500 200 300',
+      })
+    );
+  });
+
+  it('returns success with warnings when kitchen sync fails after the order is saved', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    mockOrdersRepo.findById.mockResolvedValue({
+      ...mockOrder,
+      status: OrderStatus.PREPARING,
+      notes: 'Stara notatka',
+      items: [
+        {
+          id: 'item-1',
+          product_id: 'prod-1',
+          product_name: 'Ramen',
+          quantity: 1,
+          unit_price: 30,
+          subtotal: 30,
+          modifiers: [],
+        },
+      ],
+      payment_method: PaymentMethod.CARD,
+      payment_status: PaymentStatus.PENDING,
+      status_history: [],
+    });
+    mockOrdersRepo.update.mockResolvedValue({
+      ...mockOrder,
+      status: OrderStatus.PREPARING,
+      notes: 'Nowa notatka',
+      items: [
+        {
+          id: 'item-1',
+          product_id: 'prod-1',
+          product_name: 'Ramen',
+          quantity: 1,
+          unit_price: 30,
+          subtotal: 30,
+          modifiers: [],
+        },
+      ],
+      payment_method: PaymentMethod.CARD,
+      payment_status: PaymentStatus.PENDING,
+      status_history: [],
+    });
+    mockKitchenTicketsIn.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'ticket-1',
+          order_id: 'order-1',
+          status: OrderStatus.PREPARING,
+          items: [],
+          estimated_minutes: 5,
+        },
+      ],
+      error: null,
+    });
+    mockKitchenTicketsUpdateEq.mockResolvedValueOnce({
+      error: { message: 'kds unavailable' },
+    });
+
+    const req = makeRequest('http://localhost:3000/api/v1/orders/order-1', {
+      method: 'PUT',
+      body: JSON.stringify({ notes: 'Nowa notatka' }),
+    });
+    const res = await PUT(req, makeParams('order-1'));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.meta.warnings).toEqual([
+      expect.objectContaining({
+        code: 'KITCHEN_SYNC_FAILED',
+      }),
+    ]);
+    expect(consoleErrorSpy).toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
+  });
+
+  it('resets kitchen completion flags when a ready order rolls back because note changed', async () => {
+    mockOrdersRepo.findById.mockResolvedValue({
+      ...mockOrder,
+      status: OrderStatus.READY,
+      notes: 'Stara notatka',
+      items: [
+        {
+          id: 'item-1',
+          product_id: 'prod-1',
+          product_name: 'Ramen',
+          quantity: 1,
+          unit_price: 30,
+          subtotal: 30,
+          modifiers: [],
+        },
+      ],
+      payment_method: PaymentMethod.CARD,
+      payment_status: PaymentStatus.PENDING,
+      status_history: [],
+    });
+    mockOrdersRepo.update.mockResolvedValue({
+      ...mockOrder,
+      status: OrderStatus.PREPARING,
+      notes: 'Nowa notatka',
+      items: [
+        {
+          id: 'item-1',
+          product_id: 'prod-1',
+          product_name: 'Ramen',
+          quantity: 1,
+          unit_price: 30,
+          subtotal: 30,
+          modifiers: [],
+        },
+      ],
+      payment_method: PaymentMethod.CARD,
+      payment_status: PaymentStatus.PENDING,
+      status_history: [],
+    });
+    mockKitchenTicketsIn.mockResolvedValueOnce({
+      data: [
+        {
+          id: 'ticket-1',
+          order_id: 'order-1',
+          status: OrderStatus.READY,
+          items: [
+            {
+              id: 'k-item-1',
+              order_item_id: 'item-1',
+              product_name: 'Ramen',
+              quantity: 1,
+              modifiers: [],
+              is_done: true,
+            },
+          ],
+          estimated_minutes: 5,
+        },
+      ],
+      error: null,
+    });
+
+    const req = makeRequest('http://localhost:3000/api/v1/orders/order-1', {
+      method: 'PUT',
+      body: JSON.stringify({ notes: 'Nowa notatka' }),
+    });
+    const res = await PUT(req, makeParams('order-1'));
+
+    expect(res.status).toBe(200);
+    expect(mockKitchenTicketsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: OrderStatus.PREPARING,
+        items: [
+          expect.objectContaining({
+            order_item_id: 'item-1',
+            is_done: false,
+          }),
+        ],
       })
     );
   });

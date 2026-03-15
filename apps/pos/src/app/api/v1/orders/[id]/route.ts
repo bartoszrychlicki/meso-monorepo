@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { authenticateRequest, authorizeRequest, isApiKey } from '@/lib/api/auth';
 import { hasPermission } from '@/lib/api-keys';
 import {
+  type ApiResponseWarning,
   apiSuccess,
   apiNotFound,
   apiValidationError,
@@ -156,7 +157,8 @@ async function authorizeOrderWrite(
 
 async function syncKitchenTicket(
   order: Order,
-  shouldSyncContents: boolean
+  shouldSyncContents: boolean,
+  options: { resetCompletionState?: boolean } = {}
 ): Promise<void> {
   if (!shouldSyncContents) {
     return;
@@ -181,7 +183,10 @@ async function syncKitchenTicket(
   for (const rawTicket of (tickets ?? []) as KitchenTicket[]) {
     const nextItems = buildKitchenItemsFromOrderItems(
       order.items,
-      Array.isArray(rawTicket.items) ? rawTicket.items : []
+      Array.isArray(rawTicket.items) ? rawTicket.items : [],
+      {
+        resetCompletionState: options.resetCompletionState,
+      }
     );
 
     const { error: updateError } = await serviceClient
@@ -216,6 +221,51 @@ async function syncCustomerPhone(existingOrder: Order, requestedPhone: string | 
   await customersRepo.update(existingOrder.customer_id, {
     phone: normalizedPhone,
   } as Partial<Customer>);
+}
+
+async function runOrderUpdateSideEffects(params: {
+  existingOrder: Order;
+  updatedOrder: Order;
+  requestedPhone: string | undefined;
+  shouldSyncKitchenContents: boolean;
+  resetKitchenCompletionState: boolean;
+}): Promise<ApiResponseWarning[]> {
+  const warnings: ApiResponseWarning[] = [];
+
+  try {
+    await syncKitchenTicket(
+      params.updatedOrder,
+      params.shouldSyncKitchenContents,
+      {
+        resetCompletionState: params.resetKitchenCompletionState,
+      }
+    );
+  } catch (error) {
+    console.error('[orders.update] Kitchen ticket sync failed', {
+      orderId: params.updatedOrder.id,
+      error,
+    });
+    warnings.push({
+      code: 'KITCHEN_SYNC_FAILED',
+      message: 'Zamówienie zostało zapisane, ale nie udało się zsynchronizować ticketu kuchni.',
+    });
+  }
+
+  try {
+    await syncCustomerPhone(params.existingOrder, params.requestedPhone);
+  } catch (error) {
+    console.error('[orders.update] Customer phone sync failed', {
+      orderId: params.updatedOrder.id,
+      customerId: params.existingOrder.customer_id,
+      error,
+    });
+    warnings.push({
+      code: 'CUSTOMER_SYNC_FAILED',
+      message: 'Zamówienie zostało zapisane, ale nie udało się zaktualizować telefonu klienta w CRM.',
+    });
+  }
+
+  return warnings;
 }
 
 /**
@@ -334,6 +384,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     : false;
   const shouldRollbackReady = existing.status === OrderStatus.READY && (itemsChanged || notesChanged);
   const shouldSyncKitchenContents = itemsChanged || notesChanged;
+  const shouldResetKitchenCompletionState = shouldRollbackReady && notesChanged;
   const nowIso = new Date().toISOString();
   const nextStatus = shouldRollbackReady ? OrderStatus.PREPARING : existing.status;
 
@@ -434,19 +485,18 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     updatedOrder = await serverOrdersRepo.update(id, patch);
   }
 
-  try {
-    await syncKitchenTicket(updatedOrder, shouldSyncKitchenContents);
-    await syncCustomerPhone(existing, normalizedPhone);
-  } catch (error) {
-    return apiError(
-      'ORDER_UPDATE_FAILED',
-      error instanceof Error ? error.message : 'Nie udało się zsynchronizować zmian zamówienia',
-      500,
-      [error]
-    );
-  }
+  const warnings = await runOrderUpdateSideEffects({
+    existingOrder: existing,
+    updatedOrder,
+    requestedPhone: normalizedPhone,
+    shouldSyncKitchenContents,
+    resetKitchenCompletionState: shouldResetKitchenCompletionState,
+  });
 
-  return apiSuccess(updatedOrder);
+  return apiSuccess(
+    updatedOrder,
+    warnings.length > 0 ? { warnings } : undefined
+  );
 }
 
 /**

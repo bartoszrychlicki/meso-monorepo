@@ -100,8 +100,10 @@ export function haveOrderItemsChanged(currentItems: OrderItem[], nextItems: Orde
 
 export function buildKitchenItemsFromOrderItems(
   orderItems: OrderItem[],
-  previousKitchenItems: KitchenItem[] = []
+  previousKitchenItems: KitchenItem[] = [],
+  options: { resetCompletionState?: boolean } = {}
 ): KitchenItem[] {
+  const resetCompletionState = options.resetCompletionState ?? false;
   const previousByOrderItemId = new Map(
     previousKitchenItems.map((item) => [item.order_item_id, item])
   );
@@ -130,7 +132,11 @@ export function buildKitchenItemsFromOrderItems(
       quantity: item.quantity,
       modifiers: nextComparable.modifiers,
       notes: item.notes,
-      is_done: canPreserveCompletion && previousItem ? previousItem.is_done : false,
+      is_done: resetCompletionState
+        ? false
+        : canPreserveCompletion && previousItem
+          ? previousItem.is_done
+          : false,
     };
   });
 }
