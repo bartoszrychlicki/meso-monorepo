@@ -569,7 +569,7 @@ export async function POST(request: NextRequest) {
       previousStatus: '',
     });
 
-    scheduleWebhookDispatch(
+    await scheduleWebhookDispatch(
       'order.status_changed',
       webhookData as unknown as Record<string, unknown>
     );

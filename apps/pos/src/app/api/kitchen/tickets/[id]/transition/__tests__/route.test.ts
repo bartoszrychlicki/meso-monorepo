@@ -7,7 +7,7 @@ vi.mock('@/modules/orders/server-loyalty', () => ({
 }))
 
 const { mockScheduleWebhookDispatch } = vi.hoisted(() => ({
-  mockScheduleWebhookDispatch: vi.fn(),
+  mockScheduleWebhookDispatch: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/webhooks/schedule', () => ({
   scheduleWebhookDispatch: mockScheduleWebhookDispatch,
