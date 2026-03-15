@@ -148,7 +148,7 @@ export default function CheckoutPage() {
                 const { data: deliveryConfig } = await supabase
                     .from(Tables.deliveryConfig)
                     .select(
-                        'is_pickup_active, opening_time, closing_time, pickup_time_min, pickup_time_max, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order, ordering_paused_until_date'
+                        'is_pickup_active, opening_time, closing_time, pickup_time_min, pickup_time_max, estimated_delivery_minutes, pickup_buffer_after_open, pickup_buffer_before_close, pay_on_pickup_enabled, pay_on_pickup_fee, pay_on_pickup_max_order, ordering_paused_until_date, ordering_paused_until_time'
                     )
                     .eq('location_id', locationData.id)
                     .maybeSingle()
@@ -444,10 +444,15 @@ export default function CheckoutPage() {
                             setPickupTime('')
                         }}
                     />
-                    {orderingAvailability.isOrderingPaused && orderingAvailability.orderingPausedUntilDate && (
+                    {orderingAvailability.isOrderingPaused &&
+                      orderingAvailability.orderingPausedUntilDate &&
+                      orderingAvailability.orderingPausedUntilTime && (
                         <p className="text-xs text-amber-300">
                             Lokal jest chwilowo zamkniety. Przyjmujemy zamowienia z wyprzedzeniem na{' '}
-                            {formatOrderingPausedUntilDate(orderingAvailability.orderingPausedUntilDate)}.
+                            {formatOrderingPausedUntilDate(
+                                orderingAvailability.orderingPausedUntilDate,
+                                orderingAvailability.orderingPausedUntilTime
+                            )}.
                         </p>
                     )}
                 </div>

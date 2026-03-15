@@ -123,6 +123,7 @@ describe('GET /api/v1/locations/:id', () => {
     opening_time: '11:00',
     closing_time: '21:00',
     ordering_paused_until_date: null,
+    ordering_paused_until_time: null,
   };
 
   const mockReceiptConfig = {
@@ -198,6 +199,7 @@ describe('GET /api/v1/locations/:id', () => {
     expect(body.data.delivery_config.is_delivery_active).toBe(true);
     expect(body.data.delivery_config.is_pickup_active).toBe(true);
     expect(body.data.delivery_config.ordering_paused_until_date).toBeNull();
+    expect(body.data.delivery_config.ordering_paused_until_time).toBeNull();
     expect(body.data.receipt_config).toBeTruthy();
     expect(body.data.receipt_config.receipt_header).toBe('MESO');
     expect(body.data.kds_config).toBeTruthy();

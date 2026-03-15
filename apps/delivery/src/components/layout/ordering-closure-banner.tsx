@@ -19,7 +19,11 @@ export function OrderingClosureBanner({
 }) {
   const availability = resolveOrderingAvailability(config, now)
 
-  if (!availability.isOrderingPaused || !availability.orderingPausedUntilDate) {
+  if (
+    !availability.isOrderingPaused ||
+    !availability.orderingPausedUntilDate ||
+    !availability.orderingPausedUntilTime
+  ) {
     return null
   }
 
@@ -30,7 +34,10 @@ export function OrderingClosureBanner({
         <p className="flex-1 leading-6">
           Jestesmy aktualnie zamknieci. Przyjmujemy zamowienia z wyprzedzeniem na{' '}
           <span className="font-semibold text-amber-200">
-            {formatOrderingPausedUntilDate(availability.orderingPausedUntilDate)}
+            {formatOrderingPausedUntilDate(
+              availability.orderingPausedUntilDate,
+              availability.orderingPausedUntilTime
+            )}
           </span>.
         </p>
         <CalendarClock className="mt-0.5 hidden h-4 w-4 shrink-0 text-amber-300 sm:block" />
@@ -64,7 +71,7 @@ export function OrderingClosureBannerContainer() {
 
       const { data: deliveryConfig } = await supabase
         .from(Tables.deliveryConfig)
-        .select('opening_time, ordering_paused_until_date')
+        .select('opening_time, ordering_paused_until_date, ordering_paused_until_time')
         .eq('location_id', activeLocationId)
         .maybeSingle()
 

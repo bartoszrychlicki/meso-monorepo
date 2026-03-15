@@ -70,6 +70,7 @@ function makeDeliveryConfig(overrides: Partial<DeliveryConfig> = {}): DeliveryCo
     pay_on_pickup_fee: 0,
     pay_on_pickup_max_order: 0,
     ordering_paused_until_date: null,
+    ordering_paused_until_time: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
     ...overrides,

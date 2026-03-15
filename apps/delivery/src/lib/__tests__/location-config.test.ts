@@ -164,29 +164,32 @@ describe('resolveOrderingAvailability', () => {
     expect(result).toEqual({
       isOrderingPaused: true,
       orderingPausedUntilDate: '2026-03-20',
+      orderingPausedUntilTime: '11:00',
       firstAvailableDate: '2026-03-20',
       firstAvailableTime: '11:00',
     })
   })
 
-  it('stops treating ordering as paused after opening time on reopen date', () => {
+  it('uses explicit reopen time when configured', () => {
     const result = resolveOrderingAvailability(
       {
         opening_time: '11:00:00',
         ordering_paused_until_date: '2026-03-20',
+        ordering_paused_until_time: '12:15:00',
       },
-      new Date(2026, 2, 20, 11, 1, 0)
+      new Date(2026, 2, 20, 12, 0, 0)
     )
 
-    expect(result.isOrderingPaused).toBe(false)
+    expect(result.isOrderingPaused).toBe(true)
     expect(result.firstAvailableDate).toBe('2026-03-20')
-    expect(result.firstAvailableTime).toBe('11:00')
+    expect(result.firstAvailableTime).toBe('12:15')
   })
 
   it('returns inactive state when no reopen date is configured', () => {
     expect(resolveOrderingAvailability({ opening_time: '11:00:00' })).toEqual({
       isOrderingPaused: false,
       orderingPausedUntilDate: null,
+      orderingPausedUntilTime: null,
       firstAvailableDate: null,
       firstAvailableTime: null,
     })
@@ -232,10 +235,11 @@ describe('formatters', () => {
     expect(formatDateInputValue(new Date(2026, 2, 20, 15, 0, 0))).toBe('2026-03-20')
   })
 
-  it('formats paused-until date for banner copy', () => {
-    const result = formatOrderingPausedUntilDate('2026-03-20')
+  it('formats paused-until date and time for banner copy', () => {
+    const result = formatOrderingPausedUntilDate('2026-03-20', '11:30')
 
     expect(result).toContain('2026')
+    expect(result).toContain('11:30')
     expect(result).not.toBe('2026-03-20')
   })
 })
