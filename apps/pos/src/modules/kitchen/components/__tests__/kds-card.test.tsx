@@ -113,6 +113,25 @@ describe('KdsCard', () => {
     expect(screen.queryByText(/Odbior:/)).not.toBeInTheDocument();
   });
 
+  it('renders scheduled time without pickup label when delivery type is unknown', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-03T12:00:00'));
+
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          id: 'ticket-6',
+          delivery_type: undefined,
+        }}
+      />
+    );
+
+    expect(screen.getByText('jutro, 18:45')).toBeInTheDocument();
+    expect(screen.queryByText(/Odbior:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Dostawa:/)).not.toBeInTheDocument();
+  });
+
   it('shows cancel action only for new tickets', () => {
     render(<KdsCard ticket={ticketWithVariantAndModifiers} />);
 

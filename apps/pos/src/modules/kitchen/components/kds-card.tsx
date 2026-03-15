@@ -38,7 +38,11 @@ export function KdsCard({ ticket }: KdsCardProps) {
   const scheduledTimeLabel = ticket.scheduled_time
     ? formatKitchenScheduledTime(ticket.scheduled_time)
     : null;
-  const scheduleLabelPrefix = ticket.delivery_type === 'delivery' ? 'Dostawa' : 'Odbior';
+  const scheduleLabelPrefix = ticket.delivery_type === 'delivery'
+    ? 'Dostawa'
+    : ticket.delivery_type === 'pickup'
+      ? 'Odbior'
+      : null;
 
   const allItemsDone = ticket.items.every((item) => item.is_done);
   const orderNum = ticket.order_number.split('-').pop() || ticket.order_number;
@@ -74,7 +78,8 @@ export function KdsCard({ ticket }: KdsCardProps) {
           {scheduledTimeLabel && (
             <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-sm font-semibold text-sky-700">
               <Clock3 className="h-4 w-4" />
-              {scheduleLabelPrefix}: {scheduledTimeLabel}
+              {scheduleLabelPrefix ? `${scheduleLabelPrefix}: ` : ''}
+              {scheduledTimeLabel}
             </div>
           )}
         </div>
