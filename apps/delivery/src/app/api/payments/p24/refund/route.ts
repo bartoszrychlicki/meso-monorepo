@@ -45,6 +45,10 @@ function buildRefundIds() {
 }
 
 export async function POST(request: Request) {
+  let persistedOrderId: string | null = null
+  let persistedRefundRecord: P24RefundRecord | null = null
+  let persistedMetadata: Record<string, unknown> | null = null
+
   try {
     if (!isAuthorized(request)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -99,6 +103,38 @@ export async function POST(request: Request) {
     const amount = Math.round(Number(order.total) * 100)
     const description = buildRefundDescription(order.order_number)
 
+    const refundRecord: P24RefundRecord = {
+      requestId,
+      refundsUuid,
+      sessionId: verifiedSession.sessionId,
+      p24OrderId: verifiedSession.p24OrderId,
+      amount,
+      description,
+      status: 'requested',
+      requestedAt: new Date().toISOString(),
+      requestedBy: body.requestedBy,
+      requestedFrom: body.requestedFrom || 'system',
+    }
+
+    persistedMetadata = upsertP24Refund(order.metadata, refundRecord)
+    const { error: updateError } = await supabaseAdmin
+      .from(Tables.orders)
+      .update({
+        metadata: persistedMetadata,
+      })
+      .eq('id', order.id)
+
+    if (updateError) {
+      console.error('[P24 Refund] Failed to persist refund metadata:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to persist refund metadata' },
+        { status: 500 }
+      )
+    }
+
+    persistedOrderId = order.id
+    persistedRefundRecord = refundRecord
+
     const refundItems = await p24.refundTransaction({
       requestId,
       refundsUuid,
@@ -115,42 +151,44 @@ export async function POST(request: Request) {
 
     const refundItem = refundItems[0]
     if (!refundItem?.status) {
+      const rejectedRefundRecord: P24RefundRecord = {
+        ...refundRecord,
+        status: 'manual_action_required',
+        rejectedAt: new Date().toISOString(),
+        errorMessage: refundItem?.message || 'Refund request rejected by P24',
+      }
+
+      await supabaseAdmin
+        .from(Tables.orders)
+        .update({
+          metadata: upsertP24Refund(persistedMetadata, rejectedRefundRecord),
+        })
+        .eq('id', order.id)
+
       return NextResponse.json(
-        { error: refundItem?.message || 'Refund request rejected by P24' },
+        { error: rejectedRefundRecord.errorMessage, refund: rejectedRefundRecord },
         { status: 409 }
-      )
-    }
-
-    const refundRecord: P24RefundRecord = {
-      requestId,
-      refundsUuid,
-      sessionId: verifiedSession.sessionId,
-      p24OrderId: verifiedSession.p24OrderId,
-      amount,
-      description,
-      status: 'requested',
-      requestedAt: new Date().toISOString(),
-      requestedBy: body.requestedBy,
-      requestedFrom: body.requestedFrom || 'system',
-    }
-
-    const { error: updateError } = await supabaseAdmin
-      .from(Tables.orders)
-      .update({
-        metadata: upsertP24Refund(order.metadata, refundRecord),
-      })
-      .eq('id', order.id)
-
-    if (updateError) {
-      console.error('[P24 Refund] Failed to persist refund metadata:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to persist refund metadata' },
-        { status: 500 }
       )
     }
 
     return NextResponse.json({ status: 'requested', refund: refundRecord })
   } catch (error) {
+    if (persistedOrderId && persistedRefundRecord && persistedMetadata) {
+      const failedRefundRecord: P24RefundRecord = {
+        ...persistedRefundRecord,
+        status: 'manual_action_required',
+        rejectedAt: new Date().toISOString(),
+        errorMessage: error instanceof Error ? error.message : 'Refund request failed',
+      }
+
+      await createAdminClient()
+        .from(Tables.orders)
+        .update({
+          metadata: upsertP24Refund(persistedMetadata, failedRefundRecord),
+        })
+        .eq('id', persistedOrderId)
+    }
+
     if (error instanceof P24RefundError) {
       return NextResponse.json(
         {

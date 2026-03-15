@@ -1,4 +1,5 @@
 import {
+  getLatestP24Refund,
   upsertP24Refund,
   type P24RefundRecord,
 } from '@meso/core';
@@ -117,6 +118,22 @@ export async function cancelOrderWithOptionalRefund(
     const message = error instanceof Error
       ? error.message
       : 'Nie udalo sie zlecic zwrotu do P24.'
+    const refreshedOrder = await orderRepo.findById(input.orderId)
+    const trackedRefund = refreshedOrder
+      ? getLatestP24Refund(refreshedOrder.metadata)
+      : null
+
+    if (trackedRefund) {
+      return {
+        order: refreshedOrder ?? updatedOrder,
+        refund: {
+          status: trackedRefund.status === 'requested' ? 'requested' : 'manual_action_required',
+          message,
+          refund: trackedRefund,
+        },
+      }
+    }
+
     const manualRefund = buildManualRefundRecord(existingOrder, input, message);
 
     if (!manualRefund) {
