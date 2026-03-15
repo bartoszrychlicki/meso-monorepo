@@ -111,10 +111,13 @@ async function updateStatusViaApi(
   }
 
   const updatedOrder = json.data as Order;
+  const loyaltyPointsAwarded = payload.status === OrderStatus.DELIVERED
+    ? (updatedOrder.loyalty_points_earned ?? undefined)
+    : undefined;
 
   if (updatedOrder.customer_phone) {
     try {
-      await sendOrderStatusSMS(updatedOrder, payload.status);
+      await sendOrderStatusSMS(updatedOrder, payload.status, loyaltyPointsAwarded);
     } catch (error) {
       console.error('Failed to send SMS notification:', error);
     }
