@@ -7,7 +7,9 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { syncProductWithCurrentModifierState } from '@/lib/product-modifier-groups';
 import { UpdateProductSchema } from '@/schemas/menu';
+import { createServiceClient } from '@/lib/supabase/server';
 import type { Product } from '@/types/menu';
 
 interface RouteParams {
@@ -27,7 +29,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const product = await serverProductsRepo.findById(id);
   if (!product) return apiNotFound('Produkt');
 
-  return apiSuccess(product);
+  const syncedProduct = await syncProductWithCurrentModifierState(createServiceClient(), product);
+  return apiSuccess(syncedProduct);
 }
 
 /**

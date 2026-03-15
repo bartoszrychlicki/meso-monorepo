@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { formatPrice, formatPriceDelta } from '@/lib/formatters'
 import { getProductImageUrl, PRODUCT_BLUR_PLACEHOLDER, ProductImage } from '@/lib/product-image'
+import { syncProductWithCurrentModifierState } from '@/lib/product-modifier-groups'
 import { createClient } from '@/lib/supabase/client'
 import { Tables } from '@/lib/table-mapping'
 import { ALLERGENS, type AllergenKey } from '@/types/menu'
@@ -97,14 +98,19 @@ export function ProductCustomization({
                     return
                 }
 
+                const syncedProductData = await syncProductWithCurrentModifierState(
+                    supabase,
+                    productData
+                )
+
                 // Extract addons from modifier_groups JSONB
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const modifierGroups = (productData.modifier_groups as any[]) || []
+                const modifierGroups = (syncedProductData.modifier_groups as any[]) || []
                 const addons = modifierGroups
                     .flatMap((group: { modifiers?: Addon[] }) => group.modifiers || [])
                     .filter((a): a is Addon => a !== null && a.is_available !== false)
 
-                const fullProduct = { ...productData, addons } as Product
+                const fullProduct = { ...syncedProductData, addons } as Product
                 setProduct(fullProduct)
 
                 // Initialize state
