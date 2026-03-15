@@ -364,27 +364,56 @@ describe('UpdateDeliveryConfigSchema', () => {
     }
   });
 
-  it('accepts ordering_paused_until_date as null', () => {
-    const result = UpdateDeliveryConfigSchema.safeParse({ ordering_paused_until_date: null });
+  it('accepts ordering pause date and time as null', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({
+      ordering_paused_until_date: null,
+      ordering_paused_until_time: null,
+    });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.ordering_paused_until_date).toBeNull();
+      expect(result.data.ordering_paused_until_time).toBeNull();
     }
   });
 
-  it('accepts ordering_paused_until_date in YYYY-MM-DD format', () => {
+  it('accepts ordering pause date and time in valid formats', () => {
     const result = UpdateDeliveryConfigSchema.safeParse({
       ordering_paused_until_date: '2026-03-20',
+      ordering_paused_until_time: '11:30',
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.ordering_paused_until_date).toBe('2026-03-20');
+      expect(result.data.ordering_paused_until_time).toBe('11:30');
     }
   });
 
-  it('rejects ordering_paused_until_date in invalid format', () => {
+  it('rejects ordering pause date in invalid format', () => {
     const result = UpdateDeliveryConfigSchema.safeParse({
       ordering_paused_until_date: '20-03-2026',
+      ordering_paused_until_time: '11:30',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects ordering pause time in invalid format', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({
+      ordering_paused_until_date: '2026-03-20',
+      ordering_paused_until_time: '1130',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects ordering pause date without time', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({
+      ordering_paused_until_date: '2026-03-20',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects ordering pause time without date', () => {
+    const result = UpdateDeliveryConfigSchema.safeParse({
+      ordering_paused_until_time: '11:30',
     });
     expect(result.success).toBe(false);
   });

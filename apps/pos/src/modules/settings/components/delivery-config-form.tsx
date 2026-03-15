@@ -21,10 +21,40 @@ interface DeliveryConfigFormProps {
   locationId: string;
 }
 
+const DEFAULT_ORDERING_REOPEN_TIME = '08:00';
+
 function trimTimeSeconds(time: string | undefined | null): string {
   if (!time) return '';
   // "HH:MM:SS" -> "HH:MM"
   return time.replace(/^(\d{2}:\d{2}):\d{2}$/, '$1');
+}
+
+function resolveOrderingPauseDefaults(
+  deliveryConfig:
+    | {
+        ordering_paused_until_date?: string | null;
+        ordering_paused_until_time?: string | null;
+        opening_time?: string | null;
+      }
+    | null
+    | undefined
+) {
+  const orderingPausedUntilDate = deliveryConfig?.ordering_paused_until_date ?? null;
+
+  if (!orderingPausedUntilDate) {
+    return {
+      ordering_paused_until_date: null,
+      ordering_paused_until_time: null,
+    };
+  }
+
+  return {
+    ordering_paused_until_date: orderingPausedUntilDate,
+    ordering_paused_until_time:
+      trimTimeSeconds(deliveryConfig?.ordering_paused_until_time) ||
+      trimTimeSeconds(deliveryConfig?.opening_time) ||
+      DEFAULT_ORDERING_REOPEN_TIME,
+  };
 }
 
 export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
@@ -49,7 +79,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
       pay_on_pickup_enabled: deliveryConfig?.pay_on_pickup_enabled ?? false,
       pay_on_pickup_fee: deliveryConfig?.pay_on_pickup_fee ?? 0,
       pay_on_pickup_max_order: deliveryConfig?.pay_on_pickup_max_order ?? 0,
-      ordering_paused_until_date: deliveryConfig?.ordering_paused_until_date ?? null,
+      ...resolveOrderingPauseDefaults(deliveryConfig),
     },
   });
 
@@ -71,17 +101,24 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
         pay_on_pickup_enabled: deliveryConfig.pay_on_pickup_enabled,
         pay_on_pickup_fee: deliveryConfig.pay_on_pickup_fee,
         pay_on_pickup_max_order: deliveryConfig.pay_on_pickup_max_order,
-        ordering_paused_until_date: deliveryConfig.ordering_paused_until_date,
+        ...resolveOrderingPauseDefaults(deliveryConfig),
       });
     }
   }, [deliveryConfig, form]);
 
   const isDeliveryActive = form.watch('is_delivery_active');
+  const orderingPausedUntilDate = form.watch('ordering_paused_until_date');
+  const orderingPausedUntilTime = form.watch('ordering_paused_until_time');
 
   const handleSubmit = async (data: UpdateDeliveryConfigInput) => {
     setIsSubmitting(true);
     try {
-      await saveDeliveryConfig(locationId, data);
+      await saveDeliveryConfig(locationId, {
+        ...data,
+        ordering_paused_until_time: data.ordering_paused_until_date
+          ? data.ordering_paused_until_time
+          : null,
+      });
       toast.success('Ustawienia zapisane');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Nieznany blad';
@@ -103,28 +140,71 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2 rounded-lg border p-4">
-            <Label htmlFor="ordering_paused_until_date">Wznowienie zamowien online</Label>
-            <Input
-              id="ordering_paused_until_date"
-              type="date"
-              value={form.watch('ordering_paused_until_date') ?? ''}
-              onChange={(event) =>
-                form.setValue(
-                  'ordering_paused_until_date',
-                  event.target.value ? event.target.value : null,
-                  { shouldValidate: true }
-                )
-              }
-              data-field="ordering_paused_until_date"
-            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="ordering_paused_until_date">Data wznowienia zamowien online</Label>
+                <Input
+                  id="ordering_paused_until_date"
+                  type="date"
+                  value={orderingPausedUntilDate ?? ''}
+                  onChange={(event) => {
+                    const nextDate = event.target.value ? event.target.value : null;
+
+                    form.setValue('ordering_paused_until_date', nextDate, {
+                      shouldValidate: true,
+                    });
+
+                    if (!nextDate) {
+                      form.setValue('ordering_paused_until_time', null, {
+                        shouldValidate: true,
+                      });
+                      return;
+                    }
+
+                    if (!form.getValues('ordering_paused_until_time')) {
+                      form.setValue(
+                        'ordering_paused_until_time',
+                        trimTimeSeconds(form.getValues('opening_time')) ||
+                          DEFAULT_ORDERING_REOPEN_TIME,
+                        { shouldValidate: true }
+                      );
+                    }
+                  }}
+                  data-field="ordering_paused_until_date"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ordering_paused_until_time">Godzina wznowienia</Label>
+                <Input
+                  id="ordering_paused_until_time"
+                  type="time"
+                  disabled={!orderingPausedUntilDate}
+                  value={orderingPausedUntilTime ?? ''}
+                  onChange={(event) =>
+                    form.setValue(
+                      'ordering_paused_until_time',
+                      event.target.value ? event.target.value : null,
+                      { shouldValidate: true }
+                    )
+                  }
+                  data-field="ordering_paused_until_time"
+                />
+              </div>
+            </div>
             <p className="text-sm text-muted-foreground">
               To ustawienie dotyczy wszystkich zamowien online: odbioru i dostawy. Po ustawieniu
-              tej daty aplikacja zablokuje zamowienia ASAP i pozwoli skladac tylko zamowienia na
-              przyszlosc od godziny otwarcia wskazanego dnia.
+              daty i godziny aplikacja zablokuje zamowienia ASAP i pozwoli skladac tylko
+              zamowienia na przyszlosc od wskazanego momentu.
             </p>
             {form.formState.errors.ordering_paused_until_date && (
               <p className="text-sm text-destructive">
                 {form.formState.errors.ordering_paused_until_date.message}
+              </p>
+            )}
+            {form.formState.errors.ordering_paused_until_time && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.ordering_paused_until_time.message}
               </p>
             )}
           </div>

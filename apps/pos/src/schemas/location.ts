@@ -43,7 +43,36 @@ export const UpdateDeliveryConfigSchema = z.object({
   pay_on_pickup_fee: z.number().min(0),
   pay_on_pickup_max_order: z.number().min(0),
   ordering_paused_until_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Format RRRR-MM-DD').nullable(),
-}).partial();
+  ordering_paused_until_time: z.string().regex(/^\d{2}:\d{2}$/, 'Format HH:MM').nullable(),
+}).partial().superRefine((data, ctx) => {
+  const hasPauseDate = Object.prototype.hasOwnProperty.call(data, 'ordering_paused_until_date');
+  const hasPauseTime = Object.prototype.hasOwnProperty.call(data, 'ordering_paused_until_time');
+
+  if (!hasPauseDate && !hasPauseTime) {
+    return;
+  }
+
+  const isPauseDateSet = data.ordering_paused_until_date != null;
+  const isPauseTimeSet = data.ordering_paused_until_time != null;
+
+  if (hasPauseDate !== hasPauseTime || isPauseDateSet !== isPauseTimeSet) {
+    if (!isPauseDateSet) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ordering_paused_until_date'],
+        message: 'Data wznowienia jest wymagana razem z godzina',
+      });
+    }
+
+    if (!isPauseTimeSet) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ordering_paused_until_time'],
+        message: 'Godzina wznowienia jest wymagana razem z data',
+      });
+    }
+  }
+});
 
 // --- Receipt Config ---
 

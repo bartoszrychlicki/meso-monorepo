@@ -55,6 +55,7 @@ type RpcErrorLike = {
 type DeliveryAvailabilityConfig = {
   opening_time?: string | null;
   ordering_paused_until_date?: string | null;
+  ordering_paused_until_time?: string | null;
   is_pickup_active?: boolean | null;
 };
 
@@ -84,6 +85,43 @@ function normalizeTime(value: string | null | undefined, fallback = '11:00'): st
   if (typeof value !== 'string') return fallback;
   const match = /^(\d{2}:\d{2})/.exec(value);
   return match?.[1] ?? fallback;
+}
+
+function buildLocalDateTime(
+  dateString: string,
+  timeString: string
+): Date | null {
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeString);
+
+  if (!dateMatch || !timeMatch) return null;
+
+  const [, year, month, day] = dateMatch;
+  const [, hours, minutes] = timeMatch;
+  const value = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+    0,
+    0
+  );
+
+  return Number.isNaN(value.getTime()) ? null : value;
+}
+
+function formatOrderingPauseLabel(dateString: string, timeString: string): string {
+  const value = buildLocalDateTime(dateString, timeString);
+  if (!value) return `${dateString} ${timeString}`;
+
+  return new Intl.DateTimeFormat('pl-PL', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(value);
 }
 
 function formatDateInTimeZone(date: Date, timeZone: string): string {
@@ -116,31 +154,36 @@ function formatTimeInTimeZone(date: Date, timeZone: string): string {
 function isOrderingPaused(
   config: DeliveryAvailabilityConfig | null,
   now = new Date()
-): { paused: boolean; orderingPausedUntilDate: string | null; openingTime: string } {
+): {
+  paused: boolean;
+  orderingPausedUntilDate: string | null;
+  orderingPausedUntilTime: string | null;
+} {
   const orderingPausedUntilDate =
     typeof config?.ordering_paused_until_date === 'string' &&
     /^\d{4}-\d{2}-\d{2}$/.test(config.ordering_paused_until_date)
       ? config.ordering_paused_until_date
       : null;
   const openingTime = normalizeTime(config?.opening_time);
+  const orderingPausedUntilTime = normalizeTime(config?.ordering_paused_until_time, openingTime);
 
   if (!orderingPausedUntilDate) {
-    return { paused: false, orderingPausedUntilDate: null, openingTime };
+    return { paused: false, orderingPausedUntilDate: null, orderingPausedUntilTime: null };
   }
 
   const currentDate = formatDateInTimeZone(now, ORDERING_TIME_ZONE);
   const currentTime = formatTimeInTimeZone(now, ORDERING_TIME_ZONE);
   const paused =
     currentDate < orderingPausedUntilDate ||
-    (currentDate === orderingPausedUntilDate && currentTime < openingTime);
+    (currentDate === orderingPausedUntilDate && currentTime < orderingPausedUntilTime);
 
-  return { paused, orderingPausedUntilDate, openingTime };
+  return { paused, orderingPausedUntilDate, orderingPausedUntilTime };
 }
 
 function isScheduledTimeAllowed(
   scheduledTime: string,
   orderingPausedUntilDate: string,
-  openingTime: string
+  orderingPausedUntilTime: string
 ): boolean {
   const parsed = new Date(scheduledTime);
   if (Number.isNaN(parsed.getTime())) return false;
@@ -150,7 +193,7 @@ function isScheduledTimeAllowed(
 
   return (
     scheduledDate > orderingPausedUntilDate ||
-    (scheduledDate === orderingPausedUntilDate && scheduledLocalTime >= openingTime)
+    (scheduledDate === orderingPausedUntilDate && scheduledLocalTime >= orderingPausedUntilTime)
   );
 }
 
@@ -276,7 +319,7 @@ export async function POST(request: NextRequest) {
 
   const { data: deliveryAvailabilityConfig, error: deliveryAvailabilityError } = await serviceClient
     .from('orders_delivery_config')
-    .select('opening_time, ordering_paused_until_date, is_pickup_active')
+    .select('opening_time, ordering_paused_until_date, ordering_paused_until_time, is_pickup_active')
     .eq('location_id', input.location_id)
     .maybeSingle();
 
@@ -305,12 +348,21 @@ export async function POST(request: NextRequest) {
   const orderingPause = isOrderingPaused(
     (deliveryAvailabilityConfig as DeliveryAvailabilityConfig | null) ?? null
   );
-  if (orderingPause.paused && orderingPause.orderingPausedUntilDate) {
+  if (
+    orderingPause.paused &&
+    orderingPause.orderingPausedUntilDate &&
+    orderingPause.orderingPausedUntilTime
+  ) {
+    const formattedReopenAt = formatOrderingPauseLabel(
+      orderingPause.orderingPausedUntilDate,
+      orderingPause.orderingPausedUntilTime
+    );
+
     if (!input.scheduled_time) {
       return apiValidationError([
         {
           field: 'scheduled_time',
-          message: `Lokal czasowo nie przyjmuje zamówień ASAP. Wybierz termin od ${orderingPause.orderingPausedUntilDate} ${orderingPause.openingTime}.`,
+          message: `Lokal czasowo nie przyjmuje zamówień ASAP. Wybierz termin od ${formattedReopenAt}.`,
         },
       ]);
     }
@@ -319,13 +371,13 @@ export async function POST(request: NextRequest) {
       !isScheduledTimeAllowed(
         input.scheduled_time,
         orderingPause.orderingPausedUntilDate,
-        orderingPause.openingTime
+        orderingPause.orderingPausedUntilTime
       )
     ) {
       return apiValidationError([
         {
           field: 'scheduled_time',
-          message: `Najblizszy dostepny termin to ${orderingPause.orderingPausedUntilDate} ${orderingPause.openingTime}.`,
+          message: `Najblizszy dostepny termin to ${formattedReopenAt}.`,
         },
       ]);
     }

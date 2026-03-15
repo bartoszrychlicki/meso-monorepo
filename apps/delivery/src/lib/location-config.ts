@@ -14,6 +14,7 @@ export interface DeliveryConfigRecord {
   min_order_value?: number | null
   delivery_fee?: number | null
   ordering_paused_until_date?: string | null
+  ordering_paused_until_time?: string | null
 }
 
 export interface CheckoutRuntimeConfig {
@@ -43,6 +44,7 @@ export interface CartLocationConfig {
 export interface OrderingAvailability {
   isOrderingPaused: boolean
   orderingPausedUntilDate: string | null
+  orderingPausedUntilTime: string | null
   firstAvailableDate: string | null
   firstAvailableTime: string | null
 }
@@ -111,6 +113,33 @@ export function buildLocalDateTime(
   )
 
   return Number.isNaN(value.getTime()) ? null : value
+}
+
+function resolveOrderingPauseDateTime(
+  config: DeliveryConfigRecord | null | undefined
+): { date: string | null; time: string | null } {
+  const orderingPausedUntilDate =
+    typeof config?.ordering_paused_until_date === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(config.ordering_paused_until_date)
+      ? config.ordering_paused_until_date
+      : null
+
+  if (!orderingPausedUntilDate) {
+    return { date: null, time: null }
+  }
+
+  const runtimeConfig = resolveCheckoutConfig(config)
+  const fallbackTime = trimTimeSeconds(runtimeConfig.openTime) || DEFAULTS.openTime
+  const orderingPausedUntilTime =
+    typeof config?.ordering_paused_until_time === 'string' &&
+    /^\d{2}:\d{2}(?::\d{2})?$/.test(config.ordering_paused_until_time)
+      ? trimTimeSeconds(config.ordering_paused_until_time)
+      : fallbackTime
+
+  return {
+    date: orderingPausedUntilDate,
+    time: orderingPausedUntilTime,
+  }
 }
 
 export function resolveCheckoutConfig(
@@ -186,29 +215,26 @@ export function resolveOrderingAvailability(
   config: DeliveryConfigRecord | null | undefined,
   now = new Date()
 ): OrderingAvailability {
-  const orderingPausedUntilDate =
-    typeof config?.ordering_paused_until_date === 'string' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(config.ordering_paused_until_date)
-      ? config.ordering_paused_until_date
-      : null
+  const { date: orderingPausedUntilDate, time: orderingPausedUntilTime } =
+    resolveOrderingPauseDateTime(config)
 
-  if (!orderingPausedUntilDate) {
+  if (!orderingPausedUntilDate || !orderingPausedUntilTime) {
     return {
       isOrderingPaused: false,
       orderingPausedUntilDate: null,
+      orderingPausedUntilTime: null,
       firstAvailableDate: null,
       firstAvailableTime: null,
     }
   }
 
-  const runtimeConfig = resolveCheckoutConfig(config)
-  const openTime = trimTimeSeconds(runtimeConfig.openTime) || DEFAULTS.openTime
-  const reopenAt = buildLocalDateTime(orderingPausedUntilDate, openTime)
+  const reopenAt = buildLocalDateTime(orderingPausedUntilDate, orderingPausedUntilTime)
 
   if (!reopenAt) {
     return {
       isOrderingPaused: false,
       orderingPausedUntilDate: null,
+      orderingPausedUntilTime: null,
       firstAvailableDate: null,
       firstAvailableTime: null,
     }
@@ -217,19 +243,32 @@ export function resolveOrderingAvailability(
   return {
     isOrderingPaused: now < reopenAt,
     orderingPausedUntilDate,
+    orderingPausedUntilTime,
     firstAvailableDate: orderingPausedUntilDate,
-    firstAvailableTime: openTime,
+    firstAvailableTime: orderingPausedUntilTime,
   }
 }
 
-export function formatOrderingPausedUntilDate(dateString: string): string {
-  const date = buildLocalDateTime(dateString, '12:00')
-  if (!date) return dateString
+export function formatOrderingPausedUntilDate(
+  dateString: string,
+  timeString?: string | null
+): string {
+  const fallbackTime = timeString ?? '12:00'
+  const date = buildLocalDateTime(dateString, fallbackTime)
+  if (!date) {
+    return timeString ? `${dateString} ${timeString}` : dateString
+  }
 
   return new Intl.DateTimeFormat('pl-PL', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+    ...(timeString
+      ? {
+          hour: '2-digit',
+          minute: '2-digit',
+        }
+      : {}),
   }).format(date)
 }
 

@@ -224,6 +224,7 @@ describe('POST /api/v1/orders', () => {
             opening_time: '11:00:00',
             is_pickup_active: true,
             ordering_paused_until_date: '2026-03-20',
+            ordering_paused_until_time: null,
           },
           error: null,
         })
@@ -271,6 +272,7 @@ describe('POST /api/v1/orders', () => {
             opening_time: '11:00:00',
             is_pickup_active: true,
             ordering_paused_until_date: '2026-03-20',
+            ordering_paused_until_time: '11:30:00',
           },
           error: null,
         })
@@ -284,7 +286,7 @@ describe('POST /api/v1/orders', () => {
         method: 'POST',
         body: JSON.stringify({
           ...validOrderBody,
-          scheduled_time: '2026-03-20T09:30:00.000Z',
+          scheduled_time: '2026-03-20T10:00:00.000Z',
         }),
       })
     )
@@ -297,6 +299,53 @@ describe('POST /api/v1/orders', () => {
         field: 'scheduled_time',
       }),
     ])
+    expect(body.error.details[0].message).toMatch(/11:30/)
+  })
+
+  it('accepts scheduled orders at the configured reopen time', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
+
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'orders_delivery_config') {
+        return chain({
+          data: {
+            opening_time: '11:00:00',
+            is_pickup_active: true,
+            ordering_paused_until_date: '2026-03-20',
+            ordering_paused_until_time: '11:30:00',
+          },
+          error: null,
+        })
+      }
+
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...validOrderBody,
+          scheduled_time: '2026-03-20T10:30:00.000Z',
+        }),
+      })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(201)
+    expect(body.success).toBe(true)
   })
 
   it('creates an order successfully', async () => {
@@ -367,6 +416,7 @@ describe('POST /api/v1/orders', () => {
             opening_time: '11:00:00',
             is_pickup_active: false,
             ordering_paused_until_date: null,
+            ordering_paused_until_time: null,
           },
           error: null,
         })
