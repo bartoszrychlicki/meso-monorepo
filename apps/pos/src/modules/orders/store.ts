@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
 import type { OrderCancellationResult } from '@/types/order-cancel';
+import type { UpdateOrderInput } from '@/schemas/order';
 import {
   OrderClosureReasonCode,
   OrderStatus,
@@ -65,6 +66,10 @@ interface OrdersStore {
     status: OrderStatus,
     note?: string
   ) => Promise<void>;
+  updateOrder: (
+    id: string,
+    input: UpdateOrderInput
+  ) => Promise<Order>;
   rollbackOrderStatus: (
     id: string,
     note?: string
@@ -269,6 +274,19 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
       const updated = await ordersRepository.findById(id);
       set({ selectedOrder: updated });
     }
+  },
+
+  updateOrder: async (id, input) => {
+    const updatedOrder = await ordersRepository.updateOrder(id, input);
+    await get().loadOrders();
+    await get().loadActiveOrders();
+
+    const state = get();
+    if (state.selectedOrder?.id === id) {
+      set({ selectedOrder: updatedOrder });
+    }
+
+    return updatedOrder;
   },
 
   rollbackOrderStatus: async (id, note) => {

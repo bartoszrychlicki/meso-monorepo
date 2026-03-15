@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { Order } from '@/types/order';
 import {
@@ -11,6 +12,7 @@ import {
   PaymentStatus,
 } from '@/types/enums';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
+import { isOrderEditableStatus } from '@/lib/orders/order-editing';
 import { getRollbackTargetStatus } from '@/lib/orders/status-rollback';
 import { getAutomaticRefundEligibility } from '@/lib/orders/p24-refund';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
@@ -44,6 +46,7 @@ import {
   Clock,
   ShoppingBag,
   AlertTriangle,
+  Pencil,
 } from 'lucide-react';
 
 const CHANNEL_LABELS: Record<OrderChannel, string> = {
@@ -140,6 +143,7 @@ export function OrderDetail({
   const statusMap = isDelivery ? NEXT_STATUS : NEXT_STATUS_PICKUP;
   const nextStatus = statusMap[order.status];
   const rollbackTargetStatus = getRollbackTargetStatus(order);
+  const canEditOrder = isOrderEditableStatus(order.status);
   const canCancel =
     order.status !== OrderStatus.CANCELLED &&
     order.status !== OrderStatus.DELIVERED;
@@ -195,6 +199,14 @@ export function OrderDetail({
 
       {/* Action buttons */}
       <div className="flex flex-wrap gap-2">
+        {canEditOrder && (
+          <Link href={`/orders/${order.id}/edit`}>
+            <Button variant="outline" data-action="edit-order">
+              <Pencil className="mr-2 h-4 w-4" />
+              Edytuj zamowienie
+            </Button>
+          </Link>
+        )}
         {nextStatus && (
           <Button
             onClick={handleNextStatus}
