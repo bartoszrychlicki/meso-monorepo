@@ -25,6 +25,7 @@ import {
 import {
   getCustomerFavoriteProduct,
   getCustomerFullName,
+  getCustomerOrderHistory,
 } from '@/modules/crm/utils/customer-list';
 
 interface CustomerDetailsSheetProps {
@@ -114,6 +115,7 @@ function CustomerDetailsSheetContent({
 }) {
   const [noteValue, setNoteValue] = useState(customer.notes ?? '');
   const favoriteProduct = getCustomerFavoriteProduct(customer);
+  const orderHistory = getCustomerOrderHistory(customer);
   const noteChanged = (customer.notes ?? '') !== noteValue;
 
   const handleSave = async () => {
@@ -159,14 +161,14 @@ function CustomerDetailsSheetContent({
               Wydana kwota
             </p>
             <p className="mt-1 text-sm font-medium">
-              {formatCurrency(customer.order_history.total_spent)}
+              {formatCurrency(orderHistory.total_spent)}
             </p>
           </div>
           <div className="rounded-lg border p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Ilość zamówień
+              Zamówienia
             </p>
-            <p className="mt-1 text-sm">{customer.order_history.total_orders}</p>
+            <p className="mt-1 text-sm">{orderHistory.total_orders}</p>
           </div>
           <div className="rounded-lg border p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -220,13 +222,13 @@ function CustomerDetailsSheetContent({
             />
             <DetailItem
               label="Średnia wartość koszyka"
-              value={formatCurrency(customer.order_history.average_order_value)}
+              value={formatCurrency(orderHistory.average_order_value)}
             />
             <DetailItem
               label="Pierwsze zamówienie"
               value={
-                customer.order_history.first_order_date
-                  ? new Date(customer.order_history.first_order_date).toLocaleDateString(
+                orderHistory.first_order_date
+                  ? new Date(orderHistory.first_order_date).toLocaleDateString(
                       'pl-PL'
                     )
                   : 'Brak danych'
@@ -235,8 +237,8 @@ function CustomerDetailsSheetContent({
             <DetailItem
               label="Ostatnie zamówienie"
               value={
-                customer.order_history.last_order_date
-                  ? new Date(customer.order_history.last_order_date).toLocaleDateString(
+                orderHistory.last_order_date
+                  ? new Date(orderHistory.last_order_date).toLocaleDateString(
                       'pl-PL'
                     )
                   : 'Brak danych'

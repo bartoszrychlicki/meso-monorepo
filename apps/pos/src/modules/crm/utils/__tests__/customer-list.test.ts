@@ -5,6 +5,7 @@ import {
   DEFAULT_CUSTOMER_SORT,
   getCustomerFavoriteProduct,
   getCustomerFullName,
+  getCustomerOrderHistory,
   getDefaultCustomerSortOrder,
   sortCustomers,
 } from '../customer-list';
@@ -163,5 +164,56 @@ describe('customer list helpers', () => {
     expect(getCustomerFullName(customer)).toBe('Alicja Nowak');
     expect(getDefaultCustomerSortOrder('name')).toBe('asc');
     expect(getDefaultCustomerSortOrder('registration_date')).toBe('desc');
+  });
+
+  it('normalizes invalid order history numbers to zero', () => {
+    const customer = makeCustomer({
+      order_history: {
+        total_orders: Number.NaN,
+        total_spent: Number.NaN,
+        average_order_value: Number.NaN,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+
+    expect(getCustomerOrderHistory(customer)).toMatchObject({
+      total_orders: 0,
+      total_spent: 0,
+      average_order_value: 0,
+    });
+  });
+
+  it('treats invalid spent values as zero while sorting', () => {
+    const customerWithInvalidSpent = makeCustomer({
+      first_name: 'Adam',
+      order_history: {
+        total_orders: 0,
+        total_spent: Number.NaN,
+        average_order_value: 0,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithSpent = makeCustomer({
+      first_name: 'Karolina',
+      order_history: {
+        total_orders: 1,
+        total_spent: 80,
+        average_order_value: 80,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+
+    const sorted = sortCustomers(
+      [customerWithInvalidSpent, customerWithSpent],
+      { key: 'total_spent', order: 'desc' }
+    );
+
+    expect(sorted.map((customer) => customer.first_name)).toEqual(['Karolina', 'Adam']);
   });
 });
