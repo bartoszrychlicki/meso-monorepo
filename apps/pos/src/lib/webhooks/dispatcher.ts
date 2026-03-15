@@ -5,8 +5,13 @@ import {
 } from './types';
 import { webhookRegistry } from './registry';
 
-const WEBHOOK_TIMEOUT_MS = 5000;
-const MAX_RETRIES = 2;
+const DEFAULT_WEBHOOK_TIMEOUT_MS = 5000;
+const DEFAULT_MAX_RETRIES = 2;
+
+export type DispatchWebhookOptions = {
+  timeoutMs?: number;
+  maxRetries?: number;
+};
 
 /**
  * Sign a webhook payload with HMAC-SHA256
@@ -36,18 +41,18 @@ async function signPayload(payload: string, secret: string): Promise<string> {
 async function sendWebhook(
   url: string,
   payload: WebhookPayload,
-  secret: string
+  secret: string,
+  options: DispatchWebhookOptions = {}
 ): Promise<WebhookDeliveryResult> {
+  const timeoutMs = options.timeoutMs ?? DEFAULT_WEBHOOK_TIMEOUT_MS;
+  const maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
   const body = JSON.stringify(payload);
   const signature = await signPayload(body, secret);
 
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        WEBHOOK_TIMEOUT_MS
-      );
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
       const response = await fetch(url, {
         method: 'POST',
@@ -81,7 +86,7 @@ async function sendWebhook(
         };
       }
     } catch (error) {
-      if (attempt === MAX_RETRIES) {
+      if (attempt === maxRetries) {
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
@@ -107,7 +112,8 @@ async function sendWebhook(
  */
 export async function dispatchWebhook(
   event: WebhookEvent,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
+  options: DispatchWebhookOptions = {}
 ): Promise<WebhookDeliveryResult[]> {
   const subscriptions = await webhookRegistry.getSubscriptionsForEvent(event);
 
@@ -123,7 +129,7 @@ export async function dispatchWebhook(
   };
 
   const results = await Promise.allSettled(
-    subscriptions.map((sub) => sendWebhook(sub.url, payload, sub.secret))
+    subscriptions.map((sub) => sendWebhook(sub.url, payload, sub.secret, options))
   );
 
   return results.map((result) =>
