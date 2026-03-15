@@ -87,11 +87,11 @@ describe('UpdateOrderStatusSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejects cancelled status without any reason', () => {
+  it('allows cancelled status without reason so idempotent updates can pass schema validation', () => {
     const result = UpdateOrderStatusSchema.safeParse({
       status: 'cancelled',
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 });

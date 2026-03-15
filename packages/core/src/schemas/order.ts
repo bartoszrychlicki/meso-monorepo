@@ -76,24 +76,6 @@ export const UpdateOrderStatusSchema = z.object({
   closure_reason: z.string().optional(),
   changed_by: z.string().optional(),
   payment_status: z.nativeEnum(PaymentStatus).optional(),
-}).superRefine((data, ctx) => {
-  if (data.status !== OrderStatus.CANCELLED) {
-    return;
-  }
-
-  const hasReasonCode =
-    !!data.closure_reason_code &&
-    data.closure_reason_code !== OrderClosureReasonCode.CUSTOM;
-  const hasReasonText = !!data.closure_reason?.trim();
-  const hasNote = !!data.note?.trim();
-
-  if (!hasReasonCode && !hasReasonText && !hasNote) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['closure_reason'],
-      message: 'Powód anulowania jest wymagany',
-    });
-  }
 });
 
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;

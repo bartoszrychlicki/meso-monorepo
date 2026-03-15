@@ -309,7 +309,7 @@ describe('PATCH /api/v1/orders/:id/status', () => {
     const body = await res.json()
 
     expect(res.status).toBe(422)
-    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.code).toBe('INVALID_CANCELLATION_REASON')
   })
   it('updates delivered orders without invoking app-side loyalty awarding in supabase mode', async () => {
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase')
