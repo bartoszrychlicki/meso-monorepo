@@ -361,6 +361,12 @@ export default function ApiDocsPage() {
         {/* Products */}
         <div className="mb-8" id="menu-products">
           <h3 className="mb-4 text-xl font-semibold text-gray-800">Produkty</h3>
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <strong>Zmiana od 15 marca 2026:</strong> pola <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_groups[].modifiers[].is_available</code>
+            {' '}w odpowiedziach <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">GET /api/v1/menu/products</code> oraz{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">GET /api/v1/menu/products/:id</code> są liczone z bieżącej konfiguracji
+            modyfikatorów i ich przypisań do produktu, a nie ze starego snapshotu zapisanego w rekordzie produktu.
+          </div>
           <div className="space-y-4">
             <Endpoint
               method="GET"
@@ -372,7 +378,8 @@ export default function ApiDocsPage() {
                 { name: 'per_page', type: 'number', desc: 'Wyników na stronę (domyślnie: 20, maks: 100)' },
                 { name: 'category_id', type: 'string', desc: 'Filtruj po kategorii (UUID)' },
                 { name: 'search', type: 'string', desc: 'Szukaj po nazwie produktu' },
-                { name: 'available', type: 'boolean', desc: 'Filtruj po dostępności (true/false)' },
+                { name: 'is_available', type: 'boolean', desc: 'Filtruj po dostępności (true/false)' },
+                { name: 'include', type: 'string', desc: 'Lista pól po przecinku: modifiers,variants,pricing' },
               ]}
               response={`{
   "success": true,
@@ -389,7 +396,7 @@ export default function ApiDocsPage() {
       "is_available": true,
       "allergens": ["gluten", "eggs", "milk"],
       "variants": [...],
-      "modifier_groups": [...],
+      "modifier_groups": [...], // is_available modyfikatorów pochodzi z bieżącej konfiguracji
       "pricing": [
         { "channel": "delivery", "price": 34.90 },
         { "channel": "pickup", "price": 29.90 }

@@ -7,7 +7,9 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { syncProductsWithCurrentModifierState } from '@/lib/product-modifier-groups';
 import { CreateProductSchema } from '@/schemas/menu';
+import { createServiceClient } from '@/lib/supabase/server';
 import type { Product } from '@/types/menu';
 import { SalesChannel } from '@/types/enums';
 
@@ -35,6 +37,7 @@ export async function GET(request: NextRequest) {
   const include = searchParams.get('include');
 
   const serverProductsRepo = createServerRepository<Product>('products');
+  const serviceClient = createServiceClient();
 
   const filters: Record<string, unknown> = {};
   if (categoryId) filters.category_id = categoryId;
@@ -77,11 +80,13 @@ export async function GET(request: NextRequest) {
     result = { ...result, data: filtered, total: filtered.length };
   }
 
+  const syncedProducts = await syncProductsWithCurrentModifierState(serviceClient, result.data);
+
   // Apply include filter to control response fields
-  let responseData: Partial<Product>[] = result.data;
+  let responseData: Partial<Product>[] = syncedProducts;
   if (include) {
     const includeFields = new Set(include.split(',').map((s) => s.trim()));
-    responseData = result.data.map((p) => {
+    responseData = syncedProducts.map((p) => {
       const base: Partial<Product> = {
         id: p.id,
         name: p.name,

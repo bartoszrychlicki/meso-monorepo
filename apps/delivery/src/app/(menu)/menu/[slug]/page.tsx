@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { syncProductWithCurrentModifierState } from '@/lib/product-modifier-groups'
 import { Tables } from '@/lib/table-mapping'
 import { notFound } from 'next/navigation'
 import { ProductDetails } from './ProductDetails'
@@ -26,9 +27,11 @@ async function getProduct(slug: string) {
     return null
   }
 
+  const syncedProduct = await syncProductWithCurrentModifierState(supabase, product)
+
   // Extract addons from modifier_groups JSONB
   // modifier_groups is an array of groups, each with a `modifiers` array
-  const modifierGroups = (product.modifier_groups as Array<{
+  const modifierGroups = (syncedProduct.modifier_groups as Array<{
     id: string
     name: string
     type: string
@@ -49,7 +52,7 @@ async function getProduct(slug: string) {
     .filter(mod => mod.is_available)
 
   return {
-    ...product,
+    ...syncedProduct,
     addons,
   }
 }

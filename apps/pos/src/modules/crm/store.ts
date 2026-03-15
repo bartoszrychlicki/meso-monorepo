@@ -204,7 +204,7 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
    */
   getFilteredCustomers: () => {
     const { customers, searchQuery, tierFilter } = get();
-    let filtered = customers;
+    let filtered = [...customers];
 
     // Apply search filter
     if (searchQuery) {
@@ -223,10 +223,10 @@ export const useCRMStore = create<CRMStore>((set, get) => ({
       filtered = filtered.filter((c) => c.loyalty_tier === tierFilter);
     }
 
-    // Sort by last order date (most recent first)
+    // Default list order: newest customers first.
     return filtered.sort((a, b) => {
-      const dateA = a.order_history.last_order_date ? new Date(a.order_history.last_order_date).getTime() : 0;
-      const dateB = b.order_history.last_order_date ? new Date(b.order_history.last_order_date).getTime() : 0;
+      const dateA = new Date(a.registration_date).getTime();
+      const dateB = new Date(b.registration_date).getTime();
       return dateB - dateA;
     });
   },
