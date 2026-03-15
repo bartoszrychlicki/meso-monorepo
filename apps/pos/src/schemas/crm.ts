@@ -272,7 +272,7 @@ export const UpdateRewardSchema = RewardSchemaBase.partial()
       }
     }
 
-    if (value.discount_value !== undefined && (value.discount_value == null || value.discount_value <= 0)) {
+    if (value.discount_value !== undefined && value.discount_value != null && value.discount_value <= 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['discount_value'],

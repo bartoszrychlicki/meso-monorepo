@@ -61,6 +61,15 @@ describe('CRM schemas', () => {
     expect(result.error?.issues.some((issue) => issue.path.join('.') === 'discount_value')).toBe(true);
   });
 
+  it('allows clearing discount value on non-discount reward update', () => {
+    const result = UpdateRewardSchema.safeParse({
+      reward_type: 'free_delivery',
+      discount_value: null,
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it('requires discount value when changing promotional code type to percent', () => {
     const result = UpdatePromotionalCodeSchema.safeParse({
       discount_type: 'percent',
