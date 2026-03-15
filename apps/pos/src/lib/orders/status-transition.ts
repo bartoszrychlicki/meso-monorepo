@@ -226,7 +226,7 @@ export async function transitionOrderStatus(
     note: normalizedCancellation?.note ?? input.note,
   });
 
-  scheduleWebhookDispatch(
+  await scheduleWebhookDispatch(
     input.status === OrderStatus.CANCELLED ? 'order.cancelled' : 'order.status_changed',
     webhookData as unknown as Record<string, unknown>
   );
