@@ -24,15 +24,13 @@ function makeRequest() {
 
 function createUsersTableMock(result: unknown) {
   const maybeSingle = vi.fn().mockResolvedValue({ data: result, error: null });
-  const ilike = vi.fn(() => ({ maybeSingle }));
   const eq = vi.fn(() => ({ maybeSingle }));
-  const select = vi.fn(() => ({ eq, ilike }));
+  const select = vi.fn(() => ({ eq }));
 
   return {
     query: { select },
     maybeSingle,
     eq,
-    ilike,
   };
 }
 
@@ -42,6 +40,7 @@ describe('authorizeSessionOrApiKey', () => {
   });
 
   it('allows crm write for admin session', async () => {
+    const usersTable = createUsersTableMock({ role: 'admin', is_active: true });
     mockCreateClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -49,12 +48,17 @@ describe('authorizeSessionOrApiKey', () => {
             user: {
               id: 'user-1',
               email: 'admin@test.com',
-              user_metadata: { app_role: 'staff', role: 'admin' },
             },
           },
         }),
       },
-      from: vi.fn(),
+      from: vi.fn((table: string) => {
+        if (table === 'users_users') {
+          return usersTable.query;
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
     });
 
     const result = await authorizeSessionOrApiKey(makeRequest(), 'crm:write');
@@ -63,6 +67,7 @@ describe('authorizeSessionOrApiKey', () => {
   });
 
   it('forbids crm write for cashier session', async () => {
+    const usersTable = createUsersTableMock({ role: 'cashier', is_active: true });
     mockCreateClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
@@ -70,12 +75,17 @@ describe('authorizeSessionOrApiKey', () => {
             user: {
               id: 'user-2',
               email: 'cashier@test.com',
-              user_metadata: { app_role: 'staff', role: 'cashier' },
             },
           },
         }),
       },
-      from: vi.fn(),
+      from: vi.fn((table: string) => {
+        if (table === 'users_users') {
+          return usersTable.query;
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
     });
 
     const result = await authorizeSessionOrApiKey(makeRequest(), 'crm:write');
@@ -85,10 +95,27 @@ describe('authorizeSessionOrApiKey', () => {
   });
 
   it('falls back to users_users role for legacy staff session', async () => {
-    const usersTable = createUsersTableMock({ role: 'manager' });
+    const usersTableById = createUsersTableMock(null);
+    const usersTableByEmail = createUsersTableMock({ role: 'manager', is_active: true });
     const from = vi.fn((table: string) => {
       if (table === 'users_users') {
-        return usersTable.query;
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn((field: string, value: string) => {
+              if (field === 'id') {
+                expect(value).toBe('user-3');
+                return { maybeSingle: usersTableById.maybeSingle };
+              }
+
+              if (field === 'email') {
+                expect(value).toBe('legacy@test.com');
+                return { maybeSingle: usersTableByEmail.maybeSingle };
+              }
+
+              throw new Error(`Unexpected field ${field}`);
+            }),
+          })),
+        };
       }
 
       throw new Error(`Unexpected table ${table}`);
@@ -101,7 +128,6 @@ describe('authorizeSessionOrApiKey', () => {
             user: {
               id: 'user-3',
               email: 'legacy@test.com',
-              user_metadata: { app_role: 'staff' },
             },
           },
         }),
@@ -111,8 +137,35 @@ describe('authorizeSessionOrApiKey', () => {
 
     const result = await authorizeSessionOrApiKey(makeRequest(), 'crm:write');
 
-    expect(usersTable.eq).toHaveBeenCalledWith('id', 'user-3');
     expect(result).toEqual({ kind: 'session', actorId: 'user-3' });
+  });
+
+  it('rejects inactive staff sessions', async () => {
+    const usersTable = createUsersTableMock({ role: 'manager', is_active: false });
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: {
+            user: {
+              id: 'user-4',
+              email: 'inactive@test.com',
+            },
+          },
+        }),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'users_users') {
+          return usersTable.query;
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    });
+
+    const result = await authorizeSessionOrApiKey(makeRequest(), 'crm:read');
+
+    expect(result).toBeInstanceOf(Response);
+    expect((result as Response).status).toBe(403);
   });
 
   it('still allows api key access when there is no session', async () => {

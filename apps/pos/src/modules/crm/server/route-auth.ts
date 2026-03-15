@@ -19,22 +19,19 @@ async function resolveSessionRole(
   user: {
     id: string;
     email?: string | null;
-    user_metadata?: Record<string, unknown>;
   }
 ): Promise<string | null> {
-  const roleFromMetadata =
-    typeof user.user_metadata?.role === 'string' ? user.user_metadata.role : null;
-  if (roleFromMetadata) {
-    return roleFromMetadata;
-  }
-
   const { data: staffUserById } = await supabase
     .from('users_users')
-    .select('role')
+    .select('role, is_active')
     .eq('id', user.id)
     .maybeSingle();
 
-  if (staffUserById && typeof staffUserById.role === 'string') {
+  if (
+    staffUserById &&
+    staffUserById.is_active === true &&
+    typeof staffUserById.role === 'string'
+  ) {
     return staffUserById.role;
   }
 
@@ -42,13 +39,19 @@ async function resolveSessionRole(
     return null;
   }
 
+  const normalizedEmail = user.email.trim().toLowerCase();
+
   const { data: staffUserByEmail } = await supabase
     .from('users_users')
-    .select('role')
-    .ilike('email', user.email)
+    .select('role, is_active')
+    .eq('email', normalizedEmail)
     .maybeSingle();
 
-  return staffUserByEmail && typeof staffUserByEmail.role === 'string'
+  return (
+    staffUserByEmail &&
+    staffUserByEmail.is_active === true &&
+    typeof staffUserByEmail.role === 'string'
+  )
     ? staffUserByEmail.role
     : null;
 }
@@ -63,8 +66,7 @@ export async function authorizeSessionOrApiKey(
   } = await supabase.auth.getUser();
 
   if (user) {
-    const sessionRole = (await resolveSessionRole(supabase, user)) ??
-      (user.user_metadata?.app_role === 'staff' ? 'cashier' : null);
+    const sessionRole = await resolveSessionRole(supabase, user);
 
     const allowedPermissions =
       sessionRole && sessionRole in SESSION_ROLE_PERMISSIONS

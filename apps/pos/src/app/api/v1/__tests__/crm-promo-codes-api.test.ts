@@ -89,6 +89,25 @@ describe('CRM promotional codes API', () => {
     expect(body.data[0].code).toBe('MESO10');
   });
 
+  it('falls back to safe defaults for invalid pagination params', async () => {
+    mockListPromotionalCodes.mockResolvedValue({
+      data: [promoCode],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+
+    const response = await listRoute(
+      makeRequest('http://localhost:3000/api/v1/crm/promo-codes?page=foo&per_page=abc')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockListPromotionalCodes).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ page: 1, perPage: 50 })
+    );
+  });
+
   it('creates a promotional code', async () => {
     mockGetPromotionalCodeByCode.mockResolvedValue(null);
     mockCreatePromotionalCode.mockResolvedValue(promoCode);
@@ -164,6 +183,8 @@ describe('CRM promotional codes API', () => {
   });
 
   it('rejects unsupported free-item promotional codes on update', async () => {
+    mockGetPromotionalCodeById.mockResolvedValue(promoCode);
+
     const response = await PATCH(
       makeRequest('http://localhost:3000/api/v1/crm/promo-codes/promo-1', {
         method: 'PATCH',
@@ -183,6 +204,7 @@ describe('CRM promotional codes API', () => {
   });
 
   it('updates a promotional code', async () => {
+    mockGetPromotionalCodeById.mockResolvedValue(promoCode);
     mockGetPromotionalCodeByCode.mockResolvedValue(null);
     mockUpdatePromotionalCode.mockResolvedValue({ ...promoCode, name: 'Rabat 15%' });
 
@@ -197,6 +219,42 @@ describe('CRM promotional codes API', () => {
 
     expect(response.status).toBe(200);
     expect(body.data.name).toBe('Rabat 15%');
+  });
+
+  it('rejects percent discount updates above 100 when type is omitted', async () => {
+    mockGetPromotionalCodeById.mockResolvedValue(promoCode);
+
+    const response = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/crm/promo-codes/promo-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ discount_value: 200 }),
+      }),
+      { params: Promise.resolve({ id: 'promo-1' }) }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.details).toContainEqual(
+      expect.objectContaining({ field: 'discount_value' })
+    );
+  });
+
+  it('rejects valid_until earlier than existing valid_from on partial update', async () => {
+    mockGetPromotionalCodeById.mockResolvedValue(promoCode);
+
+    const response = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/crm/promo-codes/promo-1', {
+        method: 'PATCH',
+        body: JSON.stringify({ valid_until: '2026-03-15T09:00:00.000Z' }),
+      }),
+      { params: Promise.resolve({ id: 'promo-1' }) }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.details).toContainEqual(
+      expect.objectContaining({ field: 'valid_until' })
+    );
   });
 
   it('deletes a promotional code', async () => {

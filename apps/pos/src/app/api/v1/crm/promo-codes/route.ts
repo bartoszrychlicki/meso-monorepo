@@ -19,6 +19,11 @@ import { authorizeSessionOrApiKey } from '@/modules/crm/server/route-auth';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+function parsePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isNaN(parsed) || parsed < 1 ? fallback : parsed;
+}
+
 function unsupportedDiscountTypeResponse() {
   return apiValidationError([
     {
@@ -33,8 +38,8 @@ export async function GET(request: NextRequest) {
   if (access instanceof Response) return access;
 
   const { searchParams } = new URL(request.url);
-  const page = parseInt(searchParams.get('page') || '1', 10);
-  const perPage = Math.min(parseInt(searchParams.get('per_page') || '50', 10), 100);
+  const page = parsePositiveInt(searchParams.get('page'), 1);
+  const perPage = Math.min(parsePositiveInt(searchParams.get('per_page'), 50), 100);
   const search = searchParams.get('search');
   const isActive = searchParams.get('is_active');
 
