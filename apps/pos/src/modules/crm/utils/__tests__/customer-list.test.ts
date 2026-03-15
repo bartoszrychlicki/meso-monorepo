@@ -185,9 +185,10 @@ describe('customer list helpers', () => {
     });
   });
 
-  it('treats invalid spent values as zero while sorting', () => {
+  it('sorts spent totals ascending with invalid values treated as zero', () => {
     const customerWithInvalidSpent = makeCustomer({
       first_name: 'Adam',
+      registration_date: '2026-03-11T10:00:00.000Z',
       order_history: {
         total_orders: 0,
         total_spent: Number.NaN,
@@ -197,8 +198,21 @@ describe('customer list helpers', () => {
         top_ordered_products: [],
       },
     });
-    const customerWithSpent = makeCustomer({
+    const customerWithZeroSpent = makeCustomer({
+      first_name: 'Beata',
+      registration_date: '2026-03-09T10:00:00.000Z',
+      order_history: {
+        total_orders: 0,
+        total_spent: 0,
+        average_order_value: 0,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithEightySpent = makeCustomer({
       first_name: 'Karolina',
+      registration_date: '2026-03-08T10:00:00.000Z',
       order_history: {
         total_orders: 1,
         total_spent: 80,
@@ -208,12 +222,130 @@ describe('customer list helpers', () => {
         top_ordered_products: [],
       },
     });
+    const customerWithEightyTwoSpent = makeCustomer({
+      first_name: 'Robert',
+      registration_date: '2026-03-07T10:00:00.000Z',
+      order_history: {
+        total_orders: 1,
+        total_spent: 82,
+        average_order_value: 82,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithTwoHundredSpent = makeCustomer({
+      first_name: 'Bartosz',
+      registration_date: '2026-03-06T10:00:00.000Z',
+      order_history: {
+        total_orders: 2,
+        total_spent: 205,
+        average_order_value: 102.5,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
 
     const sorted = sortCustomers(
-      [customerWithInvalidSpent, customerWithSpent],
+      [
+        customerWithInvalidSpent,
+        customerWithEightySpent,
+        customerWithZeroSpent,
+        customerWithTwoHundredSpent,
+        customerWithEightyTwoSpent,
+      ],
+      { key: 'total_spent', order: 'asc' }
+    );
+
+    expect(sorted.map((customer) => customer.first_name)).toEqual([
+      'Adam',
+      'Beata',
+      'Karolina',
+      'Robert',
+      'Bartosz',
+    ]);
+  });
+
+  it('sorts spent totals descending with invalid values treated as zero', () => {
+    const customerWithInvalidSpent = makeCustomer({
+      first_name: 'Adam',
+      registration_date: '2026-03-11T10:00:00.000Z',
+      order_history: {
+        total_orders: 0,
+        total_spent: Number.NaN,
+        average_order_value: 0,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithZeroSpent = makeCustomer({
+      first_name: 'Beata',
+      registration_date: '2026-03-09T10:00:00.000Z',
+      order_history: {
+        total_orders: 0,
+        total_spent: 0,
+        average_order_value: 0,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithEightySpent = makeCustomer({
+      first_name: 'Karolina',
+      registration_date: '2026-03-08T10:00:00.000Z',
+      order_history: {
+        total_orders: 1,
+        total_spent: 80,
+        average_order_value: 80,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithEightyTwoSpent = makeCustomer({
+      first_name: 'Robert',
+      registration_date: '2026-03-07T10:00:00.000Z',
+      order_history: {
+        total_orders: 1,
+        total_spent: 82,
+        average_order_value: 82,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithTwoHundredSpent = makeCustomer({
+      first_name: 'Bartosz',
+      registration_date: '2026-03-06T10:00:00.000Z',
+      order_history: {
+        total_orders: 2,
+        total_spent: 205,
+        average_order_value: 102.5,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+
+    const sorted = sortCustomers(
+      [
+        customerWithInvalidSpent,
+        customerWithEightySpent,
+        customerWithZeroSpent,
+        customerWithTwoHundredSpent,
+        customerWithEightyTwoSpent,
+      ],
       { key: 'total_spent', order: 'desc' }
     );
 
-    expect(sorted.map((customer) => customer.first_name)).toEqual(['Karolina', 'Adam']);
+    expect(sorted.map((customer) => customer.first_name)).toEqual([
+      'Bartosz',
+      'Robert',
+      'Karolina',
+      'Adam',
+      'Beata',
+    ]);
   });
 });
