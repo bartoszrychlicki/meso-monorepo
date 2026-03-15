@@ -19,12 +19,19 @@ function chain(result: { data: unknown; error: unknown; count?: number | null } 
 
 const mockGetUser = vi.fn();
 const mockFrom = vi.fn();
+const mockAdminFrom = vi.fn();
 const mockFetchCustomerByAuthId = vi.fn();
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: vi.fn(async () => ({
     auth: { getUser: mockGetUser },
     from: mockFrom,
+  })),
+}));
+
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(() => ({
+    from: mockAdminFrom,
   })),
 }));
 
@@ -43,6 +50,7 @@ function makeRequest(body: Record<string, unknown>) {
 describe('POST /api/promo-codes/validate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAdminFrom.mockImplementation(() => chain({ data: null, error: null, count: 0 }));
   });
 
   it('validates a code using min_order_amount and channel', async () => {
@@ -224,5 +232,48 @@ describe('POST /api/promo-codes/validate', () => {
     expect(response.status).toBe(200);
     expect(body.valid).toBe(false);
     expect(body.error).toContain('Musisz być zalogowany');
+  });
+
+  it('rejects a code when the global max uses limit is reached', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'crm_promotions') {
+        return chain({
+          data: {
+            code: 'MESO10',
+            is_active: true,
+            valid_from: '2026-03-10T10:00:00.000Z',
+            valid_until: null,
+            min_order_amount: 0,
+            max_uses: 2,
+            max_uses_per_customer: null,
+            channels: ['delivery'],
+            required_loyalty_tier: null,
+            first_order_only: false,
+            discount_type: 'percent',
+            discount_value: 10,
+            free_item_id: null,
+          },
+          error: null,
+        });
+      }
+
+      return chain({ data: null, error: null, count: 0 });
+    });
+    mockAdminFrom.mockImplementation((table: string) => {
+      if (table === 'orders_orders') {
+        return chain({ data: null, error: null, count: 2 });
+      }
+
+      return chain({ data: null, error: null, count: 0 });
+    });
+
+    const { POST } = await import('../validate/route');
+    const response = await POST(makeRequest({ code: 'meso10', subtotal: 40, channel: 'delivery' }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.valid).toBe(false);
+    expect(body.error).toContain('maksymalną liczbę razy');
   });
 });

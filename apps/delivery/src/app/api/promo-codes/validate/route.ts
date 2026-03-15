@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Tables } from '@/lib/table-mapping'
 import { fetchCustomerByAuthId } from '@/lib/customers'
 
@@ -30,12 +31,14 @@ export async function POST(request: NextRequest) {
 
   const { code, subtotal, channel } = body
 
-  if (!code || typeof code !== 'string') {
+  if (!code || typeof code !== 'string' || code.trim().length === 0) {
     return NextResponse.json(
       { valid: false, error: 'Kod promocyjny jest wymagany' },
       { status: 400 }
     )
   }
+
+  const normalizedCode = code.trim().toUpperCase()
 
   if (subtotal == null || typeof subtotal !== 'number' || subtotal < 0) {
     return NextResponse.json(
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
   const { data: promo, error } = await supabase
     .from(Tables.promotions)
     .select('*')
-    .ilike('code', code.trim())
+    .eq('code', normalizedCode)
     .single()
 
   if (error || !promo) {
@@ -148,11 +151,19 @@ export async function POST(request: NextRequest) {
 
   // Check max uses across all customers based on created orders
   if (promo.max_uses != null) {
-    const { count } = await supabase
+    const adminClient = createAdminClient()
+    const { count, error: countError } = await adminClient
       .from(Tables.orders)
       .select('id', { count: 'exact', head: true })
       .eq('promo_code', promo.code)
       .neq('status', 'cancelled')
+
+    if (countError) {
+      return NextResponse.json(
+        { valid: false, error: 'Nie udało się zweryfikować limitu użyć kodu promocyjnego' },
+        { status: 500 }
+      )
+    }
 
     if (count != null && count >= promo.max_uses) {
       return NextResponse.json(
