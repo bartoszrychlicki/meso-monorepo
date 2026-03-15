@@ -19,6 +19,15 @@ interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+function unsupportedDiscountTypeResponse() {
+  return apiValidationError([
+    {
+      field: 'discount_type',
+      message: 'Typ "Darmowy produkt" nie jest jeszcze obsługiwany dla kodów promocyjnych',
+    },
+  ]);
+}
+
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const access = await authorizeSessionOrApiKey(request, 'crm:read');
   if (access instanceof Response) return access;
@@ -56,6 +65,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         message: issue.message,
       }))
     );
+  }
+
+  if (validation.data.discount_type === 'free_item') {
+    return unsupportedDiscountTypeResponse();
   }
 
   try {

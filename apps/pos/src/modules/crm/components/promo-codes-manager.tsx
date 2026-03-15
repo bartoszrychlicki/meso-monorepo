@@ -74,6 +74,12 @@ const discountLabels: Record<PromotionalCode['discount_type'], string> = {
   free_delivery: 'Darmowa dostawa',
 };
 
+const supportedDiscountTypes: Array<Exclude<PromotionalCode['discount_type'], 'free_item'>> = [
+  'percent',
+  'fixed',
+  'free_delivery',
+];
+
 function asNullableString(value: string): string | null {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
@@ -107,6 +113,9 @@ export function PromoCodesManager() {
 
   const discountType = form.watch('discount_type');
   const channels = form.watch('channels');
+  const availableDiscountTypes = editingCode?.discount_type === 'free_item'
+    ? [...supportedDiscountTypes, 'free_item' as const]
+    : supportedDiscountTypes;
 
   async function loadData() {
     setIsLoading(true);
@@ -314,10 +323,11 @@ export function PromoCodesManager() {
                       }
                       data-field="promo-discount-type"
                     >
-                      <option value="percent">Rabat procentowy</option>
-                      <option value="fixed">Rabat kwotowy</option>
-                      <option value="free_delivery">Darmowa dostawa</option>
-                      <option value="free_item">Darmowy produkt</option>
+                      {availableDiscountTypes.map((type) => (
+                        <option key={type} value={type}>
+                          {discountLabels[type]}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   {(discountType === 'percent' || discountType === 'fixed') && (

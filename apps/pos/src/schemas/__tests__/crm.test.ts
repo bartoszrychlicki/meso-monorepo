@@ -52,6 +52,15 @@ describe('CRM schemas', () => {
     expect(result.error?.issues.some((issue) => issue.path.join('.') === 'discount_value')).toBe(true);
   });
 
+  it('rejects zero discount value on reward update even without reward type', () => {
+    const result = UpdateRewardSchema.safeParse({
+      discount_value: 0,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.some((issue) => issue.path.join('.') === 'discount_value')).toBe(true);
+  });
+
   it('requires discount value when changing promotional code type to percent', () => {
     const result = UpdatePromotionalCodeSchema.safeParse({
       discount_type: 'percent',

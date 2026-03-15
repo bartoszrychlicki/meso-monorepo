@@ -140,7 +140,7 @@ describe('CRM promotional codes API', () => {
     expect(response.status).toBe(409);
   });
 
-  it('rejects free-item promotional codes without a product', async () => {
+  it('rejects unsupported free-item promotional codes on create', async () => {
     const response = await POST(
       makeRequest('http://localhost:3000/api/v1/crm/promo-codes', {
         method: 'POST',
@@ -149,7 +149,7 @@ describe('CRM promotional codes API', () => {
           name: 'Darmowy produkt',
           discount_type: 'free_item',
           discount_value: null,
-          free_item_id: null,
+          free_item_id: '3036b7ed-1460-46bc-b421-46c29e7f7f0a',
           valid_from: '2026-03-15T10:00:00.000Z',
           channels: ['delivery'],
         }),
@@ -159,7 +159,26 @@ describe('CRM promotional codes API', () => {
 
     expect(response.status).toBe(422);
     expect(body.error.details).toContainEqual(
-      expect.objectContaining({ field: 'free_item_id' })
+      expect.objectContaining({ field: 'discount_type' })
+    );
+  });
+
+  it('rejects unsupported free-item promotional codes on update', async () => {
+    const response = await PATCH(
+      makeRequest('http://localhost:3000/api/v1/crm/promo-codes/promo-1', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          discount_type: 'free_item',
+          free_item_id: '3036b7ed-1460-46bc-b421-46c29e7f7f0a',
+        }),
+      }),
+      { params: Promise.resolve({ id: 'promo-1' }) }
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.details).toContainEqual(
+      expect.objectContaining({ field: 'discount_type' })
     );
   });
 

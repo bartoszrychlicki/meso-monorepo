@@ -97,16 +97,20 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  if (
-    channel &&
-    Array.isArray(promo.channels) &&
-    promo.channels.length > 0 &&
-    !promo.channels.includes(channel)
-  ) {
-    return NextResponse.json(
-      { valid: false, error: `Ten kod promocyjny nie działa dla kanału ${channel === 'delivery' ? 'dostawa' : 'odbiór'}` },
-      { status: 200 }
-    )
+  if (Array.isArray(promo.channels) && promo.channels.length > 0) {
+    if (!channel) {
+      return NextResponse.json(
+        { valid: false, error: 'Ten kod promocyjny wymaga wskazania kanału zamówienia' },
+        { status: 200 }
+      )
+    }
+
+    if (!promo.channels.includes(channel)) {
+      return NextResponse.json(
+        { valid: false, error: `Ten kod promocyjny nie działa dla kanału ${channel === 'delivery' ? 'dostawa' : 'odbiór'}` },
+        { status: 200 }
+      )
+    }
   }
 
   const {

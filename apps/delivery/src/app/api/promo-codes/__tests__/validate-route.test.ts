@@ -117,6 +117,42 @@ describe('POST /api/promo-codes/validate', () => {
     expect(body.error).toContain('kanału dostawa');
   });
 
+  it('rejects a code when channel is missing for channel-restricted promotions', async () => {
+    mockGetUser.mockResolvedValue({ data: { user: null } });
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'crm_promotions') {
+        return chain({
+          data: {
+            code: 'MESO10',
+            is_active: true,
+            valid_from: '2026-03-10T10:00:00.000Z',
+            valid_until: null,
+            min_order_amount: 0,
+            max_uses: null,
+            max_uses_per_customer: null,
+            channels: ['delivery'],
+            required_loyalty_tier: null,
+            first_order_only: false,
+            discount_type: 'percent',
+            discount_value: 10,
+            free_item_id: null,
+          },
+          error: null,
+        });
+      }
+
+      return chain({ data: null, error: null, count: 0 });
+    });
+
+    const { POST } = await import('../validate/route');
+    const response = await POST(makeRequest({ code: 'MESO10', subtotal: 40 }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.valid).toBe(false);
+    expect(body.error).toContain('wymaga wskazania kanału');
+  });
+
   it('rejects a code when loyalty tier is too low', async () => {
     mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
     mockFetchCustomerByAuthId.mockResolvedValue({ id: 'customer-1', loyalty_tier: 'bronze' });

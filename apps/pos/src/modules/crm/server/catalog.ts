@@ -149,6 +149,33 @@ async function resolveUsageCount(client: QueryClient, code: string | null): Prom
   return count ?? 0;
 }
 
+async function resolveUsageCounts(
+  client: QueryClient,
+  codes: Array<string | null>
+): Promise<Record<string, number>> {
+  const normalizedCodes = [...new Set(codes.filter((code): code is string => Boolean(code)))];
+  if (normalizedCodes.length === 0) {
+    return {};
+  }
+
+  const { data, error } = await client
+    .from('orders_orders')
+    .select('promo_code')
+    .neq('status', 'cancelled')
+    .in('promo_code', normalizedCodes);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).reduce<Record<string, number>>((acc, row) => {
+    const code = typeof row.promo_code === 'string' ? row.promo_code : null;
+    if (!code) return acc;
+    acc[code] = (acc[code] ?? 0) + 1;
+    return acc;
+  }, {});
+}
+
 export async function listRewards(client: QueryClient, options: ListOptions = {}) {
   const page = options.page ?? 1;
   const perPage = options.perPage ?? 50;
@@ -279,18 +306,17 @@ export async function listPromotionalCodes(client: QueryClient, options: ListOpt
     throw new Error(error.message);
   }
 
-  const normalized = await Promise.all(
-    (data ?? []).map(async (row) => {
-      const promotionalCode = normalizePromotionalCode(row);
-      return {
-        ...promotionalCode,
-        current_uses: await resolveUsageCount(client, promotionalCode.code),
-      };
-    })
+  const normalized = (data ?? []).map((row) => normalizePromotionalCode(row));
+  const usageCounts = await resolveUsageCounts(
+    client,
+    normalized.map((promotionalCode) => promotionalCode.code)
   );
 
   return {
-    data: normalized,
+    data: normalized.map((promotionalCode) => ({
+      ...promotionalCode,
+      current_uses: promotionalCode.code ? (usageCounts[promotionalCode.code] ?? 0) : 0,
+    })),
     total: count ?? 0,
     page,
     per_page: perPage,
