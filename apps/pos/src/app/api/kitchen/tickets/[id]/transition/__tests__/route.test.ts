@@ -221,6 +221,35 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     expect(body.ticket.delivery_type).toBe('pickup');
   });
 
+  it('returns updated ticket even when linked order enrichment fails after transition', async () => {
+    mockKitchenRepo.update.mockResolvedValueOnce({
+      ...baseTicket,
+      status: OrderStatus.PREPARING,
+      started_at: '2026-03-01T10:05:00.000Z',
+    });
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockRejectedValueOnce(new Error('temporary orders lookup failure'));
+
+    const response = await POST(makeRequest({ action: 'start_preparing' }), makeParams('ticket-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket).toMatchObject({
+      id: 'ticket-1',
+      status: OrderStatus.PREPARING,
+      started_at: '2026-03-01T10:05:00.000Z',
+    });
+    expect(body.ticket.scheduled_time).toBeUndefined();
+    expect(body.ticket.delivery_type).toBeUndefined();
+    expect(mockOrdersRepo.update).toHaveBeenCalledWith(
+      orderId,
+      expect.objectContaining({
+        status: OrderStatus.PREPARING,
+      })
+    );
+  });
+
   it('still transitions ticket when order_id is missing (legacy tickets)', async () => {
     mockKitchenRepo.findById.mockResolvedValueOnce({
       ...baseTicket,

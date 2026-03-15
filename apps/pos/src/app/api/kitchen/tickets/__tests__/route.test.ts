@@ -64,7 +64,7 @@ describe('GET /api/kitchen/tickets', () => {
 
   it('hides orphaned and inactive-order tickets from the active KDS board', async () => {
     mockKitchenRepo.findMany.mockResolvedValue([
-      makeTicket({ id: 'ticket-active', order_id: 'order-active', status: OrderStatus.PENDING }),
+      makeTicket({ id: 'ticket-active', order_id: ' order-active ', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-unpaid-online', order_id: 'order-unpaid-online', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-unpaid-blik', order_id: 'order-unpaid-blik', status: OrderStatus.PENDING }),
       makeTicket({ id: 'ticket-pos-blik', order_id: 'order-pos-blik', status: OrderStatus.PENDING }),

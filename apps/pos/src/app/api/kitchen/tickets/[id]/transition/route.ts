@@ -89,8 +89,17 @@ async function enrichKitchenTicket(ticket: KitchenTicket): Promise<KitchenTicket
     return ticket;
   }
 
-  const linkedOrder = await loadKitchenLinkedOrder(orderId);
-  return mergeKitchenTicketWithLinkedOrder(ticket, linkedOrder);
+  try {
+    const linkedOrder = await loadKitchenLinkedOrder(orderId);
+    return mergeKitchenTicketWithLinkedOrder(ticket, linkedOrder);
+  } catch (error) {
+    console.warn(
+      `[KDS transition] Ticket ${ticket.id} updated, but linked order enrichment was skipped:`,
+      error
+    );
+
+    return ticket;
+  }
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {

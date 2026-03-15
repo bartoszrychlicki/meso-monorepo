@@ -28,9 +28,14 @@ export function mergeKitchenTicketsWithLinkedOrders(
 ): KitchenTicket[] {
   const linkedOrdersById = new Map(linkedOrders.map((order) => [order.id, order]));
 
-  return tickets.map((ticket) =>
-    mergeKitchenTicketWithLinkedOrder(ticket, linkedOrdersById.get(ticket.order_id))
-  );
+  return tickets.map((ticket) => {
+    const orderId = ticket.order_id?.trim();
+
+    return mergeKitchenTicketWithLinkedOrder(
+      ticket,
+      orderId ? linkedOrdersById.get(orderId) : undefined
+    );
+  });
 }
 
 export async function loadKitchenLinkedOrder(
