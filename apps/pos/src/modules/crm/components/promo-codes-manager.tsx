@@ -81,8 +81,7 @@ const supportedDiscountTypes: Array<Exclude<PromotionalCode['discount_type'], 'f
 ];
 
 function asNullableString(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  return value === '' ? null : value;
 }
 
 function toDateTimeLocal(value: string | null): string {

@@ -64,8 +64,7 @@ const rewardLabels: Record<LoyaltyRewardDefinition['reward_type'], string> = {
 };
 
 function asNullableString(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  return value === '' ? null : value;
 }
 
 export function RewardsManager() {
