@@ -11,7 +11,6 @@ import { mergeKitchenTicketsWithLinkedOrders, type KitchenLinkedOrder } from '@/
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 import type { Order } from '@/types/order';
-
 const isSupabaseBackend = process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
 
 async function loadLinkedOrders(orderIds: string[]): Promise<KitchenLinkedOrder[]> {
@@ -22,7 +21,7 @@ async function loadLinkedOrders(orderIds: string[]): Promise<KitchenLinkedOrder[
   if (isSupabaseBackend) {
     const { data, error } = await createServiceClient()
       .from('orders_orders')
-      .select('id, status, channel, payment_method, payment_status, scheduled_time, delivery_type')
+      .select('id, status, channel, payment_method, payment_status, total, metadata, scheduled_time, delivery_type')
       .in('id', orderIds);
 
     if (error) {
@@ -40,6 +39,8 @@ async function loadLinkedOrders(orderIds: string[]): Promise<KitchenLinkedOrder[
     channel: order.channel,
     payment_method: order.payment_method,
     payment_status: order.payment_status,
+    total: order.total,
+    metadata: order.metadata,
     scheduled_time: order.scheduled_time,
     delivery_type: order.delivery_type,
   }));
@@ -82,7 +83,10 @@ export async function GET(request: NextRequest) {
       {
         excludeUnpaidPrepaidOrders: filter !== 'completed_today',
       }
-    );
+    ).map((ticket) => ({
+      ...ticket,
+      linked_order: linkedOrders.find((order) => order.id === ticket.order_id),
+    }));
 
     tickets = mergeKitchenTicketsWithLinkedOrders(tickets, linkedOrders);
 

@@ -1,5 +1,6 @@
 import { OrderStatus } from './enums';
 import { BaseEntity } from './common';
+import type { Order } from './order';
 
 export interface KitchenItem {
   id: string;
@@ -17,6 +18,10 @@ export interface KitchenTicket extends BaseEntity {
   order_number: string;
   location_id: string;
   status: OrderStatus;
+  linked_order?: Pick<
+    Order,
+    'id' | 'status' | 'channel' | 'payment_method' | 'payment_status' | 'total' | 'metadata'
+  >;
   items: KitchenItem[];
   priority: number;
   delivery_type?: 'delivery' | 'pickup';

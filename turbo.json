@@ -15,6 +15,8 @@
         "RESEND_API_KEY",
         "POS_API_URL",
         "POS_API_KEY",
+        "DELIVERY_API_URL",
+        "DELIVERY_INTERNAL_API_KEY",
         "SENTRY_ORG",
         "SENTRY_PROJECT",
         "SENTRY_AUTH_TOKEN"

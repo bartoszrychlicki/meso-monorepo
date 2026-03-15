@@ -4,7 +4,7 @@ import type { Order } from '@/types/order';
 
 export type KitchenLinkedOrder = Pick<
   Order,
-  'id' | 'status' | 'channel' | 'payment_method' | 'payment_status' | 'scheduled_time' | 'delivery_type'
+  'id' | 'status' | 'channel' | 'payment_method' | 'payment_status' | 'total' | 'metadata' | 'scheduled_time' | 'delivery_type'
 >;
 
 export function mergeKitchenTicketWithLinkedOrder(
@@ -54,6 +54,8 @@ export async function loadKitchenLinkedOrder(
     channel: order.channel,
     payment_method: order.payment_method,
     payment_status: order.payment_status,
+    total: order.total,
+    metadata: order.metadata,
     scheduled_time: order.scheduled_time,
     delivery_type: order.delivery_type,
   };

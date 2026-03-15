@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { KitchenTicket } from '@/types/kitchen';
+import type { OrderCancellationResult } from '@/types/order-cancel';
 import { OrderClosureReasonCode, OrderStatus } from '@/types/enums';
 import { kitchenRepository } from './repository';
 import { toast } from 'sonner';
@@ -17,8 +18,9 @@ interface KitchenStore {
   cancelOrder: (
     ticketId: string,
     reasonCode?: OrderClosureReasonCode | null,
-    reasonText?: string
-  ) => Promise<void>;
+    reasonText?: string,
+    requestRefund?: boolean
+  ) => Promise<OrderCancellationResult>;
   markItemDone: (ticketId: string, itemId: string) => Promise<void>;
   markReady: (ticketId: string) => Promise<void>;
   markServed: (ticketId: string) => Promise<void>;
@@ -61,15 +63,17 @@ export const useKitchenStore = create<KitchenStore>((set, get) => ({
     }
   },
 
-  cancelOrder: async (ticketId, reasonCode, reasonText) => {
+  cancelOrder: async (ticketId, reasonCode, reasonText, requestRefund) => {
     try {
-      await kitchenRepository.cancelOrder(ticketId, reasonCode, reasonText);
+      const result = await kitchenRepository.cancelOrder(ticketId, reasonCode, reasonText, requestRefund);
       set({
         tickets: get().tickets.filter((t) => t.id !== ticketId),
       });
+      return result;
     } catch (error) {
       console.error('Failed to cancel ticket:', error);
       toast.error('Nie udało się anulować zamówienia.');
+      throw error;
     }
   },
 

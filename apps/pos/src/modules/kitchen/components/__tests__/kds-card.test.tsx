@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { KdsCard } from '../kds-card';
 import { KitchenTicket } from '@/types/kitchen';
@@ -150,5 +151,41 @@ describe('KdsCard', () => {
     );
 
     expect(screen.queryByText('Anuluj')).not.toBeInTheDocument();
+  });
+
+  it('shows refund prompt in cancel dialog for paid online orders', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          linked_order: {
+            id: 'order-1',
+            status: OrderStatus.PENDING,
+            channel: 'delivery_app',
+            payment_method: 'online',
+            payment_status: 'paid',
+            total: 42,
+            metadata: {
+              p24: {
+                sessions: [
+                  {
+                    sessionId: 'order-1-1234567890',
+                    status: 'verified',
+                    createdAt: '2026-03-03T10:00:00.000Z',
+                    verifiedAt: '2026-03-03T10:01:00.000Z',
+                    p24OrderId: '777',
+                  },
+                ],
+              },
+            },
+          },
+        }}
+      />
+    );
+
+    await user.click(screen.getByText('Anuluj'));
+    expect(screen.getByText(/Czy od razu zlecić zwrot płatności/)).toBeInTheDocument();
   });
 });

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { KitchenTicket } from '@/types/kitchen';
 import { OrderStatus } from '@/types/enums';
+import { getAutomaticRefundEligibility } from '@/lib/orders/p24-refund';
 import { useTicketTimer } from '../hooks';
 import { useKitchenStore } from '../store';
 import { KdsTimer } from './kds-timer';
@@ -12,6 +13,7 @@ import {
   formatKitchenScheduledTime,
   normalizeKitchenModifierLabels,
 } from '../formatting';
+import { toast } from 'sonner';
 import {
   OrderCancelDialog,
   type OrderCancelInput,
@@ -43,13 +45,33 @@ export function KdsCard({ ticket }: KdsCardProps) {
     : ticket.delivery_type === 'pickup'
       ? 'Odbior'
       : null;
+  const refundEligibility = ticket.linked_order
+    ? getAutomaticRefundEligibility(ticket.linked_order)
+    : { eligible: false };
 
   const allItemsDone = ticket.items.every((item) => item.is_done);
   const orderNum = ticket.order_number.split('-').pop() || ticket.order_number;
 
   const handleCancel = async (input: OrderCancelInput) => {
-    await cancelOrder(ticket.id, input.closureReasonCode, input.closureReason);
+    const result = await cancelOrder(
+      ticket.id,
+      input.closureReasonCode,
+      input.closureReason,
+      input.requestRefund
+    );
     setCancelDialogOpen(false);
+
+    if (result.refund.status === 'requested') {
+      toast.success('Zamowienie anulowane, a zwrot zlecony.');
+      return;
+    }
+
+    if (result.refund.status === 'manual_action_required') {
+      toast.warning(result.refund.message || 'Zamowienie anulowane. Zwrot wymaga recznej obslugi.');
+      return;
+    }
+
+    toast.success('Zamowienie anulowane.');
   };
 
   return (
@@ -233,6 +255,7 @@ export function KdsCard({ ticket }: KdsCardProps) {
         onOpenChange={setCancelDialogOpen}
         onConfirm={handleCancel}
         orderNumber={`#${orderNum}`}
+        refundableAmount={refundEligibility.eligible ? ticket.linked_order?.total : undefined}
       />
     </div>
   );

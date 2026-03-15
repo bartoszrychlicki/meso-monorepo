@@ -181,7 +181,10 @@ const cancelledOrder: Order = {
 // --- Helpers ---
 
 const noopStatusChange = vi.fn().mockResolvedValue(undefined);
-const noopCancel = vi.fn().mockResolvedValue(undefined);
+const noopCancel = vi.fn().mockResolvedValue({
+  order: baseOrder,
+  refund: { status: 'not_requested' },
+});
 
 function renderOrderDetail(order: Order) {
   return render(
@@ -209,6 +212,33 @@ describe('OrderDetail', () => {
 
     expect(screen.getByText('Powód anulowania')).toBeInTheDocument();
     expect(screen.getAllByText('Brak składników').length).toBeGreaterThan(0);
+  });
+
+  it('renders pending refund alert when metadata tracks requested refund', () => {
+    renderOrderDetail({
+      ...cancelledOrder,
+      payment_method: PaymentMethod.ONLINE,
+      payment_status: PaymentStatus.PAID,
+      total: 19.44,
+      metadata: {
+        p24: {
+          refunds: [
+            {
+              requestId: 'req-1',
+              refundsUuid: 'rf-1',
+              sessionId: 'session-1',
+              p24OrderId: '123',
+              amount: 1944,
+              description: 'Zwrot',
+              status: 'requested',
+              requestedAt: '2024-06-15T12:21:00Z',
+            },
+          ],
+        },
+      },
+    });
+
+    expect(screen.getByText('Zwrot w toku')).toBeInTheDocument();
   });
 
   it('renders items with modifiers and their prices', () => {
