@@ -59,15 +59,21 @@ export default function CRMPage() {
   } = useCRMStore();
   const [sort, setSort] = useState<CustomerSort>(DEFAULT_CUSTOMER_SORT);
   const [isSavingNote, setIsSavingNote] = useState(false);
+  const selectedCustomer = getSelectedCustomer();
 
   useEffect(() => {
     seedAll();
     loadCustomers();
   }, [loadCustomers]);
 
+  useEffect(() => {
+    if (selectedCustomerId && !selectedCustomer) {
+      setSelectedCustomerId(null);
+    }
+  }, [selectedCustomer, selectedCustomerId, setSelectedCustomerId]);
+
   const filteredCustomers = sortCustomers(getFilteredCustomers(), sort);
   const stats = getCustomerStats();
-  const selectedCustomer = getSelectedCustomer();
 
   const handleSortChange = (key: CustomerSortKey) => {
     setSort((currentSort) => {
@@ -277,7 +283,7 @@ export default function CRMPage() {
 
       <CustomerDetailsSheet
         customer={selectedCustomer}
-        open={selectedCustomerId !== null}
+        open={selectedCustomer !== null}
         isSavingNote={isSavingNote}
         onOpenChange={(open) => {
           if (!open) {

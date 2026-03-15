@@ -43,6 +43,13 @@ function compareNullableStrings(a: string | null, b: string | null): number {
   return a.localeCompare(b, 'pl', { sensitivity: 'base' });
 }
 
+function applySortOrder(
+  comparison: number,
+  order: CustomerSortOrder
+): number {
+  return order === 'asc' ? comparison : -comparison;
+}
+
 function toTimestamp(value: string | null): number {
   if (!value) return 0;
   const timestamp = new Date(value).getTime();
@@ -93,19 +100,24 @@ export function getCustomerFavoriteProduct(customer: Customer): TopOrderedProduc
   }, null);
 }
 
-function compareByFavoriteDish(a: Customer, b: Customer): number {
+function compareByFavoriteDish(
+  a: Customer,
+  b: Customer,
+  order: CustomerSortOrder
+): number {
   const productA = getCustomerFavoriteProduct(a);
   const productB = getCustomerFavoriteProduct(b);
 
-  const countComparison = compareNullableNumbers(
-    productA?.order_count ?? null,
-    productB?.order_count ?? null
-  );
-  if (countComparison !== 0) return countComparison;
+  if (!productA && !productB) return 0;
+  if (!productA) return 1;
+  if (!productB) return -1;
 
-  return compareNullableStrings(
-    productA?.product_name ?? null,
-    productB?.product_name ?? null
+  const countComparison = compareNullableNumbers(productA.order_count, productB.order_count);
+  if (countComparison !== 0) return applySortOrder(countComparison, order);
+
+  return applySortOrder(
+    compareNullableStrings(productA.product_name, productB.product_name),
+    order
   );
 }
 
@@ -115,45 +127,60 @@ export function sortCustomers(customers: Customer[], sort: CustomerSort): Custom
 
     switch (sort.key) {
       case 'registration_date':
-        comparison =
+        comparison = applySortOrder(
           toTimestamp(customerA.registration_date) -
-          toTimestamp(customerB.registration_date);
+            toTimestamp(customerB.registration_date),
+          sort.order
+        );
         break;
       case 'total_spent':
-        comparison =
-          customerA.order_history.total_spent - customerB.order_history.total_spent;
+        comparison = applySortOrder(
+          customerA.order_history.total_spent - customerB.order_history.total_spent,
+          sort.order
+        );
         break;
       case 'favorite_dish':
-        comparison = compareByFavoriteDish(customerA, customerB);
+        comparison = compareByFavoriteDish(customerA, customerB, sort.order);
         break;
       case 'total_orders':
-        comparison =
-          customerA.order_history.total_orders - customerB.order_history.total_orders;
+        comparison = applySortOrder(
+          customerA.order_history.total_orders - customerB.order_history.total_orders,
+          sort.order
+        );
         break;
       case 'loyalty_points':
-        comparison = customerA.loyalty_points - customerB.loyalty_points;
+        comparison = applySortOrder(
+          customerA.loyalty_points - customerB.loyalty_points,
+          sort.order
+        );
         break;
       case 'status':
-        comparison =
-          tierRank[customerA.loyalty_tier] - tierRank[customerB.loyalty_tier];
+        comparison = applySortOrder(
+          tierRank[customerA.loyalty_tier] - tierRank[customerB.loyalty_tier],
+          sort.order
+        );
         break;
       case 'name':
-        comparison = compareNullableStrings(
-          getCustomerFullName(customerA),
-          getCustomerFullName(customerB)
+        comparison = applySortOrder(
+          compareNullableStrings(
+            getCustomerFullName(customerA),
+            getCustomerFullName(customerB)
+          ),
+          sort.order
         );
         break;
       case 'phone':
-        comparison = compareNullableStrings(
-          getPhoneSortValue(customerA.phone),
-          getPhoneSortValue(customerB.phone)
+        comparison = applySortOrder(
+          compareNullableStrings(
+            getPhoneSortValue(customerA.phone),
+            getPhoneSortValue(customerB.phone)
+          ),
+          sort.order
         );
         break;
     }
 
-    if (comparison !== 0) {
-      return sort.order === 'asc' ? comparison : -comparison;
-    }
+    if (comparison !== 0) return comparison;
 
     return toTimestamp(customerB.registration_date) - toTimestamp(customerA.registration_date);
   });

@@ -97,6 +97,40 @@ describe('customer list helpers', () => {
     expect(sorted.map((customer) => customer.first_name)).toEqual(['Maria', 'Anna']);
   });
 
+  it('keeps customers without a favorite dish at the end in descending dish sort', () => {
+    const customerWithoutOrders = makeCustomer({
+      first_name: 'Adam',
+      order_history: {
+        total_orders: 0,
+        total_spent: 0,
+        average_order_value: 0,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [],
+      },
+    });
+    const customerWithOrders = makeCustomer({
+      first_name: 'Karolina',
+      order_history: {
+        total_orders: 2,
+        total_spent: 90,
+        average_order_value: 45,
+        last_order_date: null,
+        first_order_date: null,
+        top_ordered_products: [
+          { product_id: '1', product_name: 'Bao', order_count: 2 },
+        ],
+      },
+    });
+
+    const sorted = sortCustomers(
+      [customerWithoutOrders, customerWithOrders],
+      { key: 'favorite_dish', order: 'desc' }
+    );
+
+    expect(sorted.map((customer) => customer.first_name)).toEqual(['Karolina', 'Adam']);
+  });
+
   it('picks the most ordered favorite product', () => {
     const customer = makeCustomer({
       order_history: {
