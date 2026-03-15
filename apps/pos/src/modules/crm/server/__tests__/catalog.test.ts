@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createPromotionalCode } from '@/modules/crm/server/catalog';
+import {
+  createPromotionalCode,
+  getPromotionalCodeByCode,
+} from '@/modules/crm/server/catalog';
 import type { CreatePromotionalCodeInput } from '@/schemas/crm';
 
 function countChain(result: { data: unknown; error: unknown; count?: number | null }) {
@@ -86,5 +89,27 @@ describe('createPromotionalCode', () => {
         max_uses_per_customer: null,
       })
     );
+  });
+});
+
+describe('getPromotionalCodeByCode', () => {
+  it('matches promo codes by exact normalized value', async () => {
+    const maybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+    const eq = vi.fn(() => ({ maybeSingle }));
+    const select = vi.fn(() => ({ eq }));
+
+    const client = {
+      from: vi.fn((table: string) => {
+        if (table === 'crm_promotions') {
+          return { select };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+
+    await getPromotionalCodeByCode(client as never, 'meso_10');
+
+    expect(eq).toHaveBeenCalledWith('code', 'MESO_10');
   });
 });

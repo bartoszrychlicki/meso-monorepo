@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CreatePromotionalCodeSchema,
+  UpdateRewardSchema,
   UpdatePromotionalCodeSchema,
 } from '@/schemas/crm';
 
@@ -40,5 +41,23 @@ describe('CRM schemas', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.issues.some((issue) => issue.path.join('.') === 'free_item_id')).toBe(true);
+  });
+
+  it('requires discount value when changing reward type to discount', () => {
+    const result = UpdateRewardSchema.safeParse({
+      reward_type: 'discount',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.some((issue) => issue.path.join('.') === 'discount_value')).toBe(true);
+  });
+
+  it('requires discount value when changing promotional code type to percent', () => {
+    const result = UpdatePromotionalCodeSchema.safeParse({
+      discount_type: 'percent',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.some((issue) => issue.path.join('.') === 'discount_value')).toBe(true);
   });
 });

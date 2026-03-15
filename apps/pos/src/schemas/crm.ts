@@ -262,12 +262,14 @@ export const UpdateRewardSchema = RewardSchemaBase.partial()
       });
     }
 
-    if (value.reward_type === 'discount' && value.discount_value !== undefined && value.discount_value != null && value.discount_value <= 0) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['discount_value'],
-        message: 'Dla rabatu podaj wartość większą od zera',
-      });
+    if (value.reward_type === 'discount') {
+      if (value.discount_value == null || value.discount_value <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['discount_value'],
+          message: 'Dla rabatu podaj wartość większą od zera',
+        });
+      }
     }
   });
 
@@ -369,7 +371,6 @@ export const UpdatePromotionalCodeSchema = PromotionalCodeSchemaBase.partial()
 
     if (
       (value.discount_type === 'percent' || value.discount_type === 'fixed') &&
-      value.discount_value !== undefined &&
       (value.discount_value == null || value.discount_value <= 0)
     ) {
       ctx.addIssue({

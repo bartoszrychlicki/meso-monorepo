@@ -321,7 +321,7 @@ export async function getPromotionalCodeByCode(client: QueryClient, code: string
   const { data, error } = await client
     .from('crm_promotions')
     .select(PROMO_CODE_SELECT)
-    .ilike('code', code)
+    .eq('code', code.trim().toUpperCase())
     .maybeSingle();
 
   if (error) {
