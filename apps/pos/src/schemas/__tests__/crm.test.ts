@@ -69,4 +69,13 @@ describe('CRM schemas', () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues.some((issue) => issue.path.join('.') === 'discount_value')).toBe(true);
   });
+
+  it('rejects zero discount value on promotional code update even without discount type', () => {
+    const result = UpdatePromotionalCodeSchema.safeParse({
+      discount_value: 0,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.some((issue) => issue.path.join('.') === 'discount_value')).toBe(true);
+  });
 });

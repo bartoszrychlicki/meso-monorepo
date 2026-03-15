@@ -388,6 +388,14 @@ export const UpdatePromotionalCodeSchema = PromotionalCodeSchemaBase.partial()
       });
     }
 
+    if (value.discount_value !== undefined && value.discount_value != null && value.discount_value <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['discount_value'],
+        message: 'Dla tego typu kodu podaj wartość rabatu większą od zera',
+      });
+    }
+
     if (value.discount_type === 'percent' && value.discount_value != null && value.discount_value > 100) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
