@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/api/auth', () => ({
-  authorizeRequest: vi.fn(),
+  authenticateRequest: vi.fn(),
   isApiKey: vi.fn(),
+}))
+
+vi.mock('@/lib/api-keys', () => ({
+  hasPermission: vi.fn().mockReturnValue(true),
 }))
 
 vi.mock('@/modules/orders/server-loyalty', () => ({
@@ -17,6 +21,15 @@ const { mockKitchenTicketsIn, mockKitchenTicketsEq, mockKitchenTicketsUpdate } =
 }))
 
 vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: {
+          user: { id: 'user-1' },
+        },
+      }),
+    },
+  })),
   createServiceClient: vi.fn(() => ({
     from: vi.fn((table: string) => {
       if (table !== 'orders_kitchen_tickets') {
@@ -62,11 +75,11 @@ vi.mock('@/lib/integrations/posbistro/service', () => ({
   submitPosbistroOrder: mockSubmitPosbistroOrder,
 }))
 
-import { authorizeRequest, isApiKey } from '@/lib/api/auth'
+import { authenticateRequest, isApiKey } from '@/lib/api/auth'
 import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty'
 import { PATCH } from '../orders/[id]/status/route'
 
-const mockAuth = authorizeRequest as ReturnType<typeof vi.fn>
+const mockAuth = authenticateRequest as ReturnType<typeof vi.fn>
 const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>
 const mockFindById = mockServerRepo.findById as ReturnType<typeof vi.fn>
 const mockAwardOrderLoyaltyPoints = awardOrderLoyaltyPoints as ReturnType<typeof vi.fn>

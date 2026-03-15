@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getRollbackTargetStatus } from '@/lib/orders/status-rollback';
 import { useOrder } from '@/modules/orders/hooks';
 import { useOrdersStore } from '@/modules/orders/store';
 import { OrderDetail } from '@/modules/orders/components/order-detail';
@@ -23,7 +24,7 @@ export default function OrderDetailPage({
   const { id } = use(params);
   const { order, isLoading, refresh } = useOrder(id);
   useBreadcrumbLabel(id, order?.order_number);
-  const { updateOrderStatus, cancelOrder } = useOrdersStore();
+  const { updateOrderStatus, rollbackOrderStatus, cancelOrder } = useOrdersStore();
 
   const handleStatusChange = async (
     status: import('@/types/enums').OrderStatus,
@@ -49,6 +50,17 @@ export default function OrderDetailPage({
 
     toast.success('Zamowienie zostalo anulowane');
     return result;
+  };
+
+  const handleRollback = async () => {
+    if (!order) return;
+
+    const rollbackTarget = getRollbackTargetStatus(order);
+    if (!rollbackTarget) return;
+
+    await rollbackOrderStatus(id);
+    refresh();
+    toast.success(`Status cofniety do: ${ORDER_STATUS_LABELS[rollbackTarget]}`);
   };
 
   if (isLoading || !order) {
@@ -84,6 +96,7 @@ export default function OrderDetailPage({
       <OrderDetail
         order={order}
         onStatusChange={handleStatusChange}
+        onRollbackStatus={handleRollback}
         onCancel={handleCancel}
       />
     </div>

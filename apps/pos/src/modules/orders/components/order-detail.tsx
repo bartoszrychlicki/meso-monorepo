@@ -11,6 +11,7 @@ import {
   PaymentStatus,
 } from '@/types/enums';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
+import { getRollbackTargetStatus } from '@/lib/orders/status-rollback';
 import { getAutomaticRefundEligibility } from '@/lib/orders/p24-refund';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { OrderStatusBadge } from './order-status-badge';
@@ -35,6 +36,7 @@ import type { OrderCancellationResult } from '@/types/order-cancel';
 import {
   ArrowRight,
   XCircle,
+  RotateCcw,
   Phone,
   User,
   MapPin,
@@ -98,6 +100,7 @@ const NEXT_STATUS_PICKUP: Partial<Record<OrderStatus, OrderStatus>> = {
 interface OrderDetailProps {
   order: Order;
   onStatusChange: (status: OrderStatus, note?: string) => Promise<void>;
+  onRollbackStatus: () => Promise<void>;
   onCancel: (input: OrderCancelInput) => Promise<OrderCancellationResult>;
 }
 
@@ -127,6 +130,7 @@ function formatModifierLine(modifier: Order['items'][number]['modifiers'][number
 export function OrderDetail({
   order,
   onStatusChange,
+  onRollbackStatus,
   onCancel,
 }: OrderDetailProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
@@ -135,6 +139,7 @@ export function OrderDetail({
   const isDelivery = order.source === OrderSource.DELIVERY;
   const statusMap = isDelivery ? NEXT_STATUS : NEXT_STATUS_PICKUP;
   const nextStatus = statusMap[order.status];
+  const rollbackTargetStatus = getRollbackTargetStatus(order);
   const canCancel =
     order.status !== OrderStatus.CANCELLED &&
     order.status !== OrderStatus.DELIVERED;
@@ -157,6 +162,16 @@ export function OrderDetail({
     try {
       await onCancel(input);
       setCancelDialogOpen(false);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRollbackStatus = async () => {
+    if (!rollbackTargetStatus) return;
+    setIsUpdating(true);
+    try {
+      await onRollbackStatus();
     } finally {
       setIsUpdating(false);
     }
@@ -189,6 +204,18 @@ export function OrderDetail({
           >
             <ArrowRight className="mr-2 h-4 w-4" />
             {ORDER_STATUS_LABELS[nextStatus]}
+          </Button>
+        )}
+        {rollbackTargetStatus && (
+          <Button
+            variant="outline"
+            onClick={handleRollbackStatus}
+            disabled={isUpdating}
+            data-action="rollback-status"
+            data-status={rollbackTargetStatus}
+          >
+            <RotateCcw className="mr-2 h-4 w-4" />
+            Cofnij do: {ORDER_STATUS_LABELS[rollbackTargetStatus]}
           </Button>
         )}
         {canCancel && (

@@ -5,6 +5,14 @@ import {
   submitPosbistroOrder,
 } from '@/lib/integrations/posbistro/service';
 import { createServiceClient } from '@/lib/supabase/server';
+import {
+  buildKitchenTicketRollbackPatch,
+  buildRollbackLifecycleTimestampPatch,
+  buildRollbackStatusNote,
+  getRollbackReasonMessage,
+  getRollbackResolution,
+  type RollbackReason,
+} from '@/lib/orders/status-rollback';
 import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
 import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
 import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
@@ -48,6 +56,31 @@ async function cancelKitchenTicketsForOrder(
     throw new Error(`Failed to cancel kitchen tickets for order ${orderId}: ${error.message}`);
   }
 }
+
+async function rollbackKitchenTicketsForOrder(
+  orderId: string,
+  status: OrderStatus,
+  nowIso: string
+): Promise<void> {
+  const ticketPatch = buildKitchenTicketRollbackPatch(status);
+  if (!ticketPatch) {
+    return;
+  }
+
+  const { error } = await createServiceClient()
+    .from('orders_kitchen_tickets')
+    .update({
+      ...ticketPatch,
+      updated_at: nowIso,
+    })
+    .eq('order_id', orderId)
+    .in('status', [...ACTIVE_KITCHEN_TICKET_STATUSES]);
+
+  if (error) {
+    throw new Error(`Failed to rollback kitchen tickets for order ${orderId}: ${error.message}`);
+  }
+}
+
 export interface TransitionOrderStatusInput {
   orderId: string;
   status: OrderStatus;
@@ -57,6 +90,12 @@ export interface TransitionOrderStatusInput {
   changed_by?: string;
   payment_status?: PaymentStatus;
   requestOrigin?: string;
+}
+
+export interface RollbackOrderStatusInput {
+  orderId: string;
+  note?: string;
+  changed_by?: string;
 }
 
 export class OrderNotFoundError extends Error {
@@ -84,6 +123,18 @@ export class InvalidOrderCancellationReasonError extends Error {
   constructor() {
     super('Order cancellation reason is required');
     this.name = 'InvalidOrderCancellationReasonError';
+  }
+}
+
+export class InvalidOrderStatusRollbackError extends Error {
+  readonly currentStatus: OrderStatus;
+  readonly reason: RollbackReason;
+
+  constructor(currentStatus: OrderStatus, reason: RollbackReason) {
+    super(`Rollback is not allowed for status ${currentStatus} (${reason})`);
+    this.name = 'InvalidOrderStatusRollbackError';
+    this.currentStatus = currentStatus;
+    this.reason = reason;
   }
 }
 
@@ -241,6 +292,72 @@ export async function transitionOrderStatus(
       console.error('[POSBistro] submit on confirm failed:', error);
     }
   }
+
+  return updated;
+}
+
+export function getOrderStatusRollbackErrorMessage(
+  error: InvalidOrderStatusRollbackError
+): string {
+  return getRollbackReasonMessage(error.reason);
+}
+
+export async function rollbackOrderStatus(
+  input: RollbackOrderStatusInput,
+  deps?: {
+    orderRepo?: OrderRepo;
+    now?: () => Date;
+  }
+): Promise<Order> {
+  const orderRepo = deps?.orderRepo ?? createServerRepository<Order>('orders');
+  const order = await orderRepo.findById(input.orderId);
+  if (!order) {
+    throw new OrderNotFoundError(input.orderId);
+  }
+
+  const resolution = getRollbackResolution(order);
+  if (!resolution.canRollback || !resolution.targetStatus) {
+    throw new InvalidOrderStatusRollbackError(
+      order.status,
+      resolution.reason ?? 'invalid_history'
+    );
+  }
+
+  const nowIso = (deps?.now ?? (() => new Date()))().toISOString();
+  const rollbackNote = input.note?.trim()
+    ? `${buildRollbackStatusNote(order.status, resolution.targetStatus)}. ${input.note.trim()}`
+    : buildRollbackStatusNote(order.status, resolution.targetStatus);
+
+  const updated = await orderRepo.update(input.orderId, {
+    status: resolution.targetStatus,
+    status_history: [
+      ...(Array.isArray(order.status_history) ? order.status_history : []),
+      {
+        status: resolution.targetStatus,
+        timestamp: nowIso,
+        changed_by: input.changed_by,
+        note: rollbackNote,
+      },
+    ],
+    ...buildRollbackLifecycleTimestampPatch(resolution.targetStatus),
+  } as Partial<Order>);
+
+  try {
+    await rollbackKitchenTicketsForOrder(input.orderId, resolution.targetStatus, nowIso);
+  } catch (error) {
+    console.error('[KDS] rollback tickets on order rollback failed:', error);
+  }
+
+  const webhookData = buildOrderStatusChangedWebhookData(updated, {
+    status: resolution.targetStatus,
+    previousStatus: order.status,
+    note: rollbackNote,
+  });
+
+  await scheduleWebhookDispatch(
+    'order.status_changed',
+    webhookData as unknown as Record<string, unknown>
+  );
 
   return updated;
 }

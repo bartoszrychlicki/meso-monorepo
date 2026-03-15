@@ -1,5 +1,6 @@
 import { Order } from '@/types/order';
 import type { OrderCancellationResult } from '@/types/order-cancel';
+import type { KitchenTicket } from '@/types/kitchen';
 import {
   OrderChannel,
   OrderClosureReasonCode,
@@ -7,6 +8,13 @@ import {
   LoyaltyPointReason,
 } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
+import {
+  buildKitchenTicketRollbackPatch,
+  buildRollbackLifecycleTimestampPatch,
+  buildRollbackStatusNote,
+  getRollbackReasonMessage,
+  getRollbackResolution,
+} from '@/lib/orders/status-rollback';
 import { crmRepository } from '@/modules/crm/repository';
 import {
   calculatePointsFromOrder,
@@ -22,14 +30,20 @@ import { supabase } from '@/lib/supabase/client';
 import { normalizeOrderClosureReason } from '@meso/core';
 
 const baseRepo = createRepository<Order>('orders');
+const kitchenRepo = createRepository<KitchenTicket>('kitchen_tickets');
 const ACTIVE_KITCHEN_TICKET_STATUSES = [
   OrderStatus.PENDING,
   OrderStatus.PREPARING,
   OrderStatus.READY,
 ] as const;
+type ActiveKitchenTicketStatus = (typeof ACTIVE_KITCHEN_TICKET_STATUSES)[number];
 
 function usesSupabaseBackend(): boolean {
   return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+}
+
+function isActiveKitchenTicketStatus(status: OrderStatus): status is ActiveKitchenTicketStatus {
+  return ACTIVE_KITCHEN_TICKET_STATUSES.includes(status as ActiveKitchenTicketStatus);
 }
 
 async function cancelOrderViaApi(
@@ -61,6 +75,63 @@ async function cancelOrderViaApi(
   return json.data as OrderCancellationResult;
 }
 
+async function updateStatusViaApi(
+  id: string,
+  payload: {
+    status: OrderStatus;
+    note?: string;
+    closureReasonCode?: OrderClosureReasonCode | null;
+    closureReason?: string | null;
+  }
+): Promise<Order> {
+  const response = await fetch(`/api/v1/orders/${id}/status`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      status: payload.status,
+      note: payload.note,
+      closure_reason_code: payload.closureReasonCode,
+      closure_reason: payload.closureReason,
+    }),
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok || !json.success || !json.data) {
+    throw new Error(json.error?.message || `Order status update failed (${response.status})`);
+  }
+
+  const updatedOrder = json.data as Order;
+
+  if (updatedOrder.customer_phone) {
+    try {
+      await sendOrderStatusSMS(updatedOrder, payload.status);
+    } catch (error) {
+      console.error('Failed to send SMS notification:', error);
+    }
+  }
+
+  return updatedOrder;
+}
+
+async function rollbackStatusViaApi(id: string, note?: string): Promise<Order> {
+  const response = await fetch(`/api/v1/orders/${id}/status/rollback`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(note ? { note } : {}),
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok || !json.success || !json.data) {
+    throw new Error(json.error?.message || `Order status rollback failed (${response.status})`);
+  }
+
+  return json.data as Order;
+}
+
 async function findByStatus(status: OrderStatus): Promise<Order[]> {
   return baseRepo.findMany((order) => order.status === status);
 }
@@ -87,6 +158,15 @@ async function updateStatus(
   closureReasonCode?: OrderClosureReasonCode | null,
   closureReason?: string | null
 ): Promise<Order> {
+  if (usesSupabaseBackend()) {
+    return updateStatusViaApi(id, {
+      status,
+      note,
+      closureReasonCode,
+      closureReason,
+    });
+  }
+
   const order = await baseRepo.findById(id);
   if (!order) throw new Error(`Order with id ${id} not found`);
 
@@ -170,6 +250,58 @@ async function updateStatus(
     }
   }
   // ===== CRM INTEGRATION END =====
+
+  return updatedOrder;
+}
+
+async function rollbackStatus(id: string, note?: string): Promise<Order> {
+  if (usesSupabaseBackend()) {
+    return rollbackStatusViaApi(id, note);
+  }
+
+  const order = await baseRepo.findById(id);
+  if (!order) throw new Error(`Order with id ${id} not found`);
+
+  const resolution = getRollbackResolution(order);
+  if (!resolution.canRollback || !resolution.targetStatus) {
+    throw new Error(getRollbackReasonMessage(resolution.reason ?? 'invalid_history'));
+  }
+
+  const nowIso = new Date().toISOString();
+  const rollbackNote = note?.trim()
+    ? `${buildRollbackStatusNote(order.status, resolution.targetStatus)}. ${note.trim()}`
+    : buildRollbackStatusNote(order.status, resolution.targetStatus);
+
+  const updatedOrder = await baseRepo.update(id, {
+    status: resolution.targetStatus,
+    status_history: [
+      ...(Array.isArray(order.status_history) ? order.status_history : []),
+      {
+        status: resolution.targetStatus,
+        timestamp: nowIso,
+        note: rollbackNote,
+      },
+    ],
+    ...buildRollbackLifecycleTimestampPatch(resolution.targetStatus),
+  } as Partial<Order>);
+
+  const ticketPatch = buildKitchenTicketRollbackPatch(resolution.targetStatus);
+  if (ticketPatch) {
+    const tickets = await kitchenRepo.findMany(
+      (ticket) =>
+        ticket.order_id === id &&
+        isActiveKitchenTicketStatus(ticket.status)
+    );
+
+    await Promise.all(
+      tickets.map((ticket) =>
+        kitchenRepo.update(ticket.id, {
+          ...ticketPatch,
+          updated_at: nowIso,
+        } as Partial<KitchenTicket>)
+      )
+    );
+  }
 
   return updatedOrder;
 }
@@ -397,6 +529,7 @@ export const ordersRepository = {
   findByDateRange,
   findByCustomer,
   cancelOrder,
+  rollbackStatus,
   updateStatus,
   getActiveOrders,
   getTodaysOrders,

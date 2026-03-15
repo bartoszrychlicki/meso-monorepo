@@ -3,20 +3,20 @@ import { createClient } from '@/lib/supabase/server';
 import { authenticateRequest, isApiKey } from '@/lib/api/auth';
 import { hasPermission } from '@/lib/api-keys';
 import {
-  apiSuccess,
+  apiError,
   apiForbidden,
   apiNotFound,
+  apiSuccess,
   apiUnauthorized,
   apiValidationError,
-  apiError,
 } from '@/lib/api/response';
 import {
-  InvalidOrderCancellationReasonError,
-  InvalidOrderStatusTransitionError,
+  getOrderStatusRollbackErrorMessage,
+  InvalidOrderStatusRollbackError,
   OrderNotFoundError,
-  transitionOrderStatus,
+  rollbackOrderStatus,
 } from '@/lib/orders/status-transition';
-import { UpdateOrderStatusSchema } from '@/schemas/order';
+import { RollbackOrderStatusSchema } from '@/schemas/order';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -44,72 +44,56 @@ async function authorizeOrderStatusMutation(request: NextRequest) {
   return { changedBy: user.id, authType: 'session' as const };
 }
 
-/**
- * PATCH /api/v1/orders/:id/status
- * Update the status of an order with validation of allowed transitions.
- */
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   const auth = await authorizeOrderStatusMutation(request);
   if ('status' in auth) return auth;
 
   const { id } = await params;
 
-  let body: unknown;
+  let body: unknown = {};
   try {
-    body = await request.json();
+    const rawBody = await request.text();
+    body = rawBody ? JSON.parse(rawBody) : {};
   } catch {
-    return apiError('INVALID_JSON', 'Nieprawidłowe dane JSON w treści żądania', 400);
+    return apiError('INVALID_JSON', 'Nieprawidlowe dane JSON w tresci zadania', 400);
   }
 
-  const validation = UpdateOrderStatusSchema.safeParse(body);
+  const validation = RollbackOrderStatusSchema.safeParse(body);
   if (!validation.success) {
     return apiValidationError(
-      validation.error.issues.map((i) => ({
-        field: i.path.join('.'),
-        message: i.message,
+      validation.error.issues.map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
       }))
     );
   }
 
   try {
-    const updated = await transitionOrderStatus({
+    const updated = await rollbackOrderStatus({
       orderId: id,
-      status: validation.data.status,
       note: validation.data.note,
-      closure_reason_code: validation.data.closure_reason_code,
-      closure_reason: validation.data.closure_reason,
       changed_by: auth.authType === 'api_key'
         ? (validation.data.changed_by || auth.changedBy)
         : auth.changedBy,
-      payment_status: validation.data.payment_status,
-      requestOrigin: request.nextUrl.origin,
     });
 
     return apiSuccess(updated);
   } catch (error) {
     if (error instanceof OrderNotFoundError) {
-      return apiNotFound('Zamówienie');
+      return apiNotFound('Zamowienie');
     }
 
-    if (error instanceof InvalidOrderStatusTransitionError) {
+    if (error instanceof InvalidOrderStatusRollbackError) {
       return apiError(
-        'INVALID_STATUS_TRANSITION',
-        `Nie można zmienić statusu z "${error.currentStatus}" na "${error.requestedStatus}". Dozwolone przejścia: ${error.allowedTransitions.join(', ') || 'brak'}`,
-        422
-      );
-    }
-
-    if (error instanceof InvalidOrderCancellationReasonError) {
-      return apiError(
-        'INVALID_CANCELLATION_REASON',
-        'Powód anulowania jest wymagany',
+        'INVALID_STATUS_ROLLBACK',
+        getOrderStatusRollbackErrorMessage(error),
         422
       );
     }
 
     return apiError(
-      'ORDER_STATUS_UPDATE_FAILED',
-      'Nie udało się zaktualizować statusu zamówienia',
+      'ORDER_STATUS_ROLLBACK_FAILED',
+      'Nie udalo sie cofnac statusu zamowienia',
       500,
       [error]
     );

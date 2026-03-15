@@ -4,6 +4,7 @@ import type {
   Order,
   P24RefundRecord,
   CreateOrderInput,
+  RollbackOrderStatusInput,
   UpdateOrderStatusInput,
 } from '@meso/core';
 import { OrderStatus } from '@meso/core';
@@ -27,6 +28,17 @@ export class OrdersApi {
     return this.client.request<Order>(
       'PATCH',
       `/orders/${orderId}/status`,
+      input
+    );
+  }
+
+  async rollbackStatus(
+    orderId: string,
+    input: RollbackOrderStatusInput = {}
+  ): Promise<ApiResponse<Order>> {
+    return this.client.request<Order>(
+      'POST',
+      `/orders/${orderId}/status/rollback`,
       input
     );
   }
