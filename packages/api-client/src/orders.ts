@@ -4,6 +4,7 @@ import type {
   Order,
   P24RefundRecord,
   CreateOrderInput,
+  UpdateOrderInput,
   RollbackOrderStatusInput,
   UpdateOrderStatusInput,
 } from '@meso/core';
@@ -19,6 +20,13 @@ export class OrdersApi {
 
   async getById(orderId: string): Promise<ApiResponse<Order>> {
     return this.client.request<Order>('GET', `/orders/${orderId}`);
+  }
+
+  async update(
+    orderId: string,
+    input: UpdateOrderInput
+  ): Promise<ApiResponse<Order>> {
+    return this.client.request<Order>('PUT', `/orders/${orderId}`, input);
   }
 
   async updateStatus(

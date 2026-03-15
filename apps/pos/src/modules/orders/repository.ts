@@ -1,13 +1,25 @@
 import { Order } from '@/types/order';
 import type { OrderCancellationResult } from '@/types/order-cancel';
 import type { KitchenTicket } from '@/types/kitchen';
+import type { Customer } from '@/types/crm';
 import {
   OrderChannel,
   OrderClosureReasonCode,
   OrderStatus,
   LoyaltyPointReason,
+  PaymentMethod,
+  PaymentStatus,
 } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
+import {
+  buildKitchenItemsFromOrderItems,
+  buildKitchenTicketStatusPatch,
+  calculateIncludedTaxFromGross,
+  calculateOrderItemSubtotal,
+  estimateKitchenTicketMinutes,
+  haveOrderItemsChanged,
+  isOrderEditableStatus,
+} from '@/lib/orders/order-editing';
 import {
   buildKitchenTicketRollbackPatch,
   buildRollbackLifecycleTimestampPatch,
@@ -15,6 +27,7 @@ import {
   getRollbackReasonMessage,
   getRollbackResolution,
 } from '@/lib/orders/status-rollback';
+import { calculateOrderTotal, mergeOrderMetadata, readMetadataPaymentFee } from '@/lib/orders/financials';
 import { crmRepository } from '@/modules/crm/repository';
 import {
   calculatePointsFromOrder,
@@ -27,6 +40,8 @@ import {
   formatPhoneForSMS,
 } from '@/lib/sms/templates';
 import { supabase } from '@/lib/supabase/client';
+import type { UpdateOrderInput } from '@/schemas/order';
+import type { ApiResponseWarning } from '@meso/core';
 import { normalizeOrderClosureReason } from '@meso/core';
 
 const baseRepo = createRepository<Order>('orders');
@@ -37,6 +52,11 @@ const ACTIVE_KITCHEN_TICKET_STATUSES = [
   OrderStatus.READY,
 ] as const;
 type ActiveKitchenTicketStatus = (typeof ACTIVE_KITCHEN_TICKET_STATUSES)[number];
+
+export interface OrderUpdateResult {
+  order: Order;
+  warnings: ApiResponseWarning[];
+}
 
 function usesSupabaseBackend(): boolean {
   return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
@@ -141,6 +161,142 @@ async function rollbackStatusViaApi(id: string, note?: string): Promise<Order> {
   }
 
   return json.data as Order;
+}
+
+async function updateOrderViaApi(
+  id: string,
+  input: UpdateOrderInput
+): Promise<OrderUpdateResult> {
+  const response = await fetch(buildAppUrl(`/api/v1/orders/${id}`), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok || !json.success || !json.data) {
+    throw new Error(json.error?.message || `Order update failed (${response.status})`);
+  }
+
+  return {
+    order: json.data as Order,
+    warnings: Array.isArray(json.meta?.warnings)
+      ? (json.meta.warnings as ApiResponseWarning[])
+      : [],
+  };
+}
+
+function hasOwnProperty<T extends object>(value: T, key: keyof T): boolean {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function buildRollbackTargetTimestampPatch(
+  order: Order,
+  targetStatus: OrderStatus,
+  nowIso: string
+): Partial<Order> {
+  switch (targetStatus) {
+    case OrderStatus.CONFIRMED:
+      return order.confirmed_at ? {} : { confirmed_at: nowIso };
+    case OrderStatus.PREPARING:
+      return order.preparing_at ? {} : { preparing_at: nowIso };
+    case OrderStatus.READY:
+      return order.ready_at ? {} : { ready_at: nowIso };
+    case OrderStatus.OUT_FOR_DELIVERY:
+      return order.picked_up_at ? {} : { picked_up_at: nowIso };
+    case OrderStatus.DELIVERED:
+      return order.delivered_at ? {} : { delivered_at: nowIso };
+    case OrderStatus.CANCELLED:
+      return order.cancelled_at ? {} : { cancelled_at: nowIso };
+    default:
+      return {};
+  }
+}
+
+function buildOrderItems(items: NonNullable<UpdateOrderInput['items']>): Order['items'] {
+  return items.map((item) => ({
+    id: item.id?.trim() || crypto.randomUUID(),
+    product_id: item.product_id,
+    variant_id: item.variant_id,
+    product_name: item.product_name,
+    variant_name: item.variant_name,
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    original_unit_price: item.original_unit_price,
+    promotion_label: item.promotion_label,
+    modifiers: item.modifiers ?? [],
+    subtotal: calculateOrderItemSubtotal(item),
+    notes: item.notes,
+  }));
+}
+
+function buildEditRollbackNote(itemsChanged: boolean, notesChanged: boolean): string {
+  const changedAreas: string[] = [];
+  if (itemsChanged) changedAreas.push('składu');
+  if (notesChanged) changedAreas.push('uwag');
+
+  const reasonLabel =
+    changedAreas.length > 0
+      ? `Edycja ${changedAreas.join(' i ')} zamówienia. `
+      : '';
+
+  return `${reasonLabel}${buildRollbackStatusNote(OrderStatus.READY, OrderStatus.PREPARING)}`;
+}
+
+async function syncLocalKitchenTicket(
+  order: Order,
+  shouldSyncContents: boolean,
+  options: { resetCompletionState?: boolean } = {}
+): Promise<void> {
+  if (!shouldSyncContents) {
+    return;
+  }
+
+  const ticketStatusPatch = buildKitchenTicketStatusPatch(order.status);
+  if (!ticketStatusPatch) {
+    return;
+  }
+
+  const tickets = await kitchenRepo.findMany(
+    (ticket) =>
+      ticket.order_id === order.id &&
+      isActiveKitchenTicketStatus(ticket.status)
+  );
+
+  await Promise.all(
+    tickets.map((ticket) =>
+      kitchenRepo.update(ticket.id, {
+        ...ticketStatusPatch,
+        items: buildKitchenItemsFromOrderItems(
+          order.items,
+          Array.isArray(ticket.items) ? ticket.items : [],
+          {
+            resetCompletionState: options.resetCompletionState,
+          }
+        ),
+        notes: order.notes,
+        estimated_minutes: estimateKitchenTicketMinutes(order.items),
+      } as Partial<KitchenTicket>)
+    )
+  );
+}
+
+async function syncLocalCustomerPhone(existingOrder: Order, requestedPhone: string | undefined): Promise<void> {
+  const normalizedPhone = requestedPhone?.trim();
+  if (!existingOrder.customer_id || !normalizedPhone || normalizedPhone === existingOrder.customer_phone) {
+    return;
+  }
+
+  const customer = await crmRepository.customers.findById(existingOrder.customer_id);
+  if (!customer) {
+    return;
+  }
+
+  await crmRepository.customers.update(existingOrder.customer_id, {
+    phone: normalizedPhone,
+  } as Partial<Customer>);
 }
 
 async function findByStatus(status: OrderStatus): Promise<Order[]> {
@@ -293,6 +449,7 @@ async function rollbackStatus(id: string, note?: string): Promise<Order> {
         note: rollbackNote,
       },
     ],
+    ...buildRollbackTargetTimestampPatch(order, resolution.targetStatus, nowIso),
     ...buildRollbackLifecycleTimestampPatch(resolution.targetStatus),
   } as Partial<Order>);
 
@@ -315,6 +472,174 @@ async function rollbackStatus(id: string, note?: string): Promise<Order> {
   }
 
   return updatedOrder;
+}
+
+async function updateOrder(id: string, input: UpdateOrderInput): Promise<OrderUpdateResult> {
+  if (usesSupabaseBackend()) {
+    return updateOrderViaApi(id, input);
+  }
+
+  const existing = await baseRepo.findById(id);
+  if (!existing) throw new Error(`Order with id ${id} not found`);
+
+  if (!isOrderEditableStatus(existing.status)) {
+    throw new Error('To zamówienie nie może już być edytowane');
+  }
+
+  const normalizedPhone = hasOwnProperty(input, 'customer_phone')
+    ? input.customer_phone?.trim()
+    : undefined;
+  if (hasOwnProperty(input, 'customer_phone')) {
+    if (!normalizedPhone || !isValidPhoneNumber(normalizedPhone)) {
+      throw new Error('Niepoprawny numer telefonu');
+    }
+  }
+
+  const nextItems = input.items ? buildOrderItems(input.items) : existing.items;
+  const mergedMetadata = hasOwnProperty(input, 'metadata')
+    ? mergeOrderMetadata(existing.metadata, input.metadata)
+    : existing.metadata;
+  const nextSubtotal = input.items
+    ? nextItems.reduce((sum, item) => sum + item.subtotal, 0)
+    : existing.subtotal;
+  const nextDiscount = hasOwnProperty(input, 'discount')
+    ? (input.discount ?? 0)
+    : existing.discount;
+  const nextDeliveryFee = hasOwnProperty(input, 'delivery_fee')
+    ? input.delivery_fee
+    : existing.delivery_fee;
+  const nextTip = hasOwnProperty(input, 'tip')
+    ? input.tip
+    : existing.tip;
+  const nextTax = input.items
+    ? calculateIncludedTaxFromGross(nextSubtotal)
+    : existing.tax;
+  const nextTotal =
+    input.items ||
+    hasOwnProperty(input, 'discount') ||
+    hasOwnProperty(input, 'delivery_fee') ||
+    hasOwnProperty(input, 'tip') ||
+    hasOwnProperty(input, 'metadata')
+      ? calculateOrderTotal({
+          subtotal: nextSubtotal,
+          discount: nextDiscount,
+          deliveryFee: nextDeliveryFee,
+          paymentFee: readMetadataPaymentFee(mergedMetadata),
+          tip: nextTip,
+        })
+      : existing.total;
+
+  if (
+    existing.payment_method === PaymentMethod.ONLINE &&
+    existing.payment_status === PaymentStatus.PAID &&
+    nextTotal !== existing.total
+  ) {
+    throw new Error('Nie można zmienić kwoty opłaconego zamówienia online');
+  }
+
+  const itemsChanged = input.items
+    ? haveOrderItemsChanged(existing.items, nextItems)
+    : false;
+  const notesChanged = hasOwnProperty(input, 'notes')
+    ? (existing.notes ?? '') !== (input.notes ?? '')
+    : false;
+  const shouldRollbackReady = existing.status === OrderStatus.READY && (itemsChanged || notesChanged);
+  const shouldSyncKitchenContents = itemsChanged || notesChanged;
+  const shouldResetKitchenCompletionState = shouldRollbackReady && notesChanged;
+  const nextStatus = shouldRollbackReady ? OrderStatus.PREPARING : existing.status;
+
+  const patch: Partial<Order> = {};
+
+  if (input.items) {
+    patch.items = nextItems;
+    patch.subtotal = nextSubtotal;
+    patch.tax = nextTax;
+    patch.discount = nextDiscount;
+    patch.delivery_fee = nextDeliveryFee;
+    patch.tip = nextTip;
+    patch.total = nextTotal;
+  }
+
+  if (hasOwnProperty(input, 'customer_name')) {
+    patch.customer_name = input.customer_name;
+  }
+
+  if (hasOwnProperty(input, 'customer_phone')) {
+    patch.customer_phone = normalizedPhone;
+  }
+
+  if (hasOwnProperty(input, 'notes')) {
+    patch.notes = input.notes;
+  }
+
+  if (!input.items && hasOwnProperty(input, 'discount')) {
+    patch.discount = nextDiscount;
+  }
+
+  if (!input.items && hasOwnProperty(input, 'delivery_fee')) {
+    patch.delivery_fee = nextDeliveryFee;
+  }
+
+  if (!input.items && hasOwnProperty(input, 'tip')) {
+    patch.tip = nextTip;
+  }
+
+  if (hasOwnProperty(input, 'metadata')) {
+    patch.metadata = mergedMetadata;
+  }
+
+  if (
+    !input.items &&
+    (
+      hasOwnProperty(input, 'discount') ||
+      hasOwnProperty(input, 'delivery_fee') ||
+      hasOwnProperty(input, 'tip') ||
+      hasOwnProperty(input, 'metadata')
+    )
+  ) {
+    patch.total = nextTotal;
+  }
+
+  if (shouldRollbackReady) {
+    patch.status = nextStatus;
+    patch.status_history = [
+      ...(Array.isArray(existing.status_history) ? existing.status_history : []),
+      {
+        status: nextStatus,
+        timestamp: new Date().toISOString(),
+        note: buildEditRollbackNote(itemsChanged, notesChanged),
+      },
+    ];
+    Object.assign(patch, buildRollbackLifecycleTimestampPatch(nextStatus));
+  }
+
+  const updatedOrder = await baseRepo.update(id, patch);
+
+  try {
+    await syncLocalKitchenTicket(updatedOrder, shouldSyncKitchenContents, {
+      resetCompletionState: shouldResetKitchenCompletionState,
+    });
+  } catch (error) {
+    console.error('[ordersRepository.updateOrder] Kitchen ticket sync failed', {
+      orderId: updatedOrder.id,
+      error,
+    });
+  }
+
+  try {
+    await syncLocalCustomerPhone(existing, normalizedPhone);
+  } catch (error) {
+    console.error('[ordersRepository.updateOrder] Customer phone sync failed', {
+      orderId: updatedOrder.id,
+      customerId: existing.customer_id,
+      error,
+    });
+  }
+
+  return {
+    order: updatedOrder,
+    warnings: [],
+  };
 }
 
 async function cancelOrder(
@@ -540,6 +865,7 @@ export const ordersRepository = {
   findByDateRange,
   findByCustomer,
   cancelOrder,
+  updateOrder,
   rollbackStatus,
   updateStatus,
   getActiveOrders,

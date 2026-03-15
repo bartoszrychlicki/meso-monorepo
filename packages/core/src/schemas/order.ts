@@ -30,6 +30,17 @@ export const CreateOrderItemSchema = z.object({
   notes: z.string().optional(),
 });
 
+const PhoneSchema = z
+  .string()
+  .trim()
+  .refine((value) => /^\+[0-9]{10,15}$/.test(value.replace(/[\s\-()]/g, '')), {
+    message: 'Niepoprawny numer telefonu',
+  });
+
+export const UpdateOrderItemSchema = CreateOrderItemSchema.extend({
+  id: z.string().min(1).optional(),
+});
+
 const AddressSchema = z.object({
   street: z.string().optional(),
   city: z.string().optional(),
@@ -69,6 +80,30 @@ export const CreateOrderSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+export const UpdateOrderSchema = z
+  .object({
+    customer_name: z.string().max(120, 'Imię i nazwisko jest za długie').optional(),
+    customer_phone: PhoneSchema.optional(),
+    items: z
+      .array(UpdateOrderItemSchema)
+      .min(1, 'Zamówienie musi zawierać produkty')
+      .optional(),
+    notes: z.string().max(1000, 'Uwagi są za długie').optional(),
+    discount: z.number().min(0).optional(),
+    delivery_fee: z.number().min(0).optional(),
+    tip: z.number().min(0).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (Object.keys(value).length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [],
+        message: 'Przekaż co najmniej jedno pole do aktualizacji',
+      });
+    }
+  });
+
 export const UpdateOrderStatusSchema = z.object({
   status: z.nativeEnum(OrderStatus),
   note: z.string().optional(),
@@ -92,7 +127,9 @@ export const CancelOrderSchema = z.object({
 });
 
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
+export type UpdateOrderInput = z.infer<typeof UpdateOrderSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof UpdateOrderStatusSchema>;
 export type RollbackOrderStatusInput = z.infer<typeof RollbackOrderStatusSchema>;
 export type CancelOrderInput = z.infer<typeof CancelOrderSchema>;
 export type CreateOrderItemInput = z.infer<typeof CreateOrderItemSchema>;
+export type UpdateOrderItemInput = z.infer<typeof UpdateOrderItemSchema>;

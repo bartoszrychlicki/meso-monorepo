@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
 import type { OrderCancellationResult } from '@/types/order-cancel';
+import type { UpdateOrderInput } from '@/schemas/order';
 import {
   OrderClosureReasonCode,
   OrderStatus,
@@ -12,6 +13,7 @@ import {
 import { Product, ProductVariant } from '@/types/menu';
 import { KitchenTicket, KitchenItem } from '@/types/kitchen';
 import { ordersRepository } from './repository';
+import type { OrderUpdateResult } from './repository';
 import { createRepository } from '@/lib/data/repository-factory';
 import { LOCATION_IDS } from '@/seed/data/locations';
 import { USER_IDS } from '@/seed/data/users';
@@ -65,6 +67,10 @@ interface OrdersStore {
     status: OrderStatus,
     note?: string
   ) => Promise<void>;
+  updateOrder: (
+    id: string,
+    input: UpdateOrderInput
+  ) => Promise<OrderUpdateResult>;
   rollbackOrderStatus: (
     id: string,
     note?: string
@@ -269,6 +275,19 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
       const updated = await ordersRepository.findById(id);
       set({ selectedOrder: updated });
     }
+  },
+
+  updateOrder: async (id, input) => {
+    const result = await ordersRepository.updateOrder(id, input);
+    await get().loadOrders();
+    await get().loadActiveOrders();
+
+    const state = get();
+    if (state.selectedOrder?.id === id) {
+      set({ selectedOrder: result.order });
+    }
+
+    return result;
   },
 
   rollbackOrderStatus: async (id, note) => {

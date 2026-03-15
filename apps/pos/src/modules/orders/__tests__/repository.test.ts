@@ -159,3 +159,50 @@ describe('ordersRepository.updateStatus', () => {
     );
   });
 });
+
+describe('ordersRepository.updateOrder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  it('returns API warnings alongside the updated order', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          id: 'order-1',
+          order_number: 'WEB-20260303-001',
+          status: OrderStatus.PREPARING,
+        },
+        meta: {
+          warnings: [
+            {
+              code: 'KITCHEN_SYNC_FAILED',
+              message: 'Zamowienie zostalo zapisane, ale KDS nie zaktualizowal sie poprawnie.',
+            },
+          ],
+        },
+      }),
+    });
+
+    const result = await ordersRepository.updateOrder('order-1', {
+      notes: 'Bez cebuli',
+    });
+
+    expect(result).toEqual({
+      order: expect.objectContaining({
+        id: 'order-1',
+        status: OrderStatus.PREPARING,
+      }),
+      warnings: [
+        expect.objectContaining({
+          code: 'KITCHEN_SYNC_FAILED',
+        }),
+      ],
+    });
+  });
+});

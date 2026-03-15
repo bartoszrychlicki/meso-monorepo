@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateOrderSchema, RollbackOrderStatusSchema, UpdateOrderStatusSchema } from '../index';
+import { CreateOrderSchema, RollbackOrderStatusSchema, UpdateOrderSchema, UpdateOrderStatusSchema } from '../index';
 
 describe('CreateOrderSchema', () => {
   it('validates a minimal delivery order', () => {
@@ -93,6 +93,32 @@ describe('UpdateOrderStatusSchema', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe('UpdateOrderSchema', () => {
+  it('rejects empty customer phone so schema matches runtime validation', () => {
+    const result = UpdateOrderSchema.safeParse({
+      customer_phone: '',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a valid customer phone', () => {
+    const result = UpdateOrderSchema.safeParse({
+      customer_phone: '+48 500 200 300',
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a phone without international prefix', () => {
+    const result = UpdateOrderSchema.safeParse({
+      customer_phone: '500 200 300',
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

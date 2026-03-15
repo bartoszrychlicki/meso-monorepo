@@ -168,6 +168,14 @@ function buildLifecycleTimestampPatch(order: Order, status: OrderStatus, nowIso:
   }
 }
 
+function buildRollbackTargetTimestampPatch(
+  order: Order,
+  targetStatus: OrderStatus,
+  nowIso: string
+): Partial<Order> {
+  return buildLifecycleTimestampPatch(order, targetStatus, nowIso);
+}
+
 function buildPaymentPatch(
   order: Order,
   paymentStatus: PaymentStatus | undefined,
@@ -339,6 +347,7 @@ export async function rollbackOrderStatus(
         note: rollbackNote,
       },
     ],
+    ...buildRollbackTargetTimestampPatch(order, resolution.targetStatus, nowIso),
     ...buildRollbackLifecycleTimestampPatch(resolution.targetStatus),
   } as Partial<Order>);
 

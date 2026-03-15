@@ -1,13 +1,17 @@
 export {
   CancelOrderSchema,
   CreateOrderSchema,
+  UpdateOrderSchema,
   RollbackOrderStatusSchema,
   UpdateOrderStatusSchema,
   OrderItemModifierSchema,
   CreateOrderItemSchema,
+  UpdateOrderItemSchema,
   type CancelOrderInput,
   type CreateOrderInput,
+  type UpdateOrderInput,
   type RollbackOrderStatusInput,
   type UpdateOrderStatusInput,
   type CreateOrderItemInput,
+  type UpdateOrderItemInput,
 } from '@meso/core';
