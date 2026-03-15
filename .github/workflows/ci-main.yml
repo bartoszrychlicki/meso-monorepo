@@ -99,4 +99,5 @@ jobs:
         with:
           name: playwright-sandbox-main-${{ github.run_id }}
           path: apps/delivery/test-results/
+          if-no-files-found: ignore
           retention-days: 7

@@ -1,31 +1,27 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-const ACCESS_PASSWORD = 'TuJestMeso2026'
-
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl
-
   // Password gate: DISABLED for now
   // const isPublicPath =
-  //   pathname === '/gate' ||
-  //   pathname === '/callback' ||
-  //   pathname === '/reset-password' ||
-  //   pathname === '/forgot-password' ||
-  //   pathname === '/login' ||
-  //   pathname === '/register' ||
-  //   pathname.startsWith('/api/gate') ||
-  //   pathname.startsWith('/api/payments/') ||
-  //   pathname.startsWith('/_next/') ||
-  //   pathname.startsWith('/favicon') ||
-  //   pathname.endsWith('.svg') ||
-  //   pathname.endsWith('.png') ||
-  //   pathname.endsWith('.jpg') ||
-  //   pathname.endsWith('.ico')
+  //   request.nextUrl.pathname === '/gate' ||
+  //   request.nextUrl.pathname === '/callback' ||
+  //   request.nextUrl.pathname === '/reset-password' ||
+  //   request.nextUrl.pathname === '/forgot-password' ||
+  //   request.nextUrl.pathname === '/login' ||
+  //   request.nextUrl.pathname === '/register' ||
+  //   request.nextUrl.pathname.startsWith('/api/gate') ||
+  //   request.nextUrl.pathname.startsWith('/api/payments/') ||
+  //   request.nextUrl.pathname.startsWith('/_next/') ||
+  //   request.nextUrl.pathname.startsWith('/favicon') ||
+  //   request.nextUrl.pathname.endsWith('.svg') ||
+  //   request.nextUrl.pathname.endsWith('.png') ||
+  //   request.nextUrl.pathname.endsWith('.jpg') ||
+  //   request.nextUrl.pathname.endsWith('.ico')
   //
   // if (!isPublicPath) {
   //   const accessCookie = request.cookies.get('meso_access')
-  //   if (accessCookie?.value !== ACCESS_PASSWORD) {
+  //   if (accessCookie?.value !== 'TuJestMeso2026') {
   //     const gateUrl = new URL('/gate', request.url)
   //     return NextResponse.redirect(gateUrl)
   //   }

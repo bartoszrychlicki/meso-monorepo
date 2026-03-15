@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Table,
@@ -89,7 +89,10 @@ export function DeliveryLineTable({
   const productInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const notesInputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
-  const stockItemMap = new Map(stockItems.map((stockItem) => [stockItem.id, stockItem]));
+  const stockItemMap = useMemo(
+    () => new Map(stockItems.map((stockItem) => [stockItem.id, stockItem])),
+    [stockItems]
+  );
 
   // Ensure there's always an empty row at the bottom
   useEffect(() => {
@@ -101,21 +104,17 @@ export function DeliveryLineTable({
   // Track dropdown position based on the active input
   useEffect(() => {
     if (activeDropdown === null) {
-      setDropdownRect(null);
       return;
     }
 
     const input = productInputRefs.current[activeDropdown];
     if (!input) {
-      setDropdownRect(null);
       return;
     }
 
     const updateRect = () => {
       setDropdownRect(input.getBoundingClientRect());
     };
-
-    updateRect();
 
     window.addEventListener('scroll', updateRect, true);
     window.addEventListener('resize', updateRect);
@@ -124,6 +123,11 @@ export function DeliveryLineTable({
       window.removeEventListener('resize', updateRect);
     };
   }, [activeDropdown]);
+
+  const openDropdown = (rowIndex: number, input: HTMLInputElement) => {
+    setActiveDropdown(rowIndex);
+    setDropdownRect(input.getBoundingClientRect());
+  };
 
   const getFilteredStockItems = useCallback(
     (rowIndex: number) => {
@@ -184,6 +188,7 @@ export function DeliveryLineTable({
       unit_price_net: stockItem.cost_per_unit || null,
     });
     setActiveDropdown(null);
+    setDropdownRect(null);
     setSearchTerms((prev) => ({ ...prev, [rowIndex]: '' }));
     setHighlightedIndex(-1);
   };
@@ -206,9 +211,13 @@ export function DeliveryLineTable({
     }, 50);
   };
 
-  const handleProductInputChange = (rowIndex: number, value: string) => {
+  const handleProductInputChange = (
+    rowIndex: number,
+    value: string,
+    input: HTMLInputElement
+  ) => {
     setSearchTerms((prev) => ({ ...prev, [rowIndex]: value }));
-    setActiveDropdown(rowIndex);
+    openDropdown(rowIndex, input);
     setHighlightedIndex(-1);
 
     if (!value.trim()) {
@@ -247,12 +256,14 @@ export function DeliveryLineTable({
       } else if (hasCreateOption && highlightedIndex === filtered.length) {
         onCreateNewItem!((searchTerms[rowIndex] ?? '').trim(), rowIndex);
         setActiveDropdown(null);
+        setDropdownRect(null);
         setHighlightedIndex(-1);
       } else if (filtered.length === 1) {
         selectStockItem(rowIndex, filtered[0]);
       }
     } else if (e.key === 'Escape') {
       setActiveDropdown(null);
+      setDropdownRect(null);
       setHighlightedIndex(-1);
     }
   };
@@ -280,6 +291,7 @@ export function DeliveryLineTable({
     setTimeout(() => {
       if (activeDropdown === rowIndex) {
         setActiveDropdown(null);
+        setDropdownRect(null);
         setHighlightedIndex(-1);
       }
     }, 200);
@@ -432,9 +444,11 @@ export function DeliveryLineTable({
                             ? searchTerms[index] ?? row.stock_item_name
                             : row.stock_item_name
                         }
-                        onChange={(e) => handleProductInputChange(index, e.target.value)}
-                        onFocus={() => {
-                          setActiveDropdown(index);
+                        onChange={(e) =>
+                          handleProductInputChange(index, e.target.value, e.currentTarget)
+                        }
+                        onFocus={(e) => {
+                          openDropdown(index, e.currentTarget);
                           if (!searchTerms[index] && row.stock_item_name) {
                             setSearchTerms((prev) => ({
                               ...prev,

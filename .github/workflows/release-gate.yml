@@ -104,4 +104,5 @@ jobs:
         with:
           name: release-gate-sandbox-${{ github.run_id }}
           path: apps/delivery/test-results/
+          if-no-files-found: ignore
           retention-days: 14
