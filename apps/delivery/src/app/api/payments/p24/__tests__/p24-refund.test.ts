@@ -174,4 +174,56 @@ describe('POST /api/payments/p24/refund', () => {
     const response = await POST(makeRequest({ orderId: 'order-1' }))
     expect(response.status).toBe(409)
   })
+
+  it('returns 500 when refund metadata cannot be persisted', async () => {
+    mockFrom
+      .mockImplementationOnce(() =>
+        chain({
+          data: {
+            id: 'order-1',
+            order_number: 'WEB-20260315-001',
+            total: 42,
+            payment_status: 'paid',
+            metadata: {
+              p24: {
+                sessions: [
+                  {
+                    sessionId: 'order-1-1234567890',
+                    status: 'verified',
+                    createdAt: '2026-03-15T10:00:00.000Z',
+                    verifiedAt: '2026-03-15T10:01:00.000Z',
+                    p24OrderId: '777',
+                  },
+                ],
+                refunds: [],
+              },
+            },
+          },
+          error: null,
+        })
+      )
+      .mockImplementationOnce(() =>
+        chain({
+          data: null,
+          error: { message: 'db write failed' },
+        })
+      )
+
+    mockRefundTransaction.mockResolvedValue([
+      {
+        orderId: 777,
+        sessionId: 'order-1-1234567890',
+        amount: 4200,
+        description: 'Zwrot WEB-20260315-001',
+        status: true,
+        message: 'success',
+      },
+    ])
+
+    const response = await POST(makeRequest({ orderId: 'order-1' }))
+    const body = await response.json()
+
+    expect(response.status).toBe(500)
+    expect(body.error).toBe('Failed to persist refund metadata')
+  })
 })

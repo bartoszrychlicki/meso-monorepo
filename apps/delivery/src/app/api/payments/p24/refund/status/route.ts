@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     }
 
     const refundStatus = body.status === 0 ? 'completed' : 'rejected'
-    await supabaseAdmin
+    const { error: metadataUpdateError } = await supabaseAdmin
       .from(Tables.orders)
       .update({
         metadata: markP24RefundStatus(
@@ -65,6 +65,11 @@ export async function POST(request: Request) {
         ),
       })
       .eq('id', localOrderId)
+
+    if (metadataUpdateError) {
+      console.error('[P24 Refund Status] Failed to persist refund metadata:', metadataUpdateError)
+      return NextResponse.json({ error: 'Order update failed' }, { status: 500 })
+    }
 
     if (body.status === 0 && existingOrder.payment_status !== 'refunded') {
       const updateResult = await getPosApi().orders.updateStatus(localOrderId, {

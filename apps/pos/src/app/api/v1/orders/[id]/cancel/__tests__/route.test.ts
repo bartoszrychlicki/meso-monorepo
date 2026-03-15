@@ -99,4 +99,21 @@ describe('POST /api/v1/orders/:id/cancel', () => {
     expect(response.status).toBe(422);
     expect(body.error.code).toBe('INVALID_CANCELLATION_REASON');
   });
+
+  it('ignores changed_by from body for session-authenticated users', async () => {
+    const response = await POST(
+      makeRequest({
+        closure_reason_code: 'high_load',
+        changed_by: 'forged-user',
+      }),
+      makeParams('order-1')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockCancelOrderWithOptionalRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changed_by: 'user-1',
+      })
+    );
+  });
 });

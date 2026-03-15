@@ -134,12 +134,20 @@ export async function POST(request: Request) {
       requestedFrom: body.requestedFrom || 'system',
     }
 
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from(Tables.orders)
       .update({
         metadata: upsertP24Refund(order.metadata, refundRecord),
       })
       .eq('id', order.id)
+
+    if (updateError) {
+      console.error('[P24 Refund] Failed to persist refund metadata:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to persist refund metadata' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({ status: 'requested', refund: refundRecord })
   } catch (error) {

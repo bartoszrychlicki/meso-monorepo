@@ -28,7 +28,7 @@ async function authorizeOrderCancellation(request: NextRequest) {
       return apiForbidden('orders:status');
     }
 
-    return { changedBy: apiKeyAuth.id };
+    return { changedBy: apiKeyAuth.id, authType: 'api_key' as const };
   }
 
   const supabase = await createClient();
@@ -40,7 +40,7 @@ async function authorizeOrderCancellation(request: NextRequest) {
     return apiUnauthorized();
   }
 
-  return { changedBy: user.id };
+  return { changedBy: user.id, authType: 'session' as const };
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -73,7 +73,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       closure_reason: validation.data.closure_reason,
       request_refund: validation.data.request_refund,
       requested_from: validation.data.requested_from,
-      changed_by: validation.data.changed_by || auth.changedBy,
+      changed_by: auth.authType === 'api_key'
+        ? (validation.data.changed_by || auth.changedBy)
+        : auth.changedBy,
       requestOrigin: request.nextUrl.origin,
     });
 

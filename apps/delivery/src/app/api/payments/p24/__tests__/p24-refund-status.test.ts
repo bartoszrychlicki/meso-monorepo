@@ -188,4 +188,46 @@ describe('POST /api/payments/p24/refund/status', () => {
     expect(response.status).toBe(200)
     expect(mockUpdateStatus).not.toHaveBeenCalled()
   })
+
+  it('returns 500 and does not update POS when refund metadata persistence fails', async () => {
+    mockVerifyRefundNotificationSign.mockReturnValue(true)
+    mockFrom
+      .mockImplementationOnce(() =>
+        chain({
+          data: {
+            id: 'order-1',
+            status: 'cancelled',
+            payment_status: 'paid',
+            metadata: {
+              p24: {
+                refunds: [
+                  {
+                    requestId: 'req-1',
+                    refundsUuid: 'rf-1',
+                    sessionId: 'order-1-1234567890',
+                    p24OrderId: '777',
+                    amount: 4200,
+                    description: 'Zwrot',
+                    status: 'requested',
+                    requestedAt: '2026-03-15T10:05:00.000Z',
+                  },
+                ],
+              },
+            },
+          },
+          error: null,
+        })
+      )
+      .mockImplementationOnce(() =>
+        chain({
+          data: null,
+          error: { message: 'db write failed' },
+        })
+      )
+
+    const response = await POST(makeRequest(makeNotification()))
+
+    expect(response.status).toBe(500)
+    expect(mockUpdateStatus).not.toHaveBeenCalled()
+  })
 })
