@@ -353,7 +353,8 @@ export async function createPromotionalCode(
       min_order_amount: input.min_order_amount ?? null,
       required_loyalty_tier: input.required_loyalty_tier ?? null,
       max_uses: input.max_uses ?? null,
-      max_uses_per_customer: input.max_uses_per_customer ?? 1,
+      max_uses_per_customer:
+        input.max_uses_per_customer === undefined ? 1 : input.max_uses_per_customer,
       valid_until: input.valid_until ?? null,
       created_by: actorId ?? null,
     })

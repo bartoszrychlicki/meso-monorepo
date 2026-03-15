@@ -341,6 +341,14 @@ export const CreatePromotionalCodeSchema = PromotionalCodeSchemaBase.superRefine
     });
   }
 
+  if (value.discount_type === 'free_item' && !value.free_item_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['free_item_id'],
+      message: 'Dla darmowego produktu wybierz produkt',
+    });
+  }
+
   if (value.valid_until && new Date(value.valid_until).getTime() < new Date(value.valid_from).getTime()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -375,7 +383,15 @@ export const UpdatePromotionalCodeSchema = PromotionalCodeSchemaBase.partial()
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['discount_value'],
-        message: 'Rabat procentowy nie może przekraczać 100%',
+      message: 'Rabat procentowy nie może przekraczać 100%',
+      });
+    }
+
+    if (value.discount_type === 'free_item' && !value.free_item_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['free_item_id'],
+        message: 'Dla darmowego produktu wybierz produkt',
       });
     }
 

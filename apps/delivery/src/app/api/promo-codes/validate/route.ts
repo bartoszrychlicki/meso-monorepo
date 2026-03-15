@@ -181,7 +181,17 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  if (promo.max_uses_per_customer != null && user && customer) {
+  if (promo.max_uses_per_customer != null) {
+    if (!user || !customer) {
+      return NextResponse.json(
+        {
+          valid: false,
+          error: 'Musisz być zalogowany, aby użyć tego kodu promocyjnego',
+        },
+        { status: 200 }
+      )
+    }
+
     const { count } = await supabase
       .from(Tables.orders)
       .select('id', { count: 'exact', head: true })

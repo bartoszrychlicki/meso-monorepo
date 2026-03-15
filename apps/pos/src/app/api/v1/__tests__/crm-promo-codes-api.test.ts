@@ -140,6 +140,29 @@ describe('CRM promotional codes API', () => {
     expect(response.status).toBe(409);
   });
 
+  it('rejects free-item promotional codes without a product', async () => {
+    const response = await POST(
+      makeRequest('http://localhost:3000/api/v1/crm/promo-codes', {
+        method: 'POST',
+        body: JSON.stringify({
+          code: 'MESOFREE',
+          name: 'Darmowy produkt',
+          discount_type: 'free_item',
+          discount_value: null,
+          free_item_id: null,
+          valid_from: '2026-03-15T10:00:00.000Z',
+          channels: ['delivery'],
+        }),
+      })
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.details).toContainEqual(
+      expect.objectContaining({ field: 'free_item_id' })
+    );
+  });
+
   it('updates a promotional code', async () => {
     mockGetPromotionalCodeByCode.mockResolvedValue(null);
     mockUpdatePromotionalCode.mockResolvedValue({ ...promoCode, name: 'Rabat 15%' });
