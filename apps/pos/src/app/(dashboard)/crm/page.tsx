@@ -6,10 +6,11 @@
 
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useCRMStore } from '@/modules/crm/store';
 import { PageHeader } from '@/components/layout/page-header';
-import { CustomerCard } from '@/modules/crm/components/customer-card';
+import { CustomerTable } from '@/modules/crm/components/customer-table';
+import { CustomerDetailsSheet } from '@/modules/crm/components/customer-details-sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -28,6 +29,15 @@ import { seedAll } from '@/seed';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RewardsManager } from '@/modules/crm/components/rewards-manager';
 import { PromoCodesManager } from '@/modules/crm/components/promo-codes-manager';
+import {
+  DEFAULT_CUSTOMER_SORT,
+  getDefaultCustomerSortOrder,
+  sortCustomers,
+  type CustomerSort,
+  type CustomerSortKey,
+} from '@/modules/crm/utils/customer-list';
+import { crmRepository } from '@/modules/crm/repository';
+import { toast } from 'sonner';
 
 /**
  * CRM Page
@@ -37,21 +47,68 @@ export default function CRMPage() {
   const {
     loadCustomers,
     getFilteredCustomers,
+    getSelectedCustomer,
     getCustomerStats,
+    selectedCustomerId,
+    setSelectedCustomerId,
     searchQuery,
     setSearchQuery,
     tierFilter,
     setTierFilter,
     isLoading,
   } = useCRMStore();
+  const [sort, setSort] = useState<CustomerSort>(DEFAULT_CUSTOMER_SORT);
+  const [isSavingNote, setIsSavingNote] = useState(false);
 
   useEffect(() => {
     seedAll();
     loadCustomers();
   }, [loadCustomers]);
 
-  const filteredCustomers = getFilteredCustomers();
+  const filteredCustomers = sortCustomers(getFilteredCustomers(), sort);
   const stats = getCustomerStats();
+  const selectedCustomer = getSelectedCustomer();
+
+  const handleSortChange = (key: CustomerSortKey) => {
+    setSort((currentSort) => {
+      if (currentSort.key === key) {
+        return {
+          key,
+          order: currentSort.order === 'asc' ? 'desc' : 'asc',
+        };
+      }
+
+      return {
+        key,
+        order: getDefaultCustomerSortOrder(key),
+      };
+    });
+  };
+
+  const handleSaveNote = async (customerId: string, note: string | null) => {
+    setIsSavingNote(true);
+
+    try {
+      const updatedCustomer = await crmRepository.customers.update(customerId, {
+        notes: note,
+        updated_at: new Date().toISOString(),
+      });
+
+      useCRMStore.setState((state) => ({
+        ...state,
+        customers: state.customers.map((customer) =>
+          customer.id === updatedCustomer.id ? updatedCustomer : customer
+        ),
+      }));
+
+      toast.success('Notatka klienta została zapisana');
+    } catch (error) {
+      console.error('Failed to save customer note:', error);
+      toast.error('Nie udało się zapisać notatki');
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
 
   return (
     <div className="space-y-6" data-page="crm">
@@ -135,7 +192,7 @@ export default function CRMPage() {
 
           <Card>
             <CardContent className="pt-6">
-              <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -169,6 +226,9 @@ export default function CRMPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Kliknij wiersz klienta, aby otworzyć boczny panel ze szczegółami i notatką.
+              </p>
             </CardContent>
           </Card>
 
@@ -177,11 +237,12 @@ export default function CRMPage() {
               <p className="text-muted-foreground">Ładowanie klientów...</p>
             </div>
           ) : filteredCustomers.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredCustomers.map((customer) => (
-                <CustomerCard key={customer.id} customer={customer} />
-              ))}
-            </div>
+            <CustomerTable
+              customers={filteredCustomers}
+              sort={sort}
+              onSortChange={handleSortChange}
+              onSelectCustomer={setSelectedCustomerId}
+            />
           ) : (
             <Card>
               <CardContent className="text-center py-12">
@@ -213,6 +274,18 @@ export default function CRMPage() {
           <PromoCodesManager />
         </TabsContent>
       </Tabs>
+
+      <CustomerDetailsSheet
+        customer={selectedCustomer}
+        open={selectedCustomerId !== null}
+        isSavingNote={isSavingNote}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedCustomerId(null);
+          }
+        }}
+        onSaveNote={handleSaveNote}
+      />
     </div>
   );
 }
