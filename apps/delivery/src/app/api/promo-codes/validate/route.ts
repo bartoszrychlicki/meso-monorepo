@@ -207,12 +207,19 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from(Tables.orders)
       .select('id', { count: 'exact', head: true })
       .eq('customer_id', customer.id)
       .eq('promo_code', promo.code)
       .neq('status', 'cancelled')
+
+    if (countError) {
+      return NextResponse.json(
+        { valid: false, error: 'Nie udało się zweryfikować limitu użyć kodu promocyjnego' },
+        { status: 500 }
+      )
+    }
 
     if (count != null && count >= promo.max_uses_per_customer) {
       return NextResponse.json(

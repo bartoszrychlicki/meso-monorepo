@@ -78,6 +78,27 @@ describe('CRM rewards API', () => {
     expect(body.data[0].name).toBe('Darmowa dostawa');
   });
 
+  it('falls back to safe pagination defaults for invalid params', async () => {
+    mockListRewards.mockResolvedValue({
+      data: [reward],
+      total: 1,
+      page: 1,
+      per_page: 50,
+    });
+
+    const response = await listRoute(
+      makeRequest('http://localhost:3000/api/v1/crm/rewards?page=foo&per_page=bar')
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockListRewards).toHaveBeenCalledWith(expect.anything(), {
+      page: 1,
+      perPage: 50,
+      search: null,
+      isActive: null,
+    });
+  });
+
   it('creates a reward', async () => {
     mockCreateReward.mockResolvedValue(reward);
 
