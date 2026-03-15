@@ -41,6 +41,7 @@ import {
 } from '@/lib/sms/templates';
 import { supabase } from '@/lib/supabase/client';
 import type { UpdateOrderInput } from '@/schemas/order';
+import type { ApiResponseWarning } from '@meso/core';
 import { normalizeOrderClosureReason } from '@meso/core';
 
 const baseRepo = createRepository<Order>('orders');
@@ -51,6 +52,11 @@ const ACTIVE_KITCHEN_TICKET_STATUSES = [
   OrderStatus.READY,
 ] as const;
 type ActiveKitchenTicketStatus = (typeof ACTIVE_KITCHEN_TICKET_STATUSES)[number];
+
+export interface OrderUpdateResult {
+  order: Order;
+  warnings: ApiResponseWarning[];
+}
 
 function usesSupabaseBackend(): boolean {
   return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
@@ -160,7 +166,7 @@ async function rollbackStatusViaApi(id: string, note?: string): Promise<Order> {
 async function updateOrderViaApi(
   id: string,
   input: UpdateOrderInput
-): Promise<Order> {
+): Promise<OrderUpdateResult> {
   const response = await fetch(buildAppUrl(`/api/v1/orders/${id}`), {
     method: 'PUT',
     headers: {
@@ -174,7 +180,12 @@ async function updateOrderViaApi(
     throw new Error(json.error?.message || `Order update failed (${response.status})`);
   }
 
-  return json.data as Order;
+  return {
+    order: json.data as Order,
+    warnings: Array.isArray(json.meta?.warnings)
+      ? (json.meta.warnings as ApiResponseWarning[])
+      : [],
+  };
 }
 
 function hasOwnProperty<T extends object>(value: T, key: keyof T): boolean {
@@ -439,7 +450,7 @@ async function rollbackStatus(id: string, note?: string): Promise<Order> {
   return updatedOrder;
 }
 
-async function updateOrder(id: string, input: UpdateOrderInput): Promise<Order> {
+async function updateOrder(id: string, input: UpdateOrderInput): Promise<OrderUpdateResult> {
   if (usesSupabaseBackend()) {
     return updateOrderViaApi(id, input);
   }
@@ -601,7 +612,10 @@ async function updateOrder(id: string, input: UpdateOrderInput): Promise<Order> 
     });
   }
 
-  return updatedOrder;
+  return {
+    order: updatedOrder,
+    warnings: [],
+  };
 }
 
 async function cancelOrder(

@@ -13,6 +13,7 @@ import {
 import { Product, ProductVariant } from '@/types/menu';
 import { KitchenTicket, KitchenItem } from '@/types/kitchen';
 import { ordersRepository } from './repository';
+import type { OrderUpdateResult } from './repository';
 import { createRepository } from '@/lib/data/repository-factory';
 import { LOCATION_IDS } from '@/seed/data/locations';
 import { USER_IDS } from '@/seed/data/users';
@@ -69,7 +70,7 @@ interface OrdersStore {
   updateOrder: (
     id: string,
     input: UpdateOrderInput
-  ) => Promise<Order>;
+  ) => Promise<OrderUpdateResult>;
   rollbackOrderStatus: (
     id: string,
     note?: string
@@ -277,16 +278,16 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
   },
 
   updateOrder: async (id, input) => {
-    const updatedOrder = await ordersRepository.updateOrder(id, input);
+    const result = await ordersRepository.updateOrder(id, input);
     await get().loadOrders();
     await get().loadActiveOrders();
 
     const state = get();
     if (state.selectedOrder?.id === id) {
-      set({ selectedOrder: updatedOrder });
+      set({ selectedOrder: result.order });
     }
 
-    return updatedOrder;
+    return result;
   },
 
   rollbackOrderStatus: async (id, note) => {

@@ -81,7 +81,7 @@ export const CreateOrderSchema = z.object({
 export const UpdateOrderSchema = z
   .object({
     customer_name: z.string().max(120, 'Imię i nazwisko jest za długie').optional(),
-    customer_phone: z.union([PhoneSchema, z.literal('')]).optional(),
+    customer_phone: PhoneSchema.optional(),
     items: z
       .array(UpdateOrderItemSchema)
       .min(1, 'Zamówienie musi zawierać produkty')

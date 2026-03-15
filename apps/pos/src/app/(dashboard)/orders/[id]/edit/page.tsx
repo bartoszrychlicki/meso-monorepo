@@ -29,8 +29,13 @@ export default function OrderEditPage({
   const handleSave = async (input: Parameters<typeof updateOrder>[1]) => {
     setIsSaving(true);
     try {
-      await updateOrder(id, input);
+      const result = await updateOrder(id, input);
       toast.success('Zmiany w zamówieniu zostały zapisane');
+      if (result.warnings.length > 0) {
+        toast.warning('Zamówienie zapisane z ostrzeżeniami', {
+          description: result.warnings.map((warning) => warning.message).join(' '),
+        });
+      }
       router.push(`/orders/${id}`);
     } catch (error) {
       toast.error('Nie udało się zapisać zmian', {
