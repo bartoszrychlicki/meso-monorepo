@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
+import type { OrderCancellationResult } from '@/types/order-cancel';
 import {
   OrderClosureReasonCode,
   OrderStatus,
@@ -69,8 +70,9 @@ interface OrdersStore {
     input: {
       closureReasonCode?: OrderClosureReasonCode | null;
       closureReason?: string;
+      requestRefund?: boolean;
     }
-  ) => Promise<void>;
+  ) => Promise<OrderCancellationResult>;
 
   // Cart actions
   addToCart: (
@@ -266,15 +268,15 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
   },
 
   cancelOrder: async (id, input) => {
-    await ordersRepository.updateStatus(
-      id,
-      OrderStatus.CANCELLED,
-      input.closureReason,
-      input.closureReasonCode,
-      input.closureReason
-    );
+    const result = await ordersRepository.cancelOrder(id, input);
     await get().loadOrders();
     await get().loadActiveOrders();
+    const selectedOrder = await ordersRepository.findById(id);
+    if (selectedOrder) {
+      set({ selectedOrder });
+    }
+
+    return result;
   },
 
   // Cart actions

@@ -11,6 +11,7 @@ import {
   PaymentStatus,
 } from '@/types/enums';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
+import { getAutomaticRefundEligibility } from '@/lib/orders/p24-refund';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { OrderStatusBadge } from './order-status-badge';
 import { OrderTimeline } from './order-timeline';
@@ -30,6 +31,7 @@ import {
   OrderCancelDialog,
   type OrderCancelInput,
 } from '@/components/shared/order-cancel-dialog';
+import type { OrderCancellationResult } from '@/types/order-cancel';
 import {
   ArrowRight,
   XCircle,
@@ -96,7 +98,7 @@ const NEXT_STATUS_PICKUP: Partial<Record<OrderStatus, OrderStatus>> = {
 interface OrderDetailProps {
   order: Order;
   onStatusChange: (status: OrderStatus, note?: string) => Promise<void>;
-  onCancel: (input: OrderCancelInput) => Promise<void>;
+  onCancel: (input: OrderCancelInput) => Promise<OrderCancellationResult>;
 }
 
 interface TimestampField {
@@ -137,6 +139,8 @@ export function OrderDetail({
     order.status !== OrderStatus.CANCELLED &&
     order.status !== OrderStatus.DELIVERED;
   const netAmount = order.total - order.tax;
+  const refundEligibility = getAutomaticRefundEligibility(order);
+  const latestRefund = refundEligibility.latestRefund;
 
   const handleNextStatus = async () => {
     if (!nextStatus) return;
@@ -205,6 +209,26 @@ export function OrderDetail({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Powód anulowania</AlertTitle>
           <AlertDescription>{order.closure_reason}</AlertDescription>
+        </Alert>
+      )}
+
+      {latestRefund?.status === 'requested' && (
+        <Alert className="border-sky-200 bg-sky-50 text-sky-950" data-field="refund-pending-alert">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Zwrot w toku</AlertTitle>
+          <AlertDescription>
+            Zwrot przez Przelewy24 zostal zlecony i czeka na potwierdzenie.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {(latestRefund?.status === 'manual_action_required' || latestRefund?.status === 'rejected') && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-950" data-field="refund-manual-alert">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Zwrot wymaga recznej obslugi</AlertTitle>
+          <AlertDescription>
+            {latestRefund.errorMessage || 'Nie udalo sie domknac automatycznego zwrotu przez Przelewy24.'}
+          </AlertDescription>
         </Alert>
       )}
 
@@ -546,6 +570,7 @@ export function OrderDetail({
         onOpenChange={setCancelDialogOpen}
         onConfirm={handleCancel}
         orderNumber={order.order_number}
+        refundableAmount={refundEligibility.eligible ? order.total : undefined}
         isSubmitting={isUpdating}
       />
     </div>

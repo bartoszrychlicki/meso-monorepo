@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { OrderCancelDialog } from '../order-cancel-dialog';
 
@@ -47,5 +48,32 @@ describe('OrderCancelDialog', () => {
     expect(
       screen.getByText('Ten powód będzie widoczny dla klienta w aplikacji delivery.')
     ).toBeInTheDocument();
+  });
+
+  it('includes refund checkbox only when refundable amount is provided', async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <OrderCancelDialog
+        open
+        onOpenChange={() => undefined}
+        onConfirm={onConfirm}
+        orderNumber="ORD-3"
+        refundableAmount={42}
+      />
+    );
+
+    expect(screen.getByText(/Czy od razu zlecić zwrot płatności/)).toBeInTheDocument();
+
+    await user.click(screen.getByText('Brak składników'));
+    await user.click(screen.getByLabelText('Zlec dodatkowo automatyczny zwrot platnosci'));
+    await user.click(screen.getByRole('button', { name: 'Anuluj zamówienie' }));
+
+    expect(onConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestRefund: true,
+      })
+    );
   });
 });

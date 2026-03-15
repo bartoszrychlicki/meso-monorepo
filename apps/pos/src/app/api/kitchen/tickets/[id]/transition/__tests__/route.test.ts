@@ -6,6 +6,13 @@ vi.mock('@/modules/orders/server-loyalty', () => ({
   awardOrderLoyaltyPoints: vi.fn(),
 }))
 
+const { mockCancelOrderWithOptionalRefund } = vi.hoisted(() => ({
+  mockCancelOrderWithOptionalRefund: vi.fn(),
+}))
+vi.mock('@/lib/orders/cancel-order', () => ({
+  cancelOrderWithOptionalRefund: mockCancelOrderWithOptionalRefund,
+}))
+
 const { mockScheduleWebhookDispatch } = vi.hoisted(() => ({
   mockScheduleWebhookDispatch: vi.fn().mockResolvedValue(undefined),
 }))
@@ -142,6 +149,15 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
           timestamp: '2026-03-01T10:05:00.000Z',
         },
       ],
+    });
+    mockCancelOrderWithOptionalRefund.mockResolvedValue({
+      order: {
+        ...baseOrder,
+        status: OrderStatus.CANCELLED,
+      },
+      refund: {
+        status: 'not_requested',
+      },
     });
   });
 
@@ -321,32 +337,35 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
       status: OrderStatus.CANCELLED,
       completed_at: '2026-03-01T10:05:00.000Z',
     });
-    mockOrdersRepo.findById.mockResolvedValueOnce({
-      ...baseOrder,
-      status: OrderStatus.PENDING,
-    });
-    mockOrdersRepo.update.mockResolvedValueOnce({
-      ...baseOrder,
-      status: OrderStatus.CANCELLED,
-      cancelled_at: '2026-03-01T10:05:00.000Z',
-      closure_reason_code: 'high_load',
-      closure_reason: 'Za duży ruch',
-      status_history: [
-        {
-          status: OrderStatus.CANCELLED,
-          timestamp: '2026-03-01T10:05:00.000Z',
-          note: 'Za duży ruch',
-        },
-      ],
+    mockCancelOrderWithOptionalRefund.mockResolvedValueOnce({
+      order: {
+        ...baseOrder,
+        status: OrderStatus.CANCELLED,
+        cancelled_at: '2026-03-01T10:05:00.000Z',
+        closure_reason_code: 'high_load',
+        closure_reason: 'Za duży ruch',
+      },
+      refund: {
+        status: 'requested',
+      },
     });
 
     const response = await POST(
-      makeRequest({ action: 'cancel_order', reasonCode: 'high_load' }),
+      makeRequest({ action: 'cancel_order', reasonCode: 'high_load', requestRefund: true }),
       makeParams('ticket-1')
     );
+    const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(mockOrdersRepo.update).toHaveBeenCalledWith(
+    expect(body.cancelResult.refund.status).toBe('requested');
+    expect(mockCancelOrderWithOptionalRefund).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderId,
+        request_refund: true,
+        requested_from: 'kds',
+      })
+    );
+    expect(mockOrdersRepo.update).not.toHaveBeenCalledWith(
       orderId,
       expect.objectContaining({
         status: OrderStatus.CANCELLED,

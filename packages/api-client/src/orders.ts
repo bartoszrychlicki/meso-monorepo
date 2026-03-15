@@ -1,6 +1,8 @@
 import type {
   ApiResponse,
+  CancelOrderInput,
   Order,
+  P24RefundRecord,
   CreateOrderInput,
   UpdateOrderStatusInput,
 } from '@meso/core';
@@ -25,6 +27,31 @@ export class OrdersApi {
     return this.client.request<Order>(
       'PATCH',
       `/orders/${orderId}/status`,
+      input
+    );
+  }
+
+  async cancel(
+    orderId: string,
+    input: CancelOrderInput
+  ): Promise<ApiResponse<{
+    order: Order
+    refund: {
+      status: 'not_requested' | 'requested' | 'manual_action_required'
+      message?: string
+      refund?: P24RefundRecord
+    }
+  }>> {
+    return this.client.request<{
+      order: Order
+      refund: {
+        status: 'not_requested' | 'requested' | 'manual_action_required'
+        message?: string
+        refund?: P24RefundRecord
+      }
+    }>(
+      'POST',
+      `/orders/${orderId}/cancel`,
       input
     );
   }

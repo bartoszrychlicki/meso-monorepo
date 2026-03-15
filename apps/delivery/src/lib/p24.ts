@@ -53,6 +53,50 @@ export interface P24Notification {
     sign: string
 }
 
+export interface P24RefundRequestItem {
+    orderId: number
+    sessionId: string
+    amount: number
+    description: string
+}
+
+export interface P24RefundRequest {
+    requestId: string
+    refundsUuid: string
+    urlStatus: string
+    refunds: P24RefundRequestItem[]
+}
+
+export interface P24RefundResponseItem extends P24RefundRequestItem {
+    status: boolean
+    message: string
+}
+
+export interface P24RefundNotification {
+    orderId: number
+    sessionId: string
+    merchantId: number
+    requestId: string
+    refundsUuid: string
+    amount: number
+    currency: string
+    timestamp: number
+    status: 0 | 1
+    sign: string
+}
+
+export class P24RefundError extends Error {
+    readonly details?: unknown
+    readonly statusCode?: number
+
+    constructor(message: string, options?: { details?: unknown; statusCode?: number }) {
+        super(message)
+        this.name = 'P24RefundError'
+        this.details = options?.details
+        this.statusCode = options?.statusCode
+    }
+}
+
 export class P24 {
     private config: P24Config
     private baseUrl: string
@@ -67,6 +111,10 @@ export class P24 {
     private calculateSign(sessionId: string, amount: number, currency: string, crcKey: string): string {
         const data = `{"sessionId":"${sessionId}","merchantId":${this.config.merchantId},"amount":${amount},"currency":"${currency}","crc":"${crcKey}"}`
         return crypto.createHash('sha384').update(data).digest('hex')
+    }
+
+    private getAuthHeader(): string {
+        return `Basic ${Buffer.from(`${this.config.posId}:${this.config.apiKey}`).toString('base64')}`
     }
 
     // For verifying notification signature
@@ -114,7 +162,7 @@ export class P24 {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Basic ${Buffer.from(`${this.config.posId}:${this.config.apiKey}`).toString('base64')}`
+                    'Authorization': this.getAuthHeader()
                 },
                 body: JSON.stringify(payload),
                 signal: controller.signal,
@@ -156,7 +204,7 @@ export class P24 {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Basic ${Buffer.from(`${this.config.posId}:${this.config.apiKey}`).toString('base64')}`
+                    'Authorization': this.getAuthHeader()
                 },
                 signal: verifyController.signal,
                 body: JSON.stringify({
@@ -186,5 +234,52 @@ export class P24 {
 
     public getPaymentLink(token: string): string {
         return `${this.baseUrl}/trnRequest/${token}`
+    }
+
+    public verifyRefundNotificationSign(notification: P24RefundNotification): boolean {
+        const { orderId, sessionId, refundsUuid, merchantId, amount, currency, status, sign } = notification
+        const data = `{"orderId":${orderId},"sessionId":"${sessionId}","refundsUuid":"${refundsUuid}","merchantId":${merchantId},"amount":${amount},"currency":"${currency}","status":${status},"crc":"${this.config.crcKey}"}`
+        const expectedSign = crypto.createHash('sha384').update(data).digest('hex')
+        return expectedSign === sign
+    }
+
+    public async refundTransaction(payload: P24RefundRequest): Promise<P24RefundResponseItem[]> {
+        try {
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 15_000)
+            const response = await fetch(`${this.baseUrl}/api/v1/transaction/refund`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': this.getAuthHeader(),
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal,
+            })
+            clearTimeout(timeoutId)
+
+            const data = await response.json().catch(() => ({}))
+            if (response.ok && Array.isArray(data.data)) {
+                return data.data as P24RefundResponseItem[]
+            }
+
+            if (response.status === 409 && Array.isArray(data.error)) {
+                const firstError = data.error[0]
+                const message = firstError?.message || 'Refund request rejected'
+                throw new P24RefundError(message, { details: data.error, statusCode: response.status })
+            }
+
+            const message = data.error || data.message || 'Failed to request refund'
+            throw new P24RefundError(message, { details: data, statusCode: response.status })
+        } catch (error) {
+            if (error instanceof P24RefundError) {
+                throw error
+            }
+
+            console.error('P24 Refund API Error:', error)
+            throw new P24RefundError(
+                error instanceof Error ? error.message : 'Failed to request refund'
+            )
+        }
     }
 }

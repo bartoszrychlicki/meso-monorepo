@@ -78,6 +78,15 @@ export const UpdateOrderStatusSchema = z.object({
   payment_status: z.nativeEnum(PaymentStatus).optional(),
 });
 
+export const CancelOrderSchema = z.object({
+  closure_reason_code: z.nativeEnum(OrderClosureReasonCode).nullable().optional(),
+  closure_reason: z.string().optional(),
+  request_refund: z.boolean().optional(),
+  requested_from: z.enum(['pos', 'kds']).optional(),
+  changed_by: z.string().optional(),
+});
+
 export type CreateOrderInput = z.infer<typeof CreateOrderSchema>;
 export type UpdateOrderStatusInput = z.infer<typeof UpdateOrderStatusSchema>;
+export type CancelOrderInput = z.infer<typeof CancelOrderSchema>;
 export type CreateOrderItemInput = z.infer<typeof CreateOrderItemSchema>;

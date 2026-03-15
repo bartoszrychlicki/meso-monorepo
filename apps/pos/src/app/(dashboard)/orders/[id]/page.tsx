@@ -35,9 +35,20 @@ export default function OrderDetailPage({
   };
 
   const handleCancel = async (input: OrderCancelInput) => {
-    await cancelOrder(id, input);
+    const result = await cancelOrder(id, input);
     refresh();
-    toast.error('Zamowienie zostalo anulowane');
+    if (result.refund.status === 'requested') {
+      toast.success('Zamowienie zostalo anulowane, a zwrot zlecony.');
+      return result;
+    }
+
+    if (result.refund.status === 'manual_action_required') {
+      toast.warning(result.refund.message || 'Zamowienie anulowane. Zwrot wymaga recznej obslugi.');
+      return result;
+    }
+
+    toast.success('Zamowienie zostalo anulowane');
+    return result;
   };
 
   if (isLoading || !order) {

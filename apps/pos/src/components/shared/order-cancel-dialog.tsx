@@ -7,6 +7,7 @@ import {
 } from '@meso/core';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -19,10 +20,12 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { formatCurrency } from '@/lib/utils';
 
 export interface OrderCancelInput {
   closureReasonCode?: OrderClosureReasonCode | null;
   closureReason?: string;
+  requestRefund?: boolean;
 }
 
 interface OrderCancelDialogProps {
@@ -31,6 +34,7 @@ interface OrderCancelDialogProps {
   onConfirm: (input: OrderCancelInput) => Promise<void>;
   orderNumber: string;
   isSubmitting?: boolean;
+  refundableAmount?: number;
 }
 
 export function OrderCancelDialog({
@@ -39,14 +43,17 @@ export function OrderCancelDialog({
   onConfirm,
   orderNumber,
   isSubmitting = false,
+  refundableAmount,
 }: OrderCancelDialogProps) {
   const [selectedReasonCode, setSelectedReasonCode] = useState<OrderClosureReasonCode | null>(null);
   const [customReason, setCustomReason] = useState('');
+  const [requestRefund, setRequestRefund] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setSelectedReasonCode(null);
       setCustomReason('');
+      setRequestRefund(false);
     }
   }, [open]);
 
@@ -59,6 +66,7 @@ export function OrderCancelDialog({
     await onConfirm({
       closureReasonCode: selectedReasonCode,
       closureReason: trimmedCustomReason || undefined,
+      requestRefund,
     });
   };
 
@@ -124,6 +132,35 @@ export function OrderCancelDialog({
             data-field="closure-reason-text"
           />
         </div>
+
+        {typeof refundableAmount === 'number' && (
+          <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-emerald-900">
+                Czy od razu zlecić zwrot płatności?
+              </p>
+              <p className="text-sm text-emerald-800">
+                System zleci pelny zwrot przez Przelewy24 na kwote {formatCurrency(refundableAmount)}.
+              </p>
+              <p className="text-xs text-emerald-700">
+                Potwierdzenie zwrotu przyjdzie asynchronicznie z Przelewy24.
+              </p>
+            </div>
+
+            <Label
+              htmlFor="request-refund"
+              className="flex cursor-pointer items-start gap-3 rounded-md border border-emerald-200 bg-white p-3"
+            >
+              <Checkbox
+                id="request-refund"
+                checked={requestRefund}
+                onCheckedChange={(checked) => setRequestRefund(checked === true)}
+                data-field="request-refund"
+              />
+              <span>Zlec dodatkowo automatyczny zwrot platnosci</span>
+            </Label>
+          </div>
+        )}
 
         <DialogFooter>
           <Button

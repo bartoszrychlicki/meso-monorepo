@@ -83,11 +83,14 @@ Each app has its own `.env.local`. Copy from `.env.example` (if available) or se
 ### `apps/pos`
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_SECRET_KEY`
 - `NEXT_PUBLIC_DATA_BACKEND` — `"supabase"` (production) or `"localStorage"` (demo)
+- `DELIVERY_API_URL` — Delivery base URL for internal refund requests
+- `DELIVERY_INTERNAL_API_KEY` — shared secret used by POS -> Delivery refund calls
 
 ### `apps/delivery`
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY`
 - `POS_API_URL` — POS base URL (e.g. `https://pos.mesofood.pl`), **without** `/api/v1`
 - `POS_API_KEY` — API key for POS REST API
+- `DELIVERY_INTERNAL_API_KEY` — shared secret used by POS -> Delivery refund calls
 - `P24_*` — Przelewy24 payment gateway config
 - `RESEND_API_KEY` — Email delivery
 

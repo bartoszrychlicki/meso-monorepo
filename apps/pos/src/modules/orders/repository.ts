@@ -1,4 +1,5 @@
 import { Order } from '@/types/order';
+import type { OrderCancellationResult } from '@/types/order-cancel';
 import {
   OrderChannel,
   OrderClosureReasonCode,
@@ -29,6 +30,35 @@ const ACTIVE_KITCHEN_TICKET_STATUSES = [
 
 function usesSupabaseBackend(): boolean {
   return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+}
+
+async function cancelOrderViaApi(
+  id: string,
+  payload: {
+    closureReasonCode?: OrderClosureReasonCode | null;
+    closureReason?: string;
+    requestRefund?: boolean;
+  }
+): Promise<OrderCancellationResult> {
+  const response = await fetch(`/api/v1/orders/${id}/cancel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      closure_reason_code: payload.closureReasonCode,
+      closure_reason: payload.closureReason,
+      request_refund: payload.requestRefund,
+      requested_from: 'pos',
+    }),
+  });
+
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok || !json.success || !json.data) {
+    throw new Error(json.error?.message || `Order cancellation failed (${response.status})`);
+  }
+
+  return json.data as OrderCancellationResult;
 }
 
 async function findByStatus(status: OrderStatus): Promise<Order[]> {
@@ -142,6 +172,34 @@ async function updateStatus(
   // ===== CRM INTEGRATION END =====
 
   return updatedOrder;
+}
+
+async function cancelOrder(
+  id: string,
+  payload: {
+    closureReasonCode?: OrderClosureReasonCode | null;
+    closureReason?: string;
+    requestRefund?: boolean;
+  }
+): Promise<OrderCancellationResult> {
+  if (usesSupabaseBackend()) {
+    return cancelOrderViaApi(id, payload);
+  }
+
+  const order = await updateStatus(
+    id,
+    OrderStatus.CANCELLED,
+    payload.closureReason,
+    payload.closureReasonCode,
+    payload.closureReason
+  );
+
+  return {
+    order,
+    refund: {
+      status: 'not_requested',
+    },
+  };
 }
 
 /**
@@ -338,6 +396,7 @@ export const ordersRepository = {
   findByStatus,
   findByDateRange,
   findByCustomer,
+  cancelOrder,
   updateStatus,
   getActiveOrders,
   getTodaysOrders,

@@ -1,4 +1,5 @@
 import { KitchenTicket } from '@/types/kitchen';
+import type { OrderCancellationResult } from '@/types/order-cancel';
 import { OrderClosureReasonCode, OrderStatus } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
 
@@ -19,6 +20,7 @@ interface TransitionPayload {
   priority?: number;
   reasonCode?: OrderClosureReasonCode | null;
   reasonText?: string;
+  requestRefund?: boolean;
 }
 
 async function callTransition(
@@ -90,16 +92,40 @@ async function markServed(id: string): Promise<KitchenTicket> {
 async function cancelOrder(
   id: string,
   reasonCode?: OrderClosureReasonCode | null,
-  reasonText?: string
-): Promise<KitchenTicket> {
+  reasonText?: string,
+  requestRefund?: boolean
+): Promise<OrderCancellationResult> {
   if (isSupabaseBackend) {
-    return callTransition(id, 'cancel_order', { reasonCode, reasonText });
+    const response = await fetch(`/api/kitchen/tickets/${id}/transition`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: 'cancel_order', reasonCode, reasonText, requestRefund }),
+    });
+
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(json.error || `KDS transition failed (${response.status})`);
+    }
+
+    return (json.cancelResult ?? {
+      order: null,
+      refund: { status: 'not_requested' },
+    }) as OrderCancellationResult;
   }
 
-  return baseRepo.update(id, {
+  await baseRepo.update(id, {
     status: OrderStatus.CANCELLED,
     completed_at: new Date().toISOString(),
   } as Partial<KitchenTicket>);
+
+  return {
+    order: null as never,
+    refund: {
+      status: 'not_requested',
+    },
+  };
 }
 
 async function bumpOrder(id: string): Promise<KitchenTicket> {

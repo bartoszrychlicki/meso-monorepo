@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { normalizeOrderClosureReason } from '@meso/core';
 import { OrderClosureReasonCode } from '@/types/enums';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
+import { cancelOrderWithOptionalRefund } from '@/lib/orders/cancel-order';
 import {
   InvalidOrderCancellationReasonError,
   transitionOrderStatus,
@@ -32,6 +33,7 @@ interface TransitionBody {
   priority?: number;
   reasonCode?: OrderClosureReasonCode | null;
   reasonText?: string;
+  requestRefund?: boolean;
 }
 
 interface StatusUpdate {
@@ -177,18 +179,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     try {
+      if (body.action === 'cancel_order') {
+        const cancelResult = await cancelOrderWithOptionalRefund({
+          orderId,
+          closure_reason_code: normalizedCancellation?.closure_reason_code,
+          closure_reason: normalizedCancellation?.closure_reason ?? undefined,
+          request_refund: body.requestRefund,
+          requested_from: 'kds',
+          requestOrigin: request.nextUrl.origin,
+        });
+
+        return NextResponse.json({ ticket: updatedTicket, cancelResult });
+      }
+
       await transitionOrderStatus({
         orderId,
         status: statusUpdate.status,
-        note: body.action === 'cancel_order'
-          ? normalizedCancellation?.note ?? statusUpdate.note
-          : statusUpdate.note,
-        closure_reason_code: body.action === 'cancel_order'
-          ? normalizedCancellation?.closure_reason_code
-          : undefined,
-        closure_reason: body.action === 'cancel_order'
-          ? normalizedCancellation?.closure_reason
-          : undefined,
+        note: statusUpdate.note,
         requestOrigin: request.nextUrl.origin,
       });
     } catch (error) {
