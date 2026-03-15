@@ -81,6 +81,8 @@ const validOrderInput = {
       unit_price: 35,
       modifiers: [
         { modifier_id: 'mod-1', name: 'Extra Chashu', price: 8, quantity: 1, modifier_action: 'add' },
+        { modifier_id: 'mod-1b', name: 'Extra Chashu', price: 8, quantity: 1, modifier_action: 'add' },
+        { modifier_id: 'mod-2', name: 'Cebula', price: 0, quantity: 1, modifier_action: 'remove' },
       ],
     },
   ],
@@ -156,14 +158,14 @@ describe('POST /api/v1/orders — transactional create payload', () => {
 
     expect(payload).toBeDefined()
     expect(payload.p_order.order_number).toBe('WEB-20260303-001')
-    expect(payload.p_order.total).toBe(88)
-    expect(payload.p_order.loyalty_points_earned).toBe(138)
+    expect(payload.p_order.total).toBe(104)
+    expect(payload.p_order.loyalty_points_earned).toBe(154)
     expect(payload.p_order_items).toHaveLength(1)
     expect(payload.p_order_items[0]).toMatchObject({
       product_id: 'prod-1',
       quantity: 2,
       unit_price: 35,
-      total_price: 86,
+      total_price: 102,
     })
     expect(payload.p_order_items[0].addons).toEqual([
       {
@@ -172,6 +174,20 @@ describe('POST /api/v1/orders — transactional create payload', () => {
         price: 8,
         quantity: 1,
         modifier_action: 'add',
+      },
+      {
+        id: 'mod-1b',
+        name: 'Extra Chashu',
+        price: 8,
+        quantity: 1,
+        modifier_action: 'add',
+      },
+      {
+        id: 'mod-2',
+        name: 'Cebula',
+        price: 0,
+        quantity: 1,
+        modifier_action: 'remove',
       },
     ])
     expect(payload.p_kitchen_ticket).toMatchObject({
@@ -184,7 +200,7 @@ describe('POST /api/v1/orders — transactional create payload', () => {
     expect(payload.p_kitchen_ticket.items[0]).toMatchObject({
       product_name: 'Ramen',
       quantity: 2,
-      modifiers: ['Extra Chashu'],
+      modifiers: ['Extra Chashu', 'Extra Chashu', '- Cebula'],
       is_done: false,
     })
   })

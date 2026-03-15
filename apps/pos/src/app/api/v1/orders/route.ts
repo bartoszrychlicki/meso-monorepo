@@ -16,6 +16,10 @@ import { calculateOrderTotal, readMetadataPaymentFee, roundCurrency } from '@/li
 import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
 import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
 import { createServiceClient } from '@/lib/supabase/server';
+import {
+  formatKitchenModifierLabel,
+  normalizeKitchenModifierLabels,
+} from '@/modules/kitchen/formatting';
 import { estimateOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
 import { CreateOrderSchema } from '@/schemas/order';
 import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
@@ -506,7 +510,9 @@ export async function POST(request: NextRequest) {
     product_name: item.product_name,
     variant_name: item.variant_name,
     quantity: item.quantity,
-    modifiers: (item.modifiers || []).map((m) => m.name),
+    modifiers: normalizeKitchenModifierLabels(
+      (item.modifiers || []).map((modifier) => formatKitchenModifierLabel(modifier))
+    ),
     notes: item.notes,
     is_done: false,
   }));

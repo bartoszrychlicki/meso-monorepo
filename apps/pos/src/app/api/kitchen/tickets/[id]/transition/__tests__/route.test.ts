@@ -77,8 +77,11 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     order_number: 'WEB-20260301-001',
     status: OrderStatus.PENDING,
     payment_status: 'pending',
+    payment_method: 'pay_on_pickup',
     channel: 'delivery_app',
     source: 'delivery',
+    delivery_type: 'pickup',
+    scheduled_time: '2026-03-01T11:30:00.000Z',
     customer_name: 'Jan Kowalski',
     customer_phone: '+48500100100',
     total: 42,
@@ -149,6 +152,8 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
 
     expect(response.status).toBe(200);
     expect(body.ticket.status).toBe(OrderStatus.PREPARING);
+    expect(body.ticket.scheduled_time).toBe('2026-03-01T11:30:00.000Z');
+    expect(body.ticket.delivery_type).toBe('pickup');
 
     expect(mockCreateServerRepo).toHaveBeenCalledWith('kitchen_tickets');
     expect(mockCreateServerRepo).toHaveBeenCalledWith('orders');
@@ -193,10 +198,68 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     expect(body.error).toBe('Missing itemId or isDone for toggle_item');
   });
 
+  it('keeps enriched schedule fields after toggle_item', async () => {
+    mockKitchenRepo.update.mockResolvedValueOnce({
+      ...baseTicket,
+      items: [
+        {
+          ...baseTicket.items[0],
+          is_done: true,
+        },
+      ],
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'toggle_item', itemId: 'item-1', isDone: true }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.items[0].is_done).toBe(true);
+    expect(body.ticket.scheduled_time).toBe('2026-03-01T11:30:00.000Z');
+    expect(body.ticket.delivery_type).toBe('pickup');
+  });
+
+  it('returns updated ticket even when linked order enrichment fails after transition', async () => {
+    mockKitchenRepo.update.mockResolvedValueOnce({
+      ...baseTicket,
+      status: OrderStatus.PREPARING,
+      started_at: '2026-03-01T10:05:00.000Z',
+    });
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockRejectedValueOnce(new Error('temporary orders lookup failure'));
+
+    const response = await POST(makeRequest({ action: 'start_preparing' }), makeParams('ticket-1'));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket).toMatchObject({
+      id: 'ticket-1',
+      status: OrderStatus.PREPARING,
+      started_at: '2026-03-01T10:05:00.000Z',
+    });
+    expect(body.ticket.scheduled_time).toBeUndefined();
+    expect(body.ticket.delivery_type).toBeUndefined();
+    expect(mockOrdersRepo.update).toHaveBeenCalledWith(
+      orderId,
+      expect.objectContaining({
+        status: OrderStatus.PREPARING,
+      })
+    );
+  });
+
   it('still transitions ticket when order_id is missing (legacy tickets)', async () => {
     mockKitchenRepo.findById.mockResolvedValueOnce({
       ...baseTicket,
       order_id: null as unknown as string,
+    });
+    mockKitchenRepo.update.mockResolvedValueOnce({
+      ...baseTicket,
+      status: OrderStatus.PREPARING,
+      order_id: null as unknown as string,
+      started_at: '2026-03-01T10:05:00.000Z',
     });
 
     const request = makeRequest({ action: 'start_preparing' });

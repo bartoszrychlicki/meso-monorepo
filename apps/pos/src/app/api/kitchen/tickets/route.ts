@@ -7,15 +7,14 @@ import {
   extractKitchenTicketOrderIds,
   filterKitchenTicketsByLinkedOrders,
 } from '@/modules/kitchen/ticket-filters';
+import { mergeKitchenTicketsWithLinkedOrders, type KitchenLinkedOrder } from '@/modules/kitchen/server-enrichment';
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 import type { Order } from '@/types/order';
 
-type LinkedOrder = Pick<Order, 'id' | 'status' | 'channel' | 'payment_method' | 'payment_status'>;
-
 const isSupabaseBackend = process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
 
-async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
+async function loadLinkedOrders(orderIds: string[]): Promise<KitchenLinkedOrder[]> {
   if (orderIds.length === 0) {
     return [];
   }
@@ -23,14 +22,14 @@ async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
   if (isSupabaseBackend) {
     const { data, error } = await createServiceClient()
       .from('orders_orders')
-      .select('id, status, channel, payment_method, payment_status')
+      .select('id, status, channel, payment_method, payment_status, scheduled_time, delivery_type')
       .in('id', orderIds);
 
     if (error) {
       throw new Error(`[orders_orders] linked order lookup failed: ${error.message}`);
     }
 
-    return (data ?? []) as LinkedOrder[];
+    return (data ?? []) as KitchenLinkedOrder[];
   }
 
   const ordersRepo = createServerRepository<Order>('orders');
@@ -41,6 +40,8 @@ async function loadLinkedOrders(orderIds: string[]): Promise<LinkedOrder[]> {
     channel: order.channel,
     payment_method: order.payment_method,
     payment_status: order.payment_status,
+    scheduled_time: order.scheduled_time,
+    delivery_type: order.delivery_type,
   }));
 }
 
@@ -82,6 +83,8 @@ export async function GET(request: NextRequest) {
         excludeUnpaidPrepaidOrders: filter !== 'completed_today',
       }
     );
+
+    tickets = mergeKitchenTicketsWithLinkedOrders(tickets, linkedOrders);
 
     return NextResponse.json({ tickets });
   } catch (error) {
