@@ -155,7 +155,7 @@ describe('ordersRepository.updateStatus', () => {
     expect(mockGetOrderStatusSMS).toHaveBeenCalledWith(
       expect.objectContaining({ status: OrderStatus.DELIVERED }),
       OrderStatus.DELIVERED,
-      undefined
+      87
     );
   });
 });
