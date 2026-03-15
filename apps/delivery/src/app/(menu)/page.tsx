@@ -14,7 +14,7 @@ async function getMenuData() {
       .eq('is_active', true)
       .order('sort_order'),
     supabase
-      .from(Tables.products)
+      .from(Tables.productsCatalog)
       .select(`
         id,
         category_id,

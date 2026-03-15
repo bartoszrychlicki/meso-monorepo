@@ -9,14 +9,13 @@ import { useMenu, useModifiers } from '@/modules/menu/hooks';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { useRecipesStore } from '@/modules/recipes/store';
 import { ProductForm } from '@/modules/menu/components/product-form';
-import { Product } from '@/types/menu';
-import { setProductModifiers } from '@/modules/menu/repository';
+import { ProductWriteInput } from '@/types/menu';
+import { setProductModifierGroups } from '@/modules/menu/repository';
 import { toast } from 'sonner';
 
 export default function NewProductPage() {
   const router = useRouter();
-  const { categories, createProduct } = useMenu();
-  const { modifiers: allModifiers, createModifier } = useModifiers();
+  const { categories, modifierGroups, createProduct } = useMenu();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const stockItems = useInventoryStore((s) => s.stockItems);
@@ -33,12 +32,12 @@ export default function NewProductPage() {
     }
   }, [loadRecipes, loadStockItems, recipes.length, stockItems.length]);
 
-  const handleSubmit = async (data: Omit<Product, 'created_at' | 'updated_at'>, modifierIds: string[]) => {
+  const handleSubmit = async (data: ProductWriteInput, modifierGroupIds: string[]) => {
     setIsSubmitting(true);
     try {
       const newProduct = await createProduct(data);
-      if (modifierIds.length > 0) {
-        await setProductModifiers(newProduct.id, modifierIds);
+      if (modifierGroupIds.length > 0) {
+        await setProductModifierGroups(newProduct.id, modifierGroupIds);
       }
       toast.success('Produkt zostal dodany');
       router.push('/menu');
@@ -72,8 +71,7 @@ export default function NewProductPage() {
           categories={categories}
           stockItems={stockItems}
           recipes={recipes}
-          allModifiers={allModifiers}
-          onCreateModifier={createModifier}
+          allModifierGroups={modifierGroups}
           onSubmit={handleSubmit}
           onCancel={() => router.push('/menu')}
           isSubmitting={isSubmitting}

@@ -7,11 +7,13 @@ import {
   apiError,
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
-import { syncProductsWithCurrentModifierState } from '@/lib/product-modifier-groups';
 import { CreateProductSchema } from '@/schemas/menu';
 import { createServiceClient } from '@/lib/supabase/server';
-import type { Product } from '@/types/menu';
+import type { Product, ProductWriteInput } from '@/types/menu';
 import { SalesChannel } from '@/types/enums';
+import { createProductWithFoodCost } from '@/modules/menu/repository';
+import { setProductModifierGroupsWithClient } from '@/modules/menu/relations';
+import type { Recipe } from '@/types/recipe';
 
 /**
  * GET /api/v1/menu/products
@@ -36,8 +38,7 @@ export async function GET(request: NextRequest) {
   const updatedSince = searchParams.get('updated_since');
   const include = searchParams.get('include');
 
-  const serverProductsRepo = createServerRepository<Product>('products');
-  const serviceClient = createServiceClient();
+  const serverProductsRepo = createServerRepository<Product>('products_catalog');
 
   const filters: Record<string, unknown> = {};
   if (categoryId) filters.category_id = categoryId;
@@ -80,13 +81,11 @@ export async function GET(request: NextRequest) {
     result = { ...result, data: filtered, total: filtered.length };
   }
 
-  const syncedProducts = await syncProductsWithCurrentModifierState(serviceClient, result.data);
-
   // Apply include filter to control response fields
-  let responseData: Partial<Product>[] = syncedProducts;
+  let responseData: Partial<Product>[] = result.data;
   if (include) {
     const includeFields = new Set(include.split(',').map((s) => s.trim()));
-    responseData = syncedProducts.map((p) => {
+    responseData = result.data.map((p) => {
       const base: Partial<Product> = {
         id: p.id,
         name: p.name,
@@ -150,7 +149,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const serviceClient = createServiceClient();
   const serverProductsRepo = createServerRepository<Product>('products');
-  const product = await serverProductsRepo.create(validation.data as Omit<Product, 'id' | 'created_at' | 'updated_at'>);
-  return apiCreated(product);
+  const serverRecipesRepo = createServerRepository<Recipe>('recipes');
+  const catalogProductsRepo = createServerRepository<Product>('products_catalog');
+  const payload = validation.data as ProductWriteInput;
+
+  const product = await createProductWithFoodCost(payload, {
+    productsRepo: serverProductsRepo,
+    recipesRepo: serverRecipesRepo,
+  });
+
+  await setProductModifierGroupsWithClient(
+    serviceClient,
+    product.id,
+    payload.modifier_group_ids ?? []
+  );
+
+  const createdProduct = await catalogProductsRepo.findById(product.id);
+  return apiCreated(createdProduct ?? product);
 }

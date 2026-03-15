@@ -114,6 +114,15 @@ export interface Product extends BaseEntity {
   active_promotions?: string[]; // spec 3.5 - ID aktywnych promocji (Sprint 2)
 }
 
+export type ProductWriteInput = Omit<Product, 'modifier_groups' | 'created_at' | 'updated_at'> & {
+  modifier_group_ids?: string[];
+};
+
+export type ModifierGroupWriteInput = Omit<
+  ModifierGroup,
+  'modifiers' | 'created_at' | 'updated_at'
+>;
+
 export interface RecipeIngredient {
   type: 'stock_item' | 'recipe';
   reference_id: string;

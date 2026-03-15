@@ -1,7 +1,23 @@
-import { Product, Category, ModifierGroup, MenuModifier } from '@/types/menu';
+import {
+  Product,
+  Category,
+  ModifierGroup,
+  MenuModifier,
+  type ProductWriteInput,
+} from '@/types/menu';
 import { Recipe } from '@/types/recipe';
 import { createRepository } from '@/lib/data/repository-factory';
 import { supabase } from '@/lib/supabase/client';
+import type { BaseRepository } from '@/lib/data/base-repository';
+import {
+  countProductsUsingModifierWithClient,
+  getModifierGroupModifierIdsWithClient,
+  getProductModifierGroupIdsWithClient,
+  getProductModifiersWithClient,
+  listModifierGroupsWithClient,
+  setModifierGroupModifiersWithClient,
+  setProductModifierGroupsWithClient,
+} from './relations';
 
 export const productsRepository = createRepository<Product>('products');
 export const categoriesRepository = createRepository<Category>('categories');
@@ -11,6 +27,9 @@ export const recipesRepository = createRepository<Recipe>('recipes');
 
 const MAX_FOOD_COST_PERCENTAGE = 999.99;
 
+type ProductRepo = BaseRepository<Product>;
+type RecipeRepo = BaseRepository<Recipe>;
+
 function normalizeModifierIds(ids: string[]): string[] {
   return [...new Set(ids.filter(Boolean))];
 }
@@ -19,12 +38,18 @@ function roundFoodCostPercentage(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+function stripProductWriteRelations<T extends ProductWriteInput | Partial<ProductWriteInput>>(data: T) {
+  const { modifier_group_ids: _modifierGroupIds, ...persistedProduct } = data;
+  return persistedProduct;
+}
+
 export async function calculateProductFoodCostPercentage(
   recipeId: string | null | undefined,
-  productPrice: number
+  productPrice: number,
+  recipeRepo: RecipeRepo = recipesRepository
 ): Promise<number | null> {
   if (!recipeId || productPrice <= 0) return null;
-  const recipe = await recipesRepository.findById(recipeId);
+  const recipe = await recipeRepo.findById(recipeId);
   if (!recipe) return null;
 
   const costPerUnit = recipe.cost_per_unit;
@@ -40,24 +65,39 @@ export async function calculateProductFoodCostPercentage(
 }
 
 export async function createProductWithFoodCost(
-  data: Omit<Product, 'created_at' | 'updated_at'>
+  data: ProductWriteInput,
+  repositories: {
+    productsRepo?: ProductRepo;
+    recipesRepo?: RecipeRepo;
+  } = {}
 ): Promise<Product> {
+  const productsRepo = repositories.productsRepo ?? productsRepository;
+  const recipesRepo = repositories.recipesRepo ?? recipesRepository;
   const foodCostPercentage = await calculateProductFoodCostPercentage(
     data.recipe_id,
-    data.price
+    data.price,
+    recipesRepo
   );
 
-  return productsRepository.create({
-    ...data,
-    food_cost_percentage: foodCostPercentage,
-  });
+  return productsRepo.create(
+    {
+      ...stripProductWriteRelations(data),
+      food_cost_percentage: foodCostPercentage,
+    } as unknown as Omit<Product, 'id' | 'created_at' | 'updated_at'>
+  );
 }
 
 export async function updateProductWithFoodCost(
   id: string,
-  data: Partial<Product>
+  data: Partial<ProductWriteInput>,
+  repositories: {
+    productsRepo?: ProductRepo;
+    recipesRepo?: RecipeRepo;
+  } = {}
 ): Promise<Product> {
-  const existingProduct = await productsRepository.findById(id);
+  const productsRepo = repositories.productsRepo ?? productsRepository;
+  const recipesRepo = repositories.recipesRepo ?? recipesRepository;
+  const existingProduct = await productsRepo.findById(id);
   if (!existingProduct) {
     throw new Error(`Product ${id} not found`);
   }
@@ -68,11 +108,12 @@ export async function updateProductWithFoodCost(
 
   const foodCostPercentage = await calculateProductFoodCostPercentage(
     nextRecipeId,
-    nextPrice
+    nextPrice,
+    recipesRepo
   );
 
-  return productsRepository.update(id, {
-    ...data,
+  return productsRepo.update(id, {
+    ...stripProductWriteRelations(data),
     food_cost_percentage: foodCostPercentage,
   });
 }
@@ -102,13 +143,8 @@ export async function toggleAvailability(productId: string): Promise<Product> {
 
 /** Get modifier IDs for a product (ordered by per-product sort_order) */
 export async function getProductModifierIds(productId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('product_modifiers')
-    .select('modifier_id')
-    .eq('product_id', productId)
-    .order('sort_order', { ascending: true });
-  if (error) throw new Error(`getProductModifierIds failed: ${error.message}`);
-  return (data ?? []).map((row: { modifier_id: string }) => row.modifier_id);
+  const modifiers = await getProductModifiers(productId);
+  return modifiers.map((modifier) => modifier.id);
 }
 
 /** Set modifiers for a product (replace all) */
@@ -135,32 +171,30 @@ export async function setProductModifiers(productId: string, modifierIds: string
 
 /** Get modifiers for a product (full objects, ordered by per-product sort_order) */
 export async function getProductModifiers(productId: string): Promise<MenuModifier[]> {
-  const { data, error } = await supabase
-    .from('product_modifiers')
-    .select('modifier_id, sort_order')
-    .eq('product_id', productId)
-    .order('sort_order', { ascending: true });
-  if (error) throw new Error(`getProductModifiers failed: ${error.message}`);
-  if (!data || data.length === 0) return [];
-
-  const orderedIds: string[] = data.map((row: { modifier_id: string }) => row.modifier_id);
-  const { data: modifiers, error: modError } = await supabase
-    .from('menu_modifiers')
-    .select('*')
-    .in('id', orderedIds);
-  if (modError) throw new Error(`getProductModifiers fetch failed: ${modError.message}`);
-
-  // Re-sort by junction sort_order (orderedIds preserves that order)
-  const modMap = new Map((modifiers ?? []).map((m: MenuModifier) => [m.id, m]));
-  return orderedIds.map((id: string) => modMap.get(id)).filter(Boolean) as MenuModifier[];
+  return getProductModifiersWithClient(supabase, productId);
 }
 
 /** Count products using a modifier */
 export async function countProductsUsingModifier(modifierId: string): Promise<number> {
-  const { count, error } = await supabase
-    .from('product_modifiers')
-    .select('product_id', { count: 'exact', head: true })
-    .eq('modifier_id', modifierId);
-  if (error) throw new Error(`countProductsUsingModifier failed: ${error.message}`);
-  return count ?? 0;
+  return countProductsUsingModifierWithClient(supabase, modifierId);
+}
+
+export async function listModifierGroups(): Promise<ModifierGroup[]> {
+  return listModifierGroupsWithClient(supabase);
+}
+
+export async function getProductModifierGroupIds(productId: string): Promise<string[]> {
+  return getProductModifierGroupIdsWithClient(supabase, productId);
+}
+
+export async function setProductModifierGroups(productId: string, groupIds: string[]): Promise<void> {
+  await setProductModifierGroupsWithClient(supabase, productId, groupIds);
+}
+
+export async function getModifierGroupModifierIds(groupId: string): Promise<string[]> {
+  return getModifierGroupModifierIdsWithClient(supabase, groupId);
+}
+
+export async function setModifierGroupModifiers(groupId: string, modifierIds: string[]): Promise<void> {
+  await setModifierGroupModifiersWithClient(supabase, groupId, modifierIds);
 }

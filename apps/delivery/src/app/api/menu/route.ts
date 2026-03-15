@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { syncProductsWithCurrentModifierState } from '@/lib/product-modifier-groups'
 import { Tables } from '@/lib/table-mapping'
 import { NextResponse } from 'next/server'
 
@@ -17,7 +16,7 @@ export async function GET() {
   }
 
   const { data: products, error: prodError } = await supabase
-    .from(Tables.products)
+    .from(Tables.productsCatalog)
     .select(`
       id,
       category_id,
@@ -50,7 +49,8 @@ export async function GET() {
     return NextResponse.json({ error: prodError.message }, { status: 500 })
   }
 
-  const syncedProducts = await syncProductsWithCurrentModifierState(supabase, products || [])
+  const safeCategories = categories || []
+  const safeProducts = products || []
 
   // POS stores location address as JSONB, not flat columns
   // Also fetch delivery config from separate table
@@ -75,8 +75,8 @@ export async function GET() {
     .single()
 
   return NextResponse.json({
-    categories,
-    products: syncedProducts,
+    categories: safeCategories,
+    products: safeProducts,
     location: {
       ...location,
       // Flatten JSONB address for backward compatibility with Delivery frontend
@@ -88,8 +88,8 @@ export async function GET() {
       min_order_value: deliveryConfig?.min_order_amount,
     },
     meta: {
-      totalProducts: syncedProducts.length,
-      totalCategories: categories.length,
+      totalProducts: safeProducts.length,
+      totalCategories: safeCategories.length,
     }
   })
 }

@@ -362,10 +362,11 @@ export default function ApiDocsPage() {
         <div className="mb-8" id="menu-products">
           <h3 className="mb-4 text-xl font-semibold text-gray-800">Produkty</h3>
           <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-            <strong>Zmiana od 15 marca 2026:</strong> pola <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_groups[].modifiers[].is_available</code>
-            {' '}w odpowiedziach <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">GET /api/v1/menu/products</code> oraz{' '}
-            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">GET /api/v1/menu/products/:id</code> są liczone z bieżącej konfiguracji
-            modyfikatorów i ich przypisań do produktu, a nie ze starego snapshotu zapisanego w rekordzie produktu.
+            <strong>Breaking change od 15 marca 2026:</strong> endpointy <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">POST /api/v1/menu/products</code> oraz{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">PUT /api/v1/menu/products/:id</code> przyjmują teraz{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_group_ids</code> zamiast inline{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_groups</code>. Odczyt dalej zwraca{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_groups</code>, ale są one budowane z relacyjnego modelu grup i modyfikatorów.
           </div>
           <div className="space-y-4">
             <Endpoint
@@ -396,7 +397,7 @@ export default function ApiDocsPage() {
       "is_available": true,
       "allergens": ["gluten", "eggs", "milk"],
       "variants": [...],
-      "modifier_groups": [...], // is_available modyfikatorów pochodzi z bieżącej konfiguracji
+      "modifier_groups": [...], // wynik pochodzi z relacyjnego read modelu
       "pricing": [
         { "channel": "delivery", "price": 34.90 },
         { "channel": "pickup", "price": 29.90 }
@@ -438,22 +439,9 @@ export default function ApiDocsPage() {
       "variant_type": "size"   // size | version | weight
     }
   ],
-  "modifier_groups": [         // opcjonalne
-    {
-      "name": "Dodatki",
-      "type": "multiple",      // single | multiple
-      "required": false,
-      "min_selections": 0,
-      "max_selections": 5,
-      "modifiers": [
-        {
-          "name": "Ser cheddar",
-          "price": 4.00,
-          "is_available": true,
-          "modifier_action": "add"
-        }
-      ]
-    }
+  "modifier_group_ids": [      // opcjonalne
+    "uuid-grupy-dodatki",
+    "uuid-grupy-sosy"
   ],
   "ingredients": [             // opcjonalne (BOM)
     {
@@ -483,7 +471,8 @@ export default function ApiDocsPage() {
               body={`{
   "name": "Burger Classic v2",
   "price": 31.90,
-  "is_available": false
+  "is_available": false,
+  "modifier_group_ids": ["uuid-grupy-dodatki"]
 }`}
             />
 

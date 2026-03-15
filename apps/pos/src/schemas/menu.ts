@@ -103,7 +103,7 @@ const ProductBaseSchema = z.object({
   allergens: z.array(z.nativeEnum(Allergen)).default([]),
   nutritional_info: NutritionalInfoSchema.optional(),
   variants: z.array(ProductVariantSchema).default([]),
-  modifier_groups: z.array(ModifierGroupSchema).default([]),
+  modifier_group_ids: z.array(z.string().uuid()).default([]),
   ingredients: z.array(RecipeIngredientSchema).default([]),
   preparation_time_minutes: z.number().int().min(0).optional(),
   sort_order: z.number().int().default(0),

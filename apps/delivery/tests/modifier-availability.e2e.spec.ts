@@ -8,12 +8,18 @@ test.setTimeout(120_000)
 test.describe.serial('Delivery modifier availability', () => {
   const admin = getAdminClient()
   let productId: string | null = null
+  let modifierGroupId: string | null = null
   const modifierIds: string[] = []
 
   test.afterEach(async () => {
     if (productId) {
       await admin.from('menu_products').delete().eq('id', productId)
       productId = null
+    }
+
+    if (modifierGroupId) {
+      await admin.from('menu_modifier_groups').delete().eq('id', modifierGroupId)
+      modifierGroupId = null
     }
 
     if (modifierIds.length > 0) {
@@ -26,11 +32,13 @@ test.describe.serial('Delivery modifier availability', () => {
     const productSuffix = randomUUID().slice(0, 8)
     const activeModifierId = randomUUID()
     const inactiveModifierId = randomUUID()
+    const groupId = randomUUID()
     const activeModifierName = `Aktywny dodatek ${productSuffix}`
     const inactiveModifierName = `Ukryty dodatek ${productSuffix}`
     const slug = `modifier-availability-${productSuffix}`
 
     modifierIds.push(activeModifierId, inactiveModifierId)
+    modifierGroupId = groupId
 
     const { data: category } = await admin
       .from('menu_categories')
@@ -65,9 +73,9 @@ test.describe.serial('Delivery modifier availability', () => {
 
     expect(activeModifierError).toBeNull()
 
-    const modifierGroups = [
+    const modifierGroupsSnapshot = [
       {
-        id: randomUUID(),
+        id: groupId,
         name: 'Dodatki testowe',
         type: 'multiple',
         required: false,
@@ -94,6 +102,20 @@ test.describe.serial('Delivery modifier availability', () => {
       },
     ]
 
+    const { error: modifierGroupError } = await admin
+      .from('menu_modifier_groups')
+      .insert({
+        id: groupId,
+        name: 'Dodatki testowe',
+        type: 'multiple',
+        required: false,
+        min_selections: 0,
+        max_selections: 2,
+        modifiers: modifierGroupsSnapshot[0].modifiers,
+      })
+
+    expect(modifierGroupError).toBeNull()
+
     const { data: product, error: productError } = await admin
       .from('menu_products')
       .insert({
@@ -107,7 +129,7 @@ test.describe.serial('Delivery modifier availability', () => {
         is_featured: false,
         allergens: [],
         variants: [],
-        modifier_groups: modifierGroups,
+        modifier_groups: modifierGroupsSnapshot,
         ingredients: [],
         sort_order: 999,
         sku: `E2E-MOD-${productSuffix.toUpperCase()}`,
@@ -131,6 +153,25 @@ test.describe.serial('Delivery modifier availability', () => {
       ])
 
     expect(linkError).toBeNull()
+
+    const { error: productGroupLinkError } = await admin
+      .from('product_modifier_groups')
+      .insert({
+        product_id: productId,
+        group_id: groupId,
+        sort_order: 0,
+      })
+
+    expect(productGroupLinkError).toBeNull()
+
+    const { error: groupModifierLinkError } = await admin
+      .from('modifier_group_modifiers')
+      .insert([
+        { group_id: groupId, modifier_id: activeModifierId, sort_order: 0 },
+        { group_id: groupId, modifier_id: inactiveModifierId, sort_order: 1 },
+      ])
+
+    expect(groupModifierLinkError).toBeNull()
 
     await bypassGate(page)
     await page.goto(`/product/${slug}`, { timeout: 60_000 })
