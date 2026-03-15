@@ -29,15 +29,12 @@ export function normalizeKitchenModifierLabels(
 ): string[] {
   if (!labels) return [];
 
-  const seen = new Set<string>();
-
   return labels.reduce<string[]>((result, label) => {
     const normalized = label.trim();
-    if (!normalized || seen.has(normalized)) {
+    if (!normalized) {
       return result;
     }
 
-    seen.add(normalized);
     result.push(normalized);
     return result;
   }, []);

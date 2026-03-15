@@ -79,6 +79,26 @@ describe('KdsCard', () => {
     expect(screen.queryByText('Bez cebuli')).not.toBeInTheDocument();
   });
 
+  it('preserves repeated modifier entries on the ticket', () => {
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          id: 'ticket-5',
+          items: [
+            {
+              ...ticketWithVariantAndModifiers.items[0],
+              id: 'item-5',
+              modifiers: ['Extra sos', 'Extra sos', ' '],
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getAllByText('Extra sos')).toHaveLength(2);
+  });
+
   it('does not render scheduled pickup time when order is not scheduled', () => {
     render(
       <KdsCard
