@@ -15,8 +15,8 @@ import { formatCurrency } from '@/lib/utils';
 import {
   type CustomerSort,
   type CustomerSortKey,
-  getCustomerFavoriteProduct,
   getCustomerFullName,
+  getCustomerOrderHistory,
 } from '@/modules/crm/utils/customer-list';
 import {
   formatPoints,
@@ -118,17 +118,9 @@ export function CustomerTable({
                 align="right"
               />
             </TableHead>
-            <TableHead className="min-w-[220px]">
+            <TableHead className="min-w-[100px] text-right">
               <SortableHeader
-                label="Ulubiona potrawa"
-                sortKey="favorite_dish"
-                sort={sort}
-                onSortChange={onSortChange}
-              />
-            </TableHead>
-            <TableHead className="min-w-[120px] text-right">
-              <SortableHeader
-                label="Ilość zamówień"
+                label="Zamówień"
                 sortKey="total_orders"
                 sort={sort}
                 onSortChange={onSortChange}
@@ -148,7 +140,7 @@ export function CustomerTable({
         </TableHeader>
         <TableBody>
           {customers.map((customer) => {
-            const favoriteProduct = getCustomerFavoriteProduct(customer);
+            const orderHistory = getCustomerOrderHistory(customer);
 
             return (
               <TableRow
@@ -179,22 +171,10 @@ export function CustomerTable({
                   {new Date(customer.registration_date).toLocaleDateString('pl-PL')}
                 </TableCell>
                 <TableCell className="text-right font-medium">
-                  {formatCurrency(customer.order_history.total_spent)}
-                </TableCell>
-                <TableCell>
-                  {favoriteProduct ? (
-                    <div className="space-y-1">
-                      <div>{favoriteProduct.product_name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {favoriteProduct.order_count}x
-                      </div>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">Brak danych</span>
-                  )}
+                  {formatCurrency(orderHistory.total_spent)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {customer.order_history.total_orders}
+                  {orderHistory.total_orders}
                 </TableCell>
                 <TableCell className="text-right font-medium">
                   {formatPoints(customer.loyalty_points)}

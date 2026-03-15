@@ -1,4 +1,4 @@
-import type { Customer, TopOrderedProduct } from '@/types/crm';
+import type { Customer, CustomerOrderHistory, TopOrderedProduct } from '@/types/crm';
 import { LoyaltyTier } from '@/types/enums';
 
 export type CustomerSortKey =
@@ -61,6 +61,25 @@ function getPhoneSortValue(phone: string): string {
   return digits || phone;
 }
 
+function toFiniteNumber(value: number | null | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+export function getCustomerOrderHistory(customer: Customer): CustomerOrderHistory {
+  const orderHistory = customer.order_history as Partial<CustomerOrderHistory> | undefined;
+
+  return {
+    total_orders: toFiniteNumber(orderHistory?.total_orders),
+    total_spent: toFiniteNumber(orderHistory?.total_spent),
+    average_order_value: toFiniteNumber(orderHistory?.average_order_value),
+    last_order_date: orderHistory?.last_order_date ?? null,
+    first_order_date: orderHistory?.first_order_date ?? null,
+    top_ordered_products: Array.isArray(orderHistory?.top_ordered_products)
+      ? orderHistory.top_ordered_products
+      : [],
+  };
+}
+
 export function getDefaultCustomerSortOrder(key: CustomerSortKey): CustomerSortOrder {
   switch (key) {
     case 'registration_date':
@@ -81,7 +100,7 @@ export function getCustomerFullName(customer: Customer): string {
 }
 
 export function getCustomerFavoriteProduct(customer: Customer): TopOrderedProduct | null {
-  const products = customer.order_history.top_ordered_products ?? [];
+  const products = getCustomerOrderHistory(customer).top_ordered_products ?? [];
   if (products.length === 0) return null;
 
   return products.reduce<TopOrderedProduct | null>((topProduct, currentProduct) => {
@@ -124,6 +143,8 @@ function compareByFavoriteDish(
 export function sortCustomers(customers: Customer[], sort: CustomerSort): Customer[] {
   return [...customers].sort((customerA, customerB) => {
     let comparison = 0;
+    const orderHistoryA = getCustomerOrderHistory(customerA);
+    const orderHistoryB = getCustomerOrderHistory(customerB);
 
     switch (sort.key) {
       case 'registration_date':
@@ -135,7 +156,7 @@ export function sortCustomers(customers: Customer[], sort: CustomerSort): Custom
         break;
       case 'total_spent':
         comparison = applySortOrder(
-          customerA.order_history.total_spent - customerB.order_history.total_spent,
+          orderHistoryA.total_spent - orderHistoryB.total_spent,
           sort.order
         );
         break;
@@ -144,7 +165,7 @@ export function sortCustomers(customers: Customer[], sort: CustomerSort): Custom
         break;
       case 'total_orders':
         comparison = applySortOrder(
-          customerA.order_history.total_orders - customerB.order_history.total_orders,
+          orderHistoryA.total_orders - orderHistoryB.total_orders,
           sort.order
         );
         break;

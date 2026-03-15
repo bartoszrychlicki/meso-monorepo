@@ -8,6 +8,7 @@ import { createRepository } from '@/lib/data/repository-factory';
 import { Customer, LoyaltyTransaction, Coupon } from '@/types/crm';
 import { LoyaltyTier, RFMSegment } from '@/types/enums';
 import { calculateTierFromPoints } from './utils/loyalty-calculator';
+import { getCustomerOrderHistory } from './utils/customer-list';
 
 // Base repositories
 const customersRepo = createRepository<Customer>('customers');
@@ -71,7 +72,10 @@ export const crmRepository = {
   async getTopSpenders(limit = 10): Promise<Customer[]> {
     const customers = await customersRepo.findMany((c) => c.is_active);
     return customers
-      .sort((a, b) => b.order_history.total_spent - a.order_history.total_spent)
+      .sort(
+        (a, b) =>
+          getCustomerOrderHistory(b).total_spent - getCustomerOrderHistory(a).total_spent
+      )
       .slice(0, limit);
   },
 
@@ -88,12 +92,14 @@ export const crmRepository = {
     const customers = await customersRepo.findMany((c) => c.is_active);
     return customers
       .filter((c) => {
-        const lastOrder = c.order_history.last_order_date;
+        const lastOrder = getCustomerOrderHistory(c).last_order_date;
         return lastOrder && new Date(lastOrder) >= cutoffDate;
       })
       .sort((a, b) => {
-        const dateA = a.order_history.last_order_date ? new Date(a.order_history.last_order_date).getTime() : 0;
-        const dateB = b.order_history.last_order_date ? new Date(b.order_history.last_order_date).getTime() : 0;
+        const lastOrderA = getCustomerOrderHistory(a).last_order_date;
+        const lastOrderB = getCustomerOrderHistory(b).last_order_date;
+        const dateA = lastOrderA ? new Date(lastOrderA).getTime() : 0;
+        const dateB = lastOrderB ? new Date(lastOrderB).getTime() : 0;
         return dateB - dateA;
       });
   },
@@ -231,10 +237,10 @@ export const crmRepository = {
       bronze: customers.filter((c) => c.loyalty_tier === LoyaltyTier.BRONZE).length,
       silver: customers.filter((c) => c.loyalty_tier === LoyaltyTier.SILVER).length,
       gold: customers.filter((c) => c.loyalty_tier === LoyaltyTier.GOLD).length,
-      withOrders: customers.filter((c) => c.order_history.total_orders > 0).length,
+      withOrders: customers.filter((c) => getCustomerOrderHistory(c).total_orders > 0).length,
       totalLoyaltyPoints: customers.reduce((sum, c) => sum + c.loyalty_points, 0),
       averageOrderValue:
-        customers.reduce((sum, c) => sum + c.order_history.average_order_value, 0) /
+        customers.reduce((sum, c) => sum + getCustomerOrderHistory(c).average_order_value, 0) /
         (customers.length || 1),
     };
 
