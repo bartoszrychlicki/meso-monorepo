@@ -14,6 +14,10 @@ import { ordersRepository } from './repository';
 import { createRepository } from '@/lib/data/repository-factory';
 import { LOCATION_IDS } from '@/seed/data/locations';
 import { USER_IDS } from '@/seed/data/users';
+import {
+  formatKitchenModifierLabel,
+  normalizeKitchenModifierLabels,
+} from '@/modules/kitchen/formatting';
 import { getProductPromotionPricing } from '@/modules/menu/utils/pricing';
 import { getOrderStatsForLocalDay } from './stats';
 
@@ -206,7 +210,9 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
         product_name: item.product_name,
         variant_name: item.variant_name,
         quantity: item.quantity,
-        modifiers: item.modifiers.map((m) => m.name),
+        modifiers: normalizeKitchenModifierLabels(
+          item.modifiers.map((modifier) => formatKitchenModifierLabel(modifier))
+        ),
         notes: item.notes,
         is_done: false,
       }));

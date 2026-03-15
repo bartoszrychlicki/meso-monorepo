@@ -79,6 +79,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'pos',
         payment_method: 'cash',
         payment_status: 'pending',
+        scheduled_time: '2026-03-12T12:30:00.000Z',
+        delivery_type: 'pickup',
       },
       {
         id: 'order-unpaid-online',
@@ -86,6 +88,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'pending',
+        scheduled_time: null,
+        delivery_type: 'delivery',
       },
       {
         id: 'order-unpaid-blik',
@@ -93,6 +97,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'delivery_app',
         payment_method: 'blik',
         payment_status: 'pending',
+        scheduled_time: null,
+        delivery_type: 'delivery',
       },
       {
         id: 'order-pos-blik',
@@ -100,6 +106,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'pos',
         payment_method: 'blik',
         payment_status: 'pending',
+        scheduled_time: null,
+        delivery_type: 'pickup',
       },
       {
         id: 'order-pay-on-pickup',
@@ -107,6 +115,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'delivery_app',
         payment_method: 'pay_on_pickup',
         payment_status: 'pay_on_pickup',
+        scheduled_time: '2026-03-12T13:00:00.000Z',
+        delivery_type: 'pickup',
       },
       {
         id: 'order-cancelled',
@@ -114,6 +124,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'paid',
+        scheduled_time: null,
+        delivery_type: 'delivery',
       },
     ]);
 
@@ -129,6 +141,11 @@ describe('GET /api/kitchen/tickets', () => {
       'ticket-pos-blik',
       'ticket-pay-on-pickup',
     ]);
+    expect(body.tickets[0]).toMatchObject({
+      id: 'ticket-active',
+      scheduled_time: '2026-03-12T12:30:00.000Z',
+      delivery_type: 'pickup',
+    });
   });
 
   it('keeps only delivered tickets with a linked delivered order in completed view', async () => {
@@ -165,6 +182,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'pos',
         payment_method: 'cash',
         payment_status: 'pending',
+        scheduled_time: null,
+        delivery_type: 'pickup',
       },
       {
         id: 'order-stale',
@@ -172,6 +191,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'paid',
+        scheduled_time: null,
+        delivery_type: 'delivery',
       },
       {
         id: 'order-refunded-online',
@@ -179,6 +200,8 @@ describe('GET /api/kitchen/tickets', () => {
         channel: 'delivery_app',
         payment_method: 'online',
         payment_status: 'failed',
+        scheduled_time: null,
+        delivery_type: 'delivery',
       },
     ]);
 

@@ -19,6 +19,8 @@ export interface KitchenTicket extends BaseEntity {
   status: OrderStatus;
   items: KitchenItem[];
   priority: number;
+  delivery_type?: 'delivery' | 'pickup';
+  scheduled_time?: string;
   started_at?: string;
   completed_at?: string;
   estimated_minutes: number;

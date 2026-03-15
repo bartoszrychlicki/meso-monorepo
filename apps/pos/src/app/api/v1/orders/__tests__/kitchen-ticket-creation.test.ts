@@ -81,6 +81,7 @@ const validOrderInput = {
       unit_price: 35,
       modifiers: [
         { modifier_id: 'mod-1', name: 'Extra Chashu', price: 8, quantity: 1, modifier_action: 'add' },
+        { modifier_id: 'mod-2', name: 'Cebula', price: 0, quantity: 1, modifier_action: 'remove' },
       ],
     },
   ],
@@ -173,6 +174,13 @@ describe('POST /api/v1/orders — transactional create payload', () => {
         quantity: 1,
         modifier_action: 'add',
       },
+      {
+        id: 'mod-2',
+        name: 'Cebula',
+        price: 0,
+        quantity: 1,
+        modifier_action: 'remove',
+      },
     ])
     expect(payload.p_kitchen_ticket).toMatchObject({
       order_number: 'WEB-20260303-001',
@@ -184,7 +192,7 @@ describe('POST /api/v1/orders — transactional create payload', () => {
     expect(payload.p_kitchen_ticket.items[0]).toMatchObject({
       product_name: 'Ramen',
       quantity: 2,
-      modifiers: ['Extra Chashu'],
+      modifiers: ['Extra Chashu', '- Cebula'],
       is_done: false,
     })
   })
