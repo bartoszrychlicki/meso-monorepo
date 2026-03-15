@@ -161,6 +161,23 @@ const orderEmptyModifiers: Order = {
   items: [{ ...baseItem, id: 'item-empty', modifiers: [] }],
 };
 
+const cancelledOrder: Order = {
+  ...baseOrder,
+  id: 'order-cancelled',
+  order_number: 'ORD-2024-0400',
+  status: OrderStatus.CANCELLED,
+  closure_reason: 'Brak składników',
+  cancelled_at: '2024-06-15T12:20:00Z',
+  status_history: [
+    ...baseOrder.status_history,
+    {
+      status: OrderStatus.CANCELLED,
+      timestamp: '2024-06-15T12:20:00Z',
+      note: 'Brak składników',
+    },
+  ],
+};
+
 // --- Helpers ---
 
 const noopStatusChange = vi.fn().mockResolvedValue(undefined);
@@ -185,6 +202,13 @@ describe('OrderDetail', () => {
     // Channel & source labels
     expect(screen.getByText('Online')).toBeInTheDocument();
     expect(screen.getAllByText('Dostawa').length).toBeGreaterThan(0);
+  });
+
+  it('renders closure reason for cancelled orders', () => {
+    renderOrderDetail(cancelledOrder);
+
+    expect(screen.getByText('Powód anulowania')).toBeInTheDocument();
+    expect(screen.getAllByText('Brak składników').length).toBeGreaterThan(0);
   });
 
   it('renders items with modifiers and their prices', () => {

@@ -8,8 +8,13 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
 import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
 import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty';
-import { OrderStatus, PaymentStatus } from '@/types/enums';
+import {
+  OrderClosureReasonCode,
+  OrderStatus,
+  PaymentStatus,
+} from '@/types/enums';
 import type { Order } from '@/types/order';
+import { normalizeOrderClosureReason } from '@meso/core';
 
 const ACTIVE_KITCHEN_TICKET_STATUSES = [
   OrderStatus.PENDING,
@@ -47,6 +52,8 @@ export interface TransitionOrderStatusInput {
   orderId: string;
   status: OrderStatus;
   note?: string;
+  closure_reason_code?: OrderClosureReasonCode | null;
+  closure_reason?: string | null;
   changed_by?: string;
   payment_status?: PaymentStatus;
   requestOrigin?: string;
@@ -70,6 +77,13 @@ export class InvalidOrderStatusTransitionError extends Error {
     this.allowedTransitions = allowedTransitions;
     this.currentStatus = currentStatus;
     this.requestedStatus = requestedStatus;
+  }
+}
+
+export class InvalidOrderCancellationReasonError extends Error {
+  constructor() {
+    super('Order cancellation reason is required');
+    this.name = 'InvalidOrderCancellationReasonError';
   }
 }
 
@@ -149,16 +163,38 @@ export async function transitionOrderStatus(
     throw new InvalidOrderStatusTransitionError(order.status, input.status, allowedTransitions);
   }
 
+  const normalizedCancellation = input.status === OrderStatus.CANCELLED
+    ? normalizeOrderClosureReason({
+        closure_reason_code: input.closure_reason_code,
+        closure_reason: input.closure_reason,
+        note: input.note,
+      })
+    : null;
+
+  if (
+    input.status === OrderStatus.CANCELLED &&
+    !normalizedCancellation?.closure_reason &&
+    !normalizedCancellation?.note
+  ) {
+    throw new InvalidOrderCancellationReasonError();
+  }
+
   const statusEntry = {
     status: input.status,
     timestamp: nowIso,
     changed_by: input.changed_by,
-    note: input.note,
+    note: normalizedCancellation?.note ?? input.note,
   };
 
   const updated = await orderRepo.update(input.orderId, {
     status: input.status,
     status_history: [...(Array.isArray(order.status_history) ? order.status_history : []), statusEntry],
+    ...(normalizedCancellation
+      ? {
+          closure_reason_code: normalizedCancellation.closure_reason_code,
+          closure_reason: normalizedCancellation.closure_reason,
+        }
+      : {}),
     ...buildLifecycleTimestampPatch(order, input.status, nowIso),
     ...buildPaymentPatch(order, input.payment_status, nowIso),
   } as Partial<Order>);
@@ -187,7 +223,7 @@ export async function transitionOrderStatus(
   const webhookData = buildOrderStatusChangedWebhookData(updated, {
     status: input.status,
     previousStatus: order.status,
-    note: input.note,
+    note: normalizedCancellation?.note ?? input.note,
   });
 
   scheduleWebhookDispatch(

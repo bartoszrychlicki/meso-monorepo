@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { normalizeOrderClosureReason } from '@meso/core';
+import { OrderClosureReasonCode } from '@/types/enums';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
-import { transitionOrderStatus } from '@/lib/orders/status-transition';
+import {
+  InvalidOrderCancellationReasonError,
+  transitionOrderStatus,
+} from '@/lib/orders/status-transition';
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
 
@@ -12,6 +17,7 @@ type TransitionAction =
   | 'start_preparing'
   | 'mark_ready'
   | 'mark_served'
+  | 'cancel_order'
   | 'toggle_item'
   | 'set_priority';
 
@@ -20,6 +26,8 @@ interface TransitionBody {
   itemId?: string;
   isDone?: boolean;
   priority?: number;
+  reasonCode?: OrderClosureReasonCode | null;
+  reasonText?: string;
 }
 
 interface StatusUpdate {
@@ -38,6 +46,8 @@ function getStatusUpdate(action: TransitionAction): StatusUpdate | null {
       return { status: OrderStatus.READY, note: 'Zamówienie gotowe do wydania (KDS)' };
     case 'mark_served':
       return { status: OrderStatus.DELIVERED, note: 'Zamówienie wydane (KDS)' };
+    case 'cancel_order':
+      return { status: OrderStatus.CANCELLED, note: 'Anulowano w KDS' };
     default:
       return null;
   }
@@ -58,6 +68,11 @@ function getTicketStatusPatch(action: TransitionAction, now: string): Partial<Ki
     case 'mark_served':
       return {
         status: OrderStatus.DELIVERED,
+      };
+    case 'cancel_order':
+      return {
+        status: OrderStatus.CANCELLED,
+        completed_at: now,
       };
     default:
       return {};
@@ -110,6 +125,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ ticket: updatedTicket });
     }
 
+    const normalizedCancellation = body.action === 'cancel_order'
+      ? normalizeOrderClosureReason({
+          closure_reason_code: body.reasonCode,
+          closure_reason: body.reasonText,
+        })
+      : null;
+
+    if (
+      body.action === 'cancel_order' &&
+      !normalizedCancellation?.closure_reason &&
+      !normalizedCancellation?.note
+    ) {
+      return NextResponse.json({ error: 'Missing cancellation reason' }, { status: 400 });
+    }
+
     const ticketStatusPatch = getTicketStatusPatch(body.action, now);
     updatedTicket = await kitchenRepo.update(id, ticketStatusPatch);
 
@@ -127,10 +157,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       await transitionOrderStatus({
         orderId,
         status: statusUpdate.status,
-        note: statusUpdate.note,
+        note: body.action === 'cancel_order'
+          ? normalizedCancellation?.note ?? statusUpdate.note
+          : statusUpdate.note,
+        closure_reason_code: body.action === 'cancel_order'
+          ? normalizedCancellation?.closure_reason_code
+          : undefined,
+        closure_reason: body.action === 'cancel_order'
+          ? normalizedCancellation?.closure_reason
+          : undefined,
         requestOrigin: request.nextUrl.origin,
       });
     } catch (error) {
+      if (error instanceof InvalidOrderCancellationReasonError) {
+        return NextResponse.json({ error: 'Missing cancellation reason' }, { status: 400 });
+      }
+
       console.warn(
         `[KDS transition] Ticket ${id} transitioned, but linked order sync was skipped:`,
         error

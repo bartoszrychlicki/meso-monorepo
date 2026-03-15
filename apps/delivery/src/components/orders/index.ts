@@ -1,4 +1,5 @@
 export { OrderCard } from './OrderCard'
+export { OrderCancellationReason } from './OrderCancellationReason'
 export { OrderStatusBadge } from './OrderStatusBadge'
 export { OrderTimeline } from './OrderTimeline'
 export { OrderItemsList } from './OrderItemsList'

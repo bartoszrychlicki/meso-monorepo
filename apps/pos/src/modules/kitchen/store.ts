@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { KitchenTicket } from '@/types/kitchen';
-import { OrderStatus } from '@/types/enums';
+import { OrderClosureReasonCode, OrderStatus } from '@/types/enums';
 import { kitchenRepository } from './repository';
 import { toast } from 'sonner';
 
@@ -14,6 +14,11 @@ interface KitchenStore {
   loadTickets: () => Promise<void>;
   refreshTickets: () => Promise<void>;
   startPreparing: (ticketId: string) => Promise<void>;
+  cancelOrder: (
+    ticketId: string,
+    reasonCode?: OrderClosureReasonCode | null,
+    reasonText?: string
+  ) => Promise<void>;
   markItemDone: (ticketId: string, itemId: string) => Promise<void>;
   markReady: (ticketId: string) => Promise<void>;
   markServed: (ticketId: string) => Promise<void>;
@@ -53,6 +58,18 @@ export const useKitchenStore = create<KitchenStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to start preparing ticket:', error);
       toast.error('Nie udało się rozpocząć przygotowania zamówienia.');
+    }
+  },
+
+  cancelOrder: async (ticketId, reasonCode, reasonText) => {
+    try {
+      await kitchenRepository.cancelOrder(ticketId, reasonCode, reasonText);
+      set({
+        tickets: get().tickets.filter((t) => t.id !== ticketId),
+      });
+    } catch (error) {
+      console.error('Failed to cancel ticket:', error);
+      toast.error('Nie udało się anulować zamówienia.');
     }
   },
 

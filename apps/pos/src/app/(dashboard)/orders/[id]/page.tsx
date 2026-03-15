@@ -9,6 +9,7 @@ import { useOrder } from '@/modules/orders/hooks';
 import { useOrdersStore } from '@/modules/orders/store';
 import { OrderDetail } from '@/modules/orders/components/order-detail';
 import { OrderStatusBadge } from '@/modules/orders/components/order-status-badge';
+import type { OrderCancelInput } from '@/components/shared/order-cancel-dialog';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { ORDER_STATUS_LABELS } from '@/lib/constants';
@@ -33,8 +34,8 @@ export default function OrderDetailPage({
     toast.success(`Status zmieniony na: ${ORDER_STATUS_LABELS[status]}`);
   };
 
-  const handleCancel = async (reason: string) => {
-    await cancelOrder(id, reason);
+  const handleCancel = async (input: OrderCancelInput) => {
+    await cancelOrder(id, input);
     refresh();
     toast.error('Zamowienie zostalo anulowane');
   };

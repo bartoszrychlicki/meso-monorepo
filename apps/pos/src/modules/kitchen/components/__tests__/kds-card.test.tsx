@@ -67,4 +67,24 @@ describe('KdsCard', () => {
 
     expect(screen.queryByText('Bez cebuli, Extra sos')).not.toBeInTheDocument();
   });
+
+  it('shows cancel action only for new tickets', () => {
+    render(<KdsCard ticket={ticketWithVariantAndModifiers} />);
+
+    expect(screen.getByText('Anuluj')).toBeInTheDocument();
+  });
+
+  it('hides cancel action after preparation starts', () => {
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          id: 'ticket-3',
+          status: OrderStatus.PREPARING,
+        }}
+      />
+    );
+
+    expect(screen.queryByText('Anuluj')).not.toBeInTheDocument();
+  });
 });

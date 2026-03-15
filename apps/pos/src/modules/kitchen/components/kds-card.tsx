@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { KitchenTicket } from '@/types/kitchen';
 import { OrderStatus } from '@/types/enums';
 import { useTicketTimer } from '../hooks';
@@ -7,6 +8,10 @@ import { useKitchenStore } from '../store';
 import { KdsTimer } from './kds-timer';
 import { cn } from '@/lib/utils';
 import { Check, ChefHat, ArrowRight, AlertTriangle } from 'lucide-react';
+import {
+  OrderCancelDialog,
+  type OrderCancelInput,
+} from '@/components/shared/order-cancel-dialog';
 
 interface KdsCardProps {
   ticket: KitchenTicket;
@@ -20,13 +25,20 @@ const borderColorClasses: Record<string, string> = {
 
 export function KdsCard({ ticket }: KdsCardProps) {
   const startPreparing = useKitchenStore((s) => s.startPreparing);
+  const cancelOrder = useKitchenStore((s) => s.cancelOrder);
   const markItemDone = useKitchenStore((s) => s.markItemDone);
   const markReady = useKitchenStore((s) => s.markReady);
   const markServed = useKitchenStore((s) => s.markServed);
   const { color } = useTicketTimer(ticket);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   const allItemsDone = ticket.items.every((item) => item.is_done);
   const orderNum = ticket.order_number.split('-').pop() || ticket.order_number;
+
+  const handleCancel = async (input: OrderCancelInput) => {
+    await cancelOrder(ticket.id, input.closureReasonCode, input.closureReason);
+    setCancelDialogOpen(false);
+  };
 
   return (
     <div
@@ -128,16 +140,27 @@ export function KdsCard({ ticket }: KdsCardProps) {
       {/* Action buttons */}
       <div className="border-t border-slate-200 px-4 py-3">
         {ticket.status === OrderStatus.PENDING && (
-          <button
-            type="button"
-            onClick={() => startPreparing(ticket.id)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-6 py-4 text-lg font-bold text-white transition-colors hover:bg-teal-700 active:bg-teal-800"
-            data-action="start-preparing"
-            aria-label={`Rozpocznij przygotowanie zamowienia #${orderNum}`}
-          >
-            <ChefHat className="h-6 w-6" />
-            Rozpocznij
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => startPreparing(ticket.id)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-teal-600 px-6 py-4 text-lg font-bold text-white transition-colors hover:bg-teal-700 active:bg-teal-800"
+              data-action="start-preparing"
+              aria-label={`Rozpocznij przygotowanie zamowienia #${orderNum}`}
+            >
+              <ChefHat className="h-6 w-6" />
+              Rozpocznij
+            </button>
+            <button
+              type="button"
+              onClick={() => setCancelDialogOpen(true)}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 bg-red-50 px-6 py-3 text-base font-bold text-red-700 transition-colors hover:bg-red-100"
+              data-action="cancel-order"
+              aria-label={`Anuluj zamowienie #${orderNum}`}
+            >
+              Anuluj
+            </button>
+          </div>
         )}
 
         {ticket.status === OrderStatus.PREPARING && (
@@ -172,6 +195,13 @@ export function KdsCard({ ticket }: KdsCardProps) {
           </button>
         )}
       </div>
+
+      <OrderCancelDialog
+        open={cancelDialogOpen}
+        onOpenChange={setCancelDialogOpen}
+        onConfirm={handleCancel}
+        orderNumber={`#${orderNum}`}
+      />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { OrderClosureReasonCode } from '@meso/core'
 import type { Product } from './menu'
 import {
   type CoreOrderStatus,
@@ -46,6 +47,8 @@ export interface Order {
   metadata?: Record<string, unknown>
   loyalty_points_earned: number
   loyalty_points_used: number
+  closure_reason_code?: OrderClosureReasonCode | null
+  closure_reason?: string | null
   notes?: string
   paid_at?: string
   confirmed_at?: string

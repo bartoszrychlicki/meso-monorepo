@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   ModifierAction,
+  OrderClosureReasonCode,
   OrderChannel,
   OrderSource,
   OrderStatus,
@@ -71,6 +72,8 @@ export const CreateOrderSchema = z.object({
 export const UpdateOrderStatusSchema = z.object({
   status: z.nativeEnum(OrderStatus),
   note: z.string().optional(),
+  closure_reason_code: z.nativeEnum(OrderClosureReasonCode).nullable().optional(),
+  closure_reason: z.string().optional(),
   changed_by: z.string().optional(),
   payment_status: z.nativeEnum(PaymentStatus).optional(),
 });

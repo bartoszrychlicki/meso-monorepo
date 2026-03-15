@@ -1,5 +1,5 @@
 import { KitchenTicket } from '@/types/kitchen';
-import { OrderStatus } from '@/types/enums';
+import { OrderClosureReasonCode, OrderStatus } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
 
 const baseRepo = createRepository<KitchenTicket>('kitchen_tickets');
@@ -9,6 +9,7 @@ type TransitionAction =
   | 'start_preparing'
   | 'mark_ready'
   | 'mark_served'
+  | 'cancel_order'
   | 'toggle_item'
   | 'set_priority';
 
@@ -16,6 +17,8 @@ interface TransitionPayload {
   itemId?: string;
   isDone?: boolean;
   priority?: number;
+  reasonCode?: OrderClosureReasonCode | null;
+  reasonText?: string;
 }
 
 async function callTransition(
@@ -81,6 +84,21 @@ async function markServed(id: string): Promise<KitchenTicket> {
 
   return baseRepo.update(id, {
     status: OrderStatus.DELIVERED,
+  } as Partial<KitchenTicket>);
+}
+
+async function cancelOrder(
+  id: string,
+  reasonCode?: OrderClosureReasonCode | null,
+  reasonText?: string
+): Promise<KitchenTicket> {
+  if (isSupabaseBackend) {
+    return callTransition(id, 'cancel_order', { reasonCode, reasonText });
+  }
+
+  return baseRepo.update(id, {
+    status: OrderStatus.CANCELLED,
+    completed_at: new Date().toISOString(),
   } as Partial<KitchenTicket>);
 }
 
@@ -193,6 +211,7 @@ export const kitchenRepository = {
   startPreparing,
   markReady,
   markServed,
+  cancelOrder,
   bumpOrder,
   getActiveTickets,
   getCompletedToday,

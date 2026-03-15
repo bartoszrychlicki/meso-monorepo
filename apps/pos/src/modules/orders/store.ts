@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
 import {
+  OrderClosureReasonCode,
   OrderStatus,
   OrderChannel,
   OrderSource,
@@ -59,7 +60,13 @@ interface OrdersStore {
     status: OrderStatus,
     note?: string
   ) => Promise<void>;
-  cancelOrder: (id: string, reason: string) => Promise<void>;
+  cancelOrder: (
+    id: string,
+    input: {
+      closureReasonCode?: OrderClosureReasonCode | null;
+      closureReason?: string;
+    }
+  ) => Promise<void>;
 
   // Cart actions
   addToCart: (
@@ -252,8 +259,14 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
     }
   },
 
-  cancelOrder: async (id, reason) => {
-    await ordersRepository.updateStatus(id, OrderStatus.CANCELLED, reason);
+  cancelOrder: async (id, input) => {
+    await ordersRepository.updateStatus(
+      id,
+      OrderStatus.CANCELLED,
+      input.closureReason,
+      input.closureReasonCode,
+      input.closureReason
+    );
     await get().loadOrders();
     await get().loadActiveOrders();
   },

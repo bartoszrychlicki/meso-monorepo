@@ -1,6 +1,6 @@
 import { describe, it, expect, expectTypeOf } from 'vitest';
 import type { Order, OrderItem, OrderItemModifier, ApiResponse } from '../index';
-import { OrderStatus, ModifierAction } from '../index';
+import { OrderStatus, ModifierAction, OrderClosureReasonCode } from '../index';
 
 describe('@meso/core types', () => {
   it('Order has required fields', () => {
@@ -10,6 +10,8 @@ describe('@meso/core types', () => {
     expectTypeOf<Order>().toHaveProperty('tip');
     expectTypeOf<Order>().toHaveProperty('promo_code');
     expectTypeOf<Order>().toHaveProperty('loyalty_points_used');
+    expectTypeOf<Order>().toHaveProperty('closure_reason');
+    expectTypeOf<Order>().toHaveProperty('closure_reason_code');
   });
 
   it('OrderItemModifier uses ModifierAction enum', () => {
@@ -30,5 +32,9 @@ describe('@meso/core types', () => {
       meta: { timestamp: new Date().toISOString() },
     };
     expect(response.success).toBe(true);
+  });
+
+  it('exposes closure reason enum values', () => {
+    expect(OrderClosureReasonCode.MISSING_INGREDIENTS).toBe('missing_ingredients');
   });
 });
