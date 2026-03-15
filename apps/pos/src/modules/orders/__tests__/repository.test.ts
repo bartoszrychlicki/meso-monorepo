@@ -70,67 +70,72 @@ const mockAddLoyaltyTransaction = crmRepository.addLoyaltyTransaction as ReturnT
 const mockUpdateOrderStats = crmRepository.updateOrderStats as ReturnType<typeof vi.fn>;
 const mockSendSMS = sendSMS as ReturnType<typeof vi.fn>;
 const mockGetOrderStatusSMS = getOrderStatusSMS as ReturnType<typeof vi.fn>;
+const mockFetch = vi.fn();
 
 describe('ordersRepository.updateStatus', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
+    vi.stubGlobal('fetch', mockFetch);
     mockKitchenTicketsUpdate.mockReturnValue({ eq: mockKitchenTicketsEq });
     mockKitchenTicketsEq.mockReturnValue({ in: mockKitchenTicketsIn });
     mockKitchenTicketsIn.mockResolvedValue({ error: null });
   });
 
-  it('cancels active kitchen tickets when an order is cancelled from the UI repository path', async () => {
-    mockOrderFindById.mockResolvedValue({
-      id: 'order-1',
-      order_number: 'WEB-20260303-001',
-      status: OrderStatus.CONFIRMED,
-      status_history: [{ status: OrderStatus.CONFIRMED, timestamp: '2026-03-03T10:00:00.000Z' }],
-      customer_phone: undefined,
-    });
-    mockOrderUpdate.mockResolvedValue({
-      id: 'order-1',
-      order_number: 'WEB-20260303-001',
-      status: OrderStatus.CANCELLED,
-      status_history: [
-        { status: OrderStatus.CONFIRMED, timestamp: '2026-03-03T10:00:00.000Z' },
-        { status: OrderStatus.CANCELLED, timestamp: '2026-03-03T10:05:00.000Z', note: 'Test' },
-      ],
-      customer_phone: undefined,
+  it('uses the status API route for supabase-backed cancellations from the UI repository path', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          id: 'order-1',
+          order_number: 'WEB-20260303-001',
+          status: OrderStatus.CANCELLED,
+          status_history: [
+            { status: OrderStatus.CONFIRMED, timestamp: '2026-03-03T10:00:00.000Z' },
+            { status: OrderStatus.CANCELLED, timestamp: '2026-03-03T10:05:00.000Z', note: 'Test' },
+          ],
+          customer_phone: undefined,
+        },
+      }),
     });
 
     await ordersRepository.updateStatus('order-1', OrderStatus.CANCELLED, 'Test');
 
-    expect(mockKitchenTicketsUpdate).toHaveBeenCalledWith(
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/v1/orders/order-1/status',
       expect.objectContaining({
-        status: OrderStatus.CANCELLED,
-        completed_at: expect.any(String),
-        updated_at: expect.any(String),
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: OrderStatus.CANCELLED,
+          note: 'Test',
+          closure_reason_code: undefined,
+          closure_reason: undefined,
+        }),
       })
     );
-    expect(mockKitchenTicketsEq).toHaveBeenCalledWith('order_id', 'order-1');
-    expect(mockKitchenTicketsIn).toHaveBeenCalledWith('status', ['pending', 'preparing', 'ready']);
+    expect(mockKitchenTicketsUpdate).not.toHaveBeenCalled();
   });
 
   it('does not award loyalty twice in supabase mode when an order becomes delivered', async () => {
-    mockOrderFindById.mockResolvedValue({
-      id: 'order-1',
-      order_number: 'WEB-20260303-001',
-      status: OrderStatus.READY,
-      status_history: [{ status: OrderStatus.READY, timestamp: '2026-03-03T10:00:00.000Z' }],
-      customer_phone: '+48500100100',
-      loyalty_points_earned: 87,
-    });
-    mockOrderUpdate.mockResolvedValue({
-      id: 'order-1',
-      order_number: 'WEB-20260303-001',
-      status: OrderStatus.DELIVERED,
-      status_history: [
-        { status: OrderStatus.READY, timestamp: '2026-03-03T10:00:00.000Z' },
-        { status: OrderStatus.DELIVERED, timestamp: '2026-03-03T10:05:00.000Z' },
-      ],
-      customer_phone: '+48500100100',
-      loyalty_points_earned: 87,
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        data: {
+          id: 'order-1',
+          order_number: 'WEB-20260303-001',
+          status: OrderStatus.DELIVERED,
+          status_history: [
+            { status: OrderStatus.READY, timestamp: '2026-03-03T10:00:00.000Z' },
+            { status: OrderStatus.DELIVERED, timestamp: '2026-03-03T10:05:00.000Z' },
+          ],
+          customer_phone: '+48500100100',
+          loyalty_points_earned: 87,
+        },
+      }),
     });
     mockGetOrderStatusSMS.mockReturnValue('sms');
     mockSendSMS.mockResolvedValue({ success: true });
@@ -138,6 +143,12 @@ describe('ordersRepository.updateStatus', () => {
 
     await ordersRepository.updateStatus('order-1', OrderStatus.DELIVERED, 'Wydano');
 
+    expect(mockFetch).toHaveBeenCalledWith(
+      'http://localhost:3000/api/v1/orders/order-1/status',
+      expect.objectContaining({
+        method: 'PATCH',
+      })
+    );
     expect(mockAddLoyaltyTransaction).not.toHaveBeenCalled();
     expect(mockUpdateOrderStats).not.toHaveBeenCalled();
     expect(mockSendSMS).toHaveBeenCalledTimes(1);

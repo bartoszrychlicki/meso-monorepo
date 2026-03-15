@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { OrderDetail } from '../order-detail';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
@@ -181,6 +181,7 @@ const cancelledOrder: Order = {
 // --- Helpers ---
 
 const noopStatusChange = vi.fn().mockResolvedValue(undefined);
+const noopRollback = vi.fn().mockResolvedValue(undefined);
 const noopCancel = vi.fn().mockResolvedValue({
   order: baseOrder,
   refund: { status: 'not_requested' },
@@ -191,6 +192,7 @@ function renderOrderDetail(order: Order) {
     <OrderDetail
       order={order}
       onStatusChange={noopStatusChange}
+      onRollbackStatus={noopRollback}
       onCancel={noopCancel}
     />
   );
@@ -384,5 +386,65 @@ describe('OrderDetail', () => {
     // Timeline has entries with data-status attributes
     const entries = timeline!.querySelectorAll('[data-status]');
     expect(entries.length).toBe(2); // CONFIRMED + PENDING
+  });
+
+  it('renders rollback button when there is a valid previous status', () => {
+    renderOrderDetail({
+      ...orderWithModifiers,
+      status: OrderStatus.READY,
+      status_history: [
+        { status: OrderStatus.PENDING, timestamp: '2024-06-15T12:00:00Z' },
+        { status: OrderStatus.CONFIRMED, timestamp: '2024-06-15T12:05:00Z' },
+        { status: OrderStatus.PREPARING, timestamp: '2024-06-15T12:10:00Z' },
+        { status: OrderStatus.READY, timestamp: '2024-06-15T12:20:00Z' },
+      ],
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Cofnij do: W przygotowaniu' })
+    ).toBeInTheDocument();
+  });
+
+  it('hides rollback button for terminal statuses', () => {
+    renderOrderDetail({
+      ...orderWithModifiers,
+      status: OrderStatus.DELIVERED,
+      status_history: [
+        { status: OrderStatus.PENDING, timestamp: '2024-06-15T12:00:00Z' },
+        { status: OrderStatus.READY, timestamp: '2024-06-15T12:20:00Z' },
+        { status: OrderStatus.DELIVERED, timestamp: '2024-06-15T12:30:00Z' },
+      ],
+    });
+
+    expect(screen.queryByRole('button', { name: /Cofnij do:/ })).not.toBeInTheDocument();
+  });
+
+  it('disables status actions while rollback is in progress', async () => {
+    const pendingRollback = vi.fn(
+      () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+    );
+
+    render(
+      <OrderDetail
+        order={{
+          ...orderWithModifiers,
+          status: OrderStatus.READY,
+          status_history: [
+            { status: OrderStatus.PENDING, timestamp: '2024-06-15T12:00:00Z' },
+            { status: OrderStatus.CONFIRMED, timestamp: '2024-06-15T12:05:00Z' },
+            { status: OrderStatus.PREPARING, timestamp: '2024-06-15T12:10:00Z' },
+            { status: OrderStatus.READY, timestamp: '2024-06-15T12:20:00Z' },
+          ],
+        }}
+        onStatusChange={noopStatusChange}
+        onRollbackStatus={pendingRollback}
+        onCancel={noopCancel}
+      />
+    );
+
+    const rollbackButton = screen.getByRole('button', { name: 'Cofnij do: W przygotowaniu' });
+    fireEvent.click(rollbackButton);
+
+    expect(rollbackButton).toBeDisabled();
   });
 });

@@ -1,0 +1,98 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+import { OrderStatus } from '@/types/enums';
+
+const { mockRollbackOrderStatus } = vi.hoisted(() => ({
+  mockRollbackOrderStatus: vi.fn(),
+}));
+
+vi.mock('@/lib/api/auth', () => ({
+  authenticateRequest: vi.fn().mockResolvedValue({ status: 401 }),
+  isApiKey: vi.fn().mockReturnValue(false),
+}));
+
+vi.mock('@/lib/api-keys', () => ({
+  hasPermission: vi.fn().mockReturnValue(true),
+}));
+
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(async () => ({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({
+        data: {
+          user: { id: 'user-1' },
+        },
+      }),
+    },
+  })),
+}));
+
+vi.mock('@/lib/orders/status-transition', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/orders/status-transition')>();
+
+  return {
+    ...actual,
+    rollbackOrderStatus: mockRollbackOrderStatus,
+  };
+});
+
+import { POST } from '../orders/[id]/status/rollback/route';
+import { InvalidOrderStatusRollbackError } from '@/lib/orders/status-transition';
+
+function makeRequest(body: Record<string, unknown> = {}) {
+  return new NextRequest(
+    new URL('http://localhost:3000/api/v1/orders/order-1/status/rollback'),
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    } as never
+  );
+}
+
+function makeParams(id: string) {
+  return { params: Promise.resolve({ id }) };
+}
+
+describe('POST /api/v1/orders/:id/status/rollback', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRollbackOrderStatus.mockResolvedValue({
+      id: 'order-1',
+      status: 'preparing',
+    });
+  });
+
+  it('rolls back the order status for a session-authenticated user', async () => {
+    const response = await POST(
+      makeRequest(),
+      makeParams('order-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.status).toBe('preparing');
+    expect(mockRollbackOrderStatus).toHaveBeenCalledWith({
+      orderId: 'order-1',
+      note: undefined,
+      changed_by: 'user-1',
+    });
+  });
+
+  it('returns 422 when rollback is blocked', async () => {
+    mockRollbackOrderStatus.mockRejectedValueOnce(
+      new InvalidOrderStatusRollbackError(OrderStatus.DELIVERED, 'terminal_status')
+    );
+
+    const response = await POST(
+      makeRequest(),
+      makeParams('order-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.code).toBe('INVALID_STATUS_ROLLBACK');
+  });
+});

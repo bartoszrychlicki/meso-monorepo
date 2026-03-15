@@ -65,6 +65,10 @@ interface OrdersStore {
     status: OrderStatus,
     note?: string
   ) => Promise<void>;
+  rollbackOrderStatus: (
+    id: string,
+    note?: string
+  ) => Promise<void>;
   cancelOrder: (
     id: string,
     input: {
@@ -260,6 +264,18 @@ export const useOrdersStore = create<OrdersStore>((set, get) => ({
     await get().loadActiveOrders();
 
     // Update selected order if it was the one changed
+    const state = get();
+    if (state.selectedOrder?.id === id) {
+      const updated = await ordersRepository.findById(id);
+      set({ selectedOrder: updated });
+    }
+  },
+
+  rollbackOrderStatus: async (id, note) => {
+    await ordersRepository.rollbackStatus(id, note);
+    await get().loadOrders();
+    await get().loadActiveOrders();
+
     const state = get();
     if (state.selectedOrder?.id === id) {
       const updated = await ordersRepository.findById(id);

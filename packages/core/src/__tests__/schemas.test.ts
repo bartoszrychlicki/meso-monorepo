@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateOrderSchema, UpdateOrderStatusSchema } from '../index';
+import { CreateOrderSchema, RollbackOrderStatusSchema, UpdateOrderStatusSchema } from '../index';
 
 describe('CreateOrderSchema', () => {
   it('validates a minimal delivery order', () => {
@@ -90,6 +90,21 @@ describe('UpdateOrderStatusSchema', () => {
   it('allows cancelled status without reason so idempotent updates can pass schema validation', () => {
     const result = UpdateOrderStatusSchema.safeParse({
       status: 'cancelled',
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('RollbackOrderStatusSchema', () => {
+  it('accepts an empty payload', () => {
+    const result = RollbackOrderStatusSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts an optional note', () => {
+    const result = RollbackOrderStatusSchema.safeParse({
+      note: 'Operator cofnal klikniecie',
     });
 
     expect(result.success).toBe(true);
