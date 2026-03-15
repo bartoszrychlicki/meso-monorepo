@@ -156,11 +156,16 @@ export function OrderEditForm({
     order.payment_method === PaymentMethod.ONLINE &&
     order.payment_status === PaymentStatus.PAID;
   const amountChanged = total !== order.total;
-  const phoneWasPresent = Boolean(order.customer_phone?.trim());
+  const originalPhoneValue = order.customer_phone?.trim() ?? '';
+  const phoneWasPresent = originalPhoneValue.length > 0;
   const phoneValue = customerPhone.trim();
+  const phoneChanged = phoneValue !== originalPhoneValue;
   const phoneInvalid =
-    (phoneValue.length > 0 && !isValidPhoneNumber(phoneValue)) ||
-    (phoneWasPresent && phoneValue.length === 0);
+    phoneChanged &&
+    (
+      (phoneValue.length > 0 && !isValidPhoneNumber(phoneValue)) ||
+      (phoneWasPresent && phoneValue.length === 0)
+    );
   const saveDisabled =
     !isEditable ||
     isSaving ||
@@ -348,7 +353,7 @@ export function OrderEditForm({
       notes,
     };
 
-    if (phoneValue) {
+    if (phoneChanged && phoneValue) {
       payload.customer_phone = phoneValue;
     }
 

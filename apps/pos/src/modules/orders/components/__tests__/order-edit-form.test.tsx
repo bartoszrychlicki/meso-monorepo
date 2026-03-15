@@ -258,4 +258,44 @@ describe('OrderEditForm', () => {
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Zapisz zmiany/i })).toBeDisabled();
   });
+
+  it('allows saving non-phone changes when a legacy invalid phone stays unchanged', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <OrderEditForm
+        order={{
+          ...baseOrder,
+          customer_phone: '500 100 200',
+        }}
+        onSave={onSave}
+      />
+    );
+
+    await screen.findByText('Gyoza');
+
+    fireEvent.change(screen.getByLabelText('Notatka do zamówienia'), {
+      target: { value: 'Dorzucic sztucce' },
+    });
+
+    const saveButton = screen.getByRole('button', { name: /Zapisz zmiany/i });
+    expect(saveButton).not.toBeDisabled();
+
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          customer_phone: expect.anything(),
+        })
+      );
+    });
+
+    expect(onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customer_name: 'Anna',
+        notes: 'Dorzucic sztucce',
+      })
+    );
+  });
 });
