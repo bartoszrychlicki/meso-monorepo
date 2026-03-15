@@ -18,6 +18,7 @@ export function PromoCodeInput() {
   const setPromoCode = useCartStore((state) => state.setPromoCode)
   const clearPromoCode = useCartStore((state) => state.clearPromoCode)
   const getSubtotal = useCartStore((state) => state.getSubtotal)
+  const deliveryType = useCartStore((state) => state.deliveryType)
   const loyaltyCoupon = useCartStore((s) => s.loyaltyCoupon)
   const clearLoyaltyCoupon = useCartStore((s) => s.clearLoyaltyCoupon)
 
@@ -37,7 +38,11 @@ export function PromoCodeInput() {
       const response = await fetch('/api/promo-codes/validate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.trim(), subtotal: getSubtotal() }),
+        body: JSON.stringify({
+          code: code.trim(),
+          subtotal: getSubtotal(),
+          channel: deliveryType,
+        }),
       })
 
       const data = await response.json()

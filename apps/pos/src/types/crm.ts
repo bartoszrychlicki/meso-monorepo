@@ -158,6 +158,53 @@ export interface Coupon extends BaseEntity {
   created_by: string;
 }
 
+export type RewardType = 'free_delivery' | 'discount' | 'free_product';
+export type PromotionalCodeDiscountType = 'percent' | 'fixed' | 'free_item' | 'free_delivery';
+export type PromotionalCodeTriggerScenario =
+  | 'manual'
+  | 'birthday'
+  | 'win_back'
+  | 'new_customer'
+  | 'referral'
+  | 'tier_upgrade'
+  | 'seasonal';
+export type PromotionalCodeChannel = 'delivery' | 'pickup';
+
+export interface LoyaltyRewardDefinition extends BaseEntity {
+  name: string;
+  description: string | null;
+  points_cost: number;
+  reward_type: RewardType;
+  discount_value: number | null;
+  free_product_id: string | null;
+  icon: string | null;
+  min_tier: LoyaltyTier;
+  sort_order: number;
+  is_active: boolean;
+}
+
+export interface PromotionalCode extends BaseEntity {
+  code: string | null;
+  name: string;
+  description: string | null;
+  discount_type: PromotionalCodeDiscountType;
+  discount_value: number | null;
+  free_item_id: string | null;
+  min_order_amount: number | null;
+  first_order_only: boolean;
+  required_loyalty_tier: LoyaltyTier | null;
+  trigger_scenario: PromotionalCodeTriggerScenario;
+  max_uses: number | null;
+  max_uses_per_customer: number | null;
+  current_uses: number;
+  valid_from: string;
+  valid_until: string | null;
+  is_active: boolean;
+  channels: PromotionalCodeChannel[];
+  applicable_product_ids: string[] | null;
+  created_by: string | null;
+}
+
 /**
  * Coupon Usage
  * Phase 2 - Tracks coupon redemptions
