@@ -137,7 +137,6 @@ export function StockItemForm({
   const [vatRate, setVatRate] = useState<VatRate>(VatRate.PTU_B);
   const [consumptionType, setConsumptionType] = useState<ConsumptionType>(ConsumptionType.PRODUCT);
   const [shelfLifeDays, setShelfLifeDays] = useState(0);
-  const [storageLocation, setStorageLocation] = useState('');
   const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>([]);
   const [warehouseId, setWarehouseId] = useState(() =>
     warehouses.find((w) => w.is_default)?.id ?? ''
@@ -165,7 +164,6 @@ export function StockItemForm({
     setVatRate(VatRate.PTU_B);
     setConsumptionType(ConsumptionType.PRODUCT);
     setShelfLifeDays(0);
-    setStorageLocation('');
     setSelectedAllergens([]);
     setWarehouseId('');
     setQuantity(null);
@@ -218,7 +216,7 @@ export function StockItemForm({
           consumption_type: consumptionType,
           shelf_life_days: shelfLifeDays,
           default_min_quantity: minQuantity ?? 0,
-          storage_location: storageLocation.trim() || null,
+          storage_location: null,
         },
         warehouseId,
         quantity ?? 0,
@@ -455,22 +453,6 @@ export function StockItemForm({
                   data-field="min-quantity"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <FieldLabel
-                htmlFor="stock-storage"
-                tooltip="Fizyczne miejsce w magazynie, np. regal, polka. Czysto informacyjne."
-              >
-                Polozenie
-              </FieldLabel>
-              <Input
-                id="stock-storage"
-                value={storageLocation}
-                onChange={(e) => setStorageLocation(e.target.value)}
-                placeholder="np. Regal A, Polka 3"
-                data-field="storage-location"
-              />
             </div>
 
             {/* Group 4 — Dodatkowe */}

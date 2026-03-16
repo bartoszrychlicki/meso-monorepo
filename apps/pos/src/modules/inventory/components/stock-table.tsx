@@ -14,16 +14,23 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { WarehouseStockItem } from '@/types/inventory';
-import { AllergenBadges } from '@/modules/menu/components/allergen-badges';
 import { formatCurrency } from '@/lib/utils';
-import { Plus, Minus, Package, Pencil, Trash2 } from 'lucide-react';
+import { formatQuantity } from '@/lib/utils/format-quantity';
+import { Plus, Minus, Package, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
 import { EmptyState } from '@/components/shared/empty-state';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -105,16 +112,11 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDelete
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nazwa</TableHead>
-              <TableHead className="hidden md:table-cell">SKU</TableHead>
-              {showWarehouseColumn && <TableHead className="hidden sm:table-cell">Magazyn</TableHead>}
-              <TableHead className="hidden sm:table-cell">Jednostka</TableHead>
-              <TableHead className="text-right">Ilosc</TableHead>
-              <TableHead className="text-right hidden sm:table-cell">Min</TableHead>
-              <TableHead className="text-right hidden md:table-cell">Koszt/jedn.</TableHead>
-              <TableHead className="hidden lg:table-cell">Alergeny</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="w-[120px]">Akcje</TableHead>
+              <TableHead>Pozycja</TableHead>
+              <TableHead>Lokalizacja</TableHead>
+              <TableHead className="text-right">Stan</TableHead>
+              <TableHead>Koszt / status</TableHead>
+              <TableHead className="text-right">Akcje</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -124,50 +126,63 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDelete
 
               return (
                 <TableRow key={item.warehouse_stock_id} data-id={item.id} data-warehouse-id={item.warehouse_id}>
-                  <TableCell className="font-medium">
-                    <Link
-                      href={`/inventory/${item.id}`}
-                      className="hover:underline hover:text-primary"
-                      data-action="view-stock-item"
-                      data-id={item.id}
-                    >
-                      {item.name}
-                    </Link>
+                  <TableCell className="min-w-[240px]">
+                    <div className="flex flex-col gap-1">
+                      <Link
+                        href={`/inventory/${item.id}`}
+                        className="font-medium hover:text-primary hover:underline"
+                        data-action="view-stock-item"
+                        data-id={item.id}
+                      >
+                        {item.name}
+                      </Link>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        <span>{item.sku} • {item.unit}</span>
+                        {item.allergens.length > 0 ? (
+                          <span className="inline-flex items-center gap-1 text-amber-600">
+                            <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            {item.allergens.length} alerg.
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {item.sku}
+                  <TableCell className="min-w-[180px]">
+                    <div className="flex flex-col gap-1 text-sm">
+                      {showWarehouseColumn ? (
+                        <span className="font-medium">{item.warehouse_name}</span>
+                      ) : null}
+                      <span className="text-muted-foreground">
+                        {item.storage_location || 'Brak polozenia'}
+                      </span>
+                    </div>
                   </TableCell>
-                  {showWarehouseColumn && (
-                    <TableCell className="hidden sm:table-cell text-muted-foreground">
-                      {item.warehouse_name}
-                    </TableCell>
-                  )}
-                  <TableCell className="hidden sm:table-cell text-muted-foreground">
-                    {item.unit}
+                  <TableCell className="min-w-[120px] text-right">
+                    <div className="flex flex-col gap-1">
+                      <span className={`font-semibold ${qtyColor}`}>
+                        {formatQuantity(item.quantity)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Min {formatQuantity(item.min_quantity)}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell className={`text-right ${qtyColor}`}>
-                    {item.quantity}
+                  <TableCell className="min-w-[150px]">
+                    <div className="flex flex-col gap-1">
+                      <Badge
+                        variant="outline"
+                        className={`w-fit border-0 ${status.color}`}
+                        data-status={status.label}
+                      >
+                        {status.label}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatCurrency(item.cost_per_unit)} / {item.unit}
+                      </span>
+                    </div>
                   </TableCell>
-                  <TableCell className="text-right hidden sm:table-cell text-muted-foreground">
-                    {item.min_quantity}
-                  </TableCell>
-                  <TableCell className="text-right hidden md:table-cell text-muted-foreground">
-                    {formatCurrency(item.cost_per_unit)}
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <AllergenBadges allergens={item.allergens} />
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant="outline"
-                      className={`border-0 ${status.color}`}
-                      data-status={status.label}
-                    >
-                      {status.label}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1">
+                  <TableCell className="w-[180px]">
+                    <div className="flex items-center justify-end gap-1">
                       <Link href={`/inventory/${item.id}`}>
                         <Button
                           variant="outline"
@@ -181,50 +196,46 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDelete
                         </Button>
                       </Link>
                       {onAdjustStock && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => {
-                              setAdjustDialog(item);
-                              setAdjustQty(1);
-                            }}
-                            data-action="adjust-stock-plus"
-                            data-id={item.id}
-                            title="Zwieksz stan"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => {
-                              setAdjustDialog(item);
-                              setAdjustQty(-1);
-                            }}
-                            data-action="adjust-stock-minus"
-                            data-id={item.id}
-                            title="Zmniejsz stan"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </Button>
-                        </>
-                      )}
-                      {onDeleteStockItem && (
                         <Button
                           variant="outline"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => setDeleteDialog(item)}
-                          data-action="delete-stock-item"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => {
+                            setAdjustDialog(item);
+                            setAdjustQty(0);
+                          }}
+                          data-action="adjust-stock"
                           data-id={item.id}
-                          title="Usun pozycje"
                         >
-                          <Trash2 className="h-3 w-3 text-destructive" />
+                          Korekta
                         </Button>
                       )}
+                      {onDeleteStockItem ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              data-action="stock-item-actions-menu"
+                              data-id={item.id}
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => setDeleteDialog(item)}
+                              variant="destructive"
+                              data-action="delete-stock-item"
+                              data-id={item.id}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Usun pozycje
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -247,12 +258,15 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDelete
         <DialogContent data-component="adjust-stock-dialog">
           <DialogHeader>
             <DialogTitle>Korekta stanu: {adjustDialog?.name}</DialogTitle>
+            <DialogDescription>
+              Wprowadz korekte ilosci i zapisz powod zmiany stanu magazynowego.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Aktualny stan:</span>
               <span className="font-medium">
-                {adjustDialog?.quantity} {adjustDialog?.unit}
+                {formatQuantity(adjustDialog?.quantity)} {adjustDialog?.unit}
               </span>
             </div>
             {adjustDialog?.warehouse_name && (
@@ -291,7 +305,7 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDelete
               <p className="text-xs text-muted-foreground">
                 Nowy stan:{' '}
                 <span className="font-medium">
-                  {(adjustDialog?.quantity ?? 0) + adjustQty}{' '}
+                  {formatQuantity((adjustDialog?.quantity ?? 0) + adjustQty)}{' '}
                   {adjustDialog?.unit}
                 </span>
               </p>

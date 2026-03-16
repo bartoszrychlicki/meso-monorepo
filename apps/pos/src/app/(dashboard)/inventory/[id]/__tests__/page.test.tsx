@@ -98,6 +98,10 @@ vi.mock('@/modules/inventory/components/usage-tab', () => ({
   UsageTab: () => <div>Uzycie</div>,
 }));
 
+vi.mock('@/modules/inventory/components/stock-item-warehouse-summary', () => ({
+  StockItemWarehouseSummary: () => <div>Magazyny</div>,
+}));
+
 import StockItemDetailPage from '../page';
 
 const makeStockItem = () => ({
@@ -134,6 +138,9 @@ describe('StockItemDetailPage', () => {
     const loadInventoryCategories = vi.fn(async () => {
       useInventoryStore.setState({ inventoryCategories: [] });
     });
+    const loadWarehouseAssignments = vi.fn(async () => {
+      useInventoryStore.setState({ currentWarehouseAssignments: [] });
+    });
     const loadComponents = vi.fn(async () => {
       useInventoryStore.setState({
         currentComponents: [],
@@ -151,15 +158,22 @@ describe('StockItemDetailPage', () => {
       inventoryCategories: [],
       warehouses: [],
       warehouseStockItems: [],
+      inventoryCounts: [],
       selectedWarehouseId: null,
       isLoading: false,
       loadError: null,
       currentStockItem: item,
+      currentWarehouseAssignments: [],
       currentComponents: [],
       currentUsage: null,
       isDetailLoading: false,
       detailLoadError: null,
+      currentInventoryCount: null,
+      currentInventoryCountLines: [],
+      isInventoryCountLoading: false,
+      inventoryCountLoadError: null,
       loadStockItemDetail,
+      loadWarehouseAssignments,
       loadInventoryCategories,
       loadComponents,
       loadUsage,
@@ -189,11 +203,13 @@ describe('StockItemDetailPage', () => {
 
     useInventoryStore.setState({
       currentStockItem: null,
+      currentWarehouseAssignments: [],
       currentComponents: [],
       currentUsage: null,
       isDetailLoading: false,
       detailLoadError: null,
       loadStockItemDetail: vi.fn(() => pending),
+      loadWarehouseAssignments: vi.fn(() => pending),
       loadInventoryCategories: vi.fn(() => pending),
       loadComponents: vi.fn(() => pending),
       loadUsage: vi.fn(() => pending),

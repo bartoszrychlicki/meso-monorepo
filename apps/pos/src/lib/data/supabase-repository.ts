@@ -24,6 +24,8 @@ const TABLE_MAP: Record<string, string> = {
   inventory_categories: 'inventory_categories',
   warehouses: 'inventory_warehouses',
   warehouse_stock: 'inventory_warehouse_stock',
+  inventory_counts: 'inventory_counts',
+  inventory_count_lines: 'inventory_count_lines',
   stock_item_components: 'inventory_stock_item_components',
   employees: 'employees_employees',
   work_times: 'employees_work_times',
@@ -43,6 +45,7 @@ const NUMERIC_FIELDS = new Set([
   'discount_value', 'minimum_order_value',
   'amount', 'multiplier', 'tax_rate', 'quantity_produced',
   'default_min_quantity', 'shelf_life_days',
+  'expected_quantity', 'counted_quantity',
 ]);
 
 const READ_RETRY_ATTEMPTS = 2;

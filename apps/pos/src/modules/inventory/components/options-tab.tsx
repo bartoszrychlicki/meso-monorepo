@@ -42,7 +42,6 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
   );
   const [shelfLifeDays, setShelfLifeDays] = useState(item.shelf_life_days);
   const [defaultMinQuantity, setDefaultMinQuantity] = useState<number | null>(item.default_min_quantity);
-  const [storageLocation, setStorageLocation] = useState(item.storage_location ?? '');
   const [isSaving, setIsSaving] = useState(false);
 
   const hasChanges =
@@ -51,8 +50,7 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
     costPerUnit !== item.cost_per_unit ||
     purchaseUnitWeightKg !== (item.purchase_unit_weight_kg ?? null) ||
     shelfLifeDays !== item.shelf_life_days ||
-    defaultMinQuantity !== item.default_min_quantity ||
-    (storageLocation || null) !== item.storage_location;
+    defaultMinQuantity !== item.default_min_quantity;
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -64,7 +62,6 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
         purchase_unit_weight_kg: item.unit === 'kg' ? purchaseUnitWeightKg ?? null : null,
         shelf_life_days: shelfLifeDays,
         default_min_quantity: defaultMinQuantity ?? 0,
-        storage_location: storageLocation.trim() || null,
       });
       toast.success('Zapisano zmiany');
     } catch {
@@ -182,16 +179,6 @@ export function OptionsTab({ item, inventoryCategories, onSave }: OptionsTabProp
             <p className="text-xs text-muted-foreground">
               Stosowany jako domyslna wartosc przy nowym przypisaniu do magazynu
             </p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="item-storage">Polozenie</Label>
-            <Input
-              id="item-storage"
-              value={storageLocation}
-              onChange={(e) => setStorageLocation(e.target.value)}
-              placeholder="np. Regal A, Polka 3"
-              data-field="storage-location"
-            />
           </div>
         </div>
       </CardContent>
