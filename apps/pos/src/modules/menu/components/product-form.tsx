@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import { ImageUploader } from './image-uploader';
 import { ModifierGroupPicker } from './modifier-group-picker';
+import { resolveInitialModifierGroupIds } from './product-form.utils';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DecimalInput } from '@/components/ui/decimal-input';
@@ -159,11 +160,7 @@ export function ProductForm({
 
   // Modifiers
   const [selectedModifierGroupIds, setSelectedModifierGroupIds] = useState<string[]>(
-    () => (
-      initialModifierGroupIds && initialModifierGroupIds.length > 0
-        ? initialModifierGroupIds
-        : legacyModifierGroupIds
-    )
+    () => resolveInitialModifierGroupIds(initialModifierGroupIds, legacyModifierGroupIds)
   );
   const [modifierGroupSelectionTouched, setModifierGroupSelectionTouched] = useState(false);
 
@@ -171,13 +168,8 @@ export function ProductForm({
   useEffect(() => {
     if (initialModifierGroupIds === undefined || modifierGroupSelectionTouched) return;
 
-    if (initialModifierGroupIds.length > 0) {
-      setSelectedModifierGroupIds(initialModifierGroupIds);
-      return;
-    }
-
-    setSelectedModifierGroupIds(legacyModifierGroupIds);
-  }, [initialModifierGroupIds, legacyModifierGroupIds, modifierGroupSelectionTouched]);
+    setSelectedModifierGroupIds(initialModifierGroupIds);
+  }, [initialModifierGroupIds, modifierGroupSelectionTouched]);
 
   // Allergens
   const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>(
