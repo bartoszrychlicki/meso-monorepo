@@ -12,8 +12,10 @@ import { CategoryList } from '@/modules/menu/components/category-list';
 import { CategoryFormDialog } from '@/modules/menu/components/category-form-dialog';
 import { MenuGrid } from '@/modules/menu/components/menu-grid';
 import { ModifierManagement } from '@/modules/menu/components/modifier-management';
+import { ModifierGroupManagement } from '@/modules/menu/components/modifier-group-management';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Category } from '@/types/menu';
 import { toast } from 'sonner';
 
@@ -23,6 +25,7 @@ export default function MenuPage() {
     products,
     allProducts,
     categories,
+    modifierGroups,
     selectedCategoryId,
     searchQuery,
     isLoading,
@@ -34,7 +37,16 @@ export default function MenuPage() {
     deleteCategory,
   } = useMenu();
 
-  const { modifiers, isLoading: modifiersLoading, createModifier, updateModifier, deleteModifier } = useModifiers();
+  const {
+    modifiers,
+    isLoading: modifiersLoading,
+    createModifier,
+    updateModifier,
+    deleteModifier,
+    createModifierGroup,
+    updateModifierGroup,
+    deleteModifierGroup,
+  } = useModifiers();
 
   const stockItems = useInventoryStore((s) => s.stockItems);
   const loadStockItems = useInventoryStore((s) => s.loadStockItems);
@@ -194,14 +206,33 @@ export default function MenuPage() {
           <SheetHeader>
             <SheetTitle>Modyfikatory</SheetTitle>
           </SheetHeader>
-          <ModifierManagement
-            modifiers={modifiers}
-            recipes={recipes}
-            isLoading={modifiersLoading}
-            onCreateModifier={createModifier}
-            onUpdateModifier={updateModifier}
-            onDeleteModifier={deleteModifier}
-          />
+          <Tabs defaultValue="groups" className="mt-4">
+            <TabsList variant="line">
+              <TabsTrigger value="groups">Grupy</TabsTrigger>
+              <TabsTrigger value="modifiers">Standalone</TabsTrigger>
+            </TabsList>
+            <TabsContent value="groups" className="pt-4">
+              <ModifierGroupManagement
+                groups={modifierGroups}
+                modifiers={modifiers}
+                recipes={recipes}
+                isLoading={modifiersLoading}
+                onCreateGroup={createModifierGroup}
+                onUpdateGroup={updateModifierGroup}
+                onDeleteGroup={deleteModifierGroup}
+              />
+            </TabsContent>
+            <TabsContent value="modifiers" className="pt-4">
+              <ModifierManagement
+                modifiers={modifiers}
+                recipes={recipes}
+                isLoading={modifiersLoading}
+                onCreateModifier={createModifier}
+                onUpdateModifier={updateModifier}
+                onDeleteModifier={deleteModifier}
+              />
+            </TabsContent>
+          </Tabs>
         </SheetContent>
       </Sheet>
     </div>

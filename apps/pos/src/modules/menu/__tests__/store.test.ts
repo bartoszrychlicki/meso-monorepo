@@ -10,6 +10,8 @@ const mockModifiersFindAll = vi.fn();
 const mockModifiersCreate = vi.fn();
 const mockModifiersUpdate = vi.fn();
 const mockModifiersDelete = vi.fn();
+const mockListModifierGroups = vi.fn();
+const mockSetModifierGroupModifiers = vi.fn();
 const mockCreateProductWithFoodCost = vi.fn();
 const mockUpdateProductWithFoodCost = vi.fn();
 
@@ -36,6 +38,8 @@ vi.mock('../repository', () => ({
     update: (...args: unknown[]) => mockModifiersUpdate(...args),
     delete: (...args: unknown[]) => mockModifiersDelete(...args),
   },
+  listModifierGroups: (...args: unknown[]) => mockListModifierGroups(...args),
+  setModifierGroupModifiers: (...args: unknown[]) => mockSetModifierGroupModifiers(...args),
   createProductWithFoodCost: (...args: unknown[]) => mockCreateProductWithFoodCost(...args),
   updateProductWithFoodCost: (...args: unknown[]) => mockUpdateProductWithFoodCost(...args),
   toggleAvailability: vi.fn(),
@@ -64,6 +68,7 @@ const makeModifier = (overrides: Partial<MenuModifier> = {}): MenuModifier => ({
 describe('useMenuStore — Modifiers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockListModifierGroups.mockResolvedValue([]);
     useMenuStore.setState({
       modifiers: [],
       products: [],
@@ -203,7 +208,7 @@ describe('useMenuStore — Modifiers', () => {
       const modifiers = [makeModifier({ id: 'mod-all-1' })];
       mockProductsFindAll.mockResolvedValue({ data: [] });
       mockCategoriesFindAll.mockResolvedValue({ data: [] });
-      mockModifierGroupsFindAll.mockResolvedValue({ data: [] });
+      mockListModifierGroups.mockResolvedValue([]);
       mockModifiersFindAll.mockResolvedValue({ data: modifiers });
 
       await useMenuStore.getState().loadAll();

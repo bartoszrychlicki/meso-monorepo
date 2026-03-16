@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { syncProductWithCurrentModifierState } from '@/lib/product-modifier-groups'
 import { Tables } from '@/lib/table-mapping'
 import { notFound } from 'next/navigation'
 import { ProductDetailClient } from './ProductDetailClient'
@@ -16,7 +15,7 @@ export default async function ProductPage({ params }: PageProps) {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
   const { data: product } = await supabase
-    .from(Tables.products)
+    .from(Tables.productsCatalog)
     .select(`
       *,
       category:menu_categories(id, name, slug, icon)
@@ -30,10 +29,8 @@ export default async function ProductPage({ params }: PageProps) {
     notFound()
   }
 
-  const syncedProduct = await syncProductWithCurrentModifierState(supabase, product)
-
   // Extract addons from modifier_groups JSONB (same extraction as menu/[slug]/page.tsx)
-  const modifierGroups = (syncedProduct.modifier_groups as Array<{
+  const modifierGroups = (product.modifier_groups as Array<{
     id: string
     name: string
     type: string
@@ -53,5 +50,5 @@ export default async function ProductPage({ params }: PageProps) {
     .flatMap(group => group.modifiers || [])
     .filter(mod => mod.is_available)
 
-  return <ProductDetailClient product={{ ...syncedProduct, addons }} />
+  return <ProductDetailClient product={{ ...product, addons }} />
 }

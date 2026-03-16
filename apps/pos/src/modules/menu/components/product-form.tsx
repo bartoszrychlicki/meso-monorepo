@@ -1,10 +1,18 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Product, Category, MenuModifier, ProductVariant, RecipeIngredient, ProductImage } from '@/types/menu';
+import {
+  Product,
+  Category,
+  ModifierGroup,
+  ProductVariant,
+  RecipeIngredient,
+  ProductImage,
+  type ProductWriteInput,
+} from '@/types/menu';
 import { Recipe } from '@/types/recipe';
 import { StockItem } from '@/types/inventory';
-import { Allergen, ModifierType, ProductType, VariantType } from '@/types/enums';
+import { Allergen, ProductType, VariantType } from '@/types/enums';
 import { generateSKU } from '@/modules/menu/utils/sku-generator';
 import { createDefaultPricing } from '@/modules/menu/utils/pricing';
 import { ALLERGEN_LABELS } from '@/lib/constants';
@@ -40,7 +48,8 @@ import {
   Save,
 } from 'lucide-react';
 import { ImageUploader } from './image-uploader';
-import { ModifierPicker } from './modifier-picker';
+import { ModifierGroupPicker } from './modifier-group-picker';
+import { resolveInitialModifierGroupIds } from './product-form.utils';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { DecimalInput } from '@/components/ui/decimal-input';
@@ -59,73 +68,22 @@ interface ProductFormProps {
   categories: Category[];
   stockItems: StockItem[];
   recipes: Recipe[];
-  allModifiers?: MenuModifier[];
-  initialModifierIds?: string[];
-  onCreateModifier?: (data: Omit<MenuModifier, 'id' | 'created_at' | 'updated_at'>) => Promise<MenuModifier>;
-  onSubmit: (data: Omit<Product, 'created_at' | 'updated_at'>, modifierIds: string[]) => void;
+  allModifierGroups?: ModifierGroup[];
+  initialModifierGroupIds?: string[];
+  onSubmit: (data: ProductWriteInput, modifierGroupIds: string[]) => void;
   onCancel: () => void;
   isSubmitting?: boolean;
 }
 
-type ProductModifier = Product['modifier_groups'][number]['modifiers'][number];
-type ProductModifierGroup = Product['modifier_groups'][number];
-
-function extractModifierIdsFromLegacyGroups(groups?: Product['modifier_groups']): string[] {
+function extractModifierGroupIds(groups?: Product['modifier_groups']): string[] {
   if (!groups || groups.length === 0) return [];
 
-  const ids = groups
-    .flatMap((group) => group.modifiers ?? [])
-    .map((modifier) => modifier.id)
-    .filter((id): id is string => Boolean(id));
-
+  const ids = groups.map((group) => group.id).filter((id): id is string => Boolean(id));
   return [...new Set(ids)];
 }
 
-function normalizeModifierIds(ids: string[]): string[] {
+function normalizeModifierGroupIds(ids: string[]): string[] {
   return [...new Set(ids.filter(Boolean))];
-}
-
-function buildLegacyModifierGroups(
-  selectedModifierIds: string[],
-  allModifiers: MenuModifier[],
-  existingGroups: Product['modifier_groups']
-): Product['modifier_groups'] {
-  const resolvedModifiers: ProductModifier[] = selectedModifierIds
-    .map((modifierId, index) => {
-      const modifier = allModifiers.find((item) => item.id === modifierId);
-      if (!modifier) return null;
-
-      const now = new Date().toISOString();
-      return {
-        id: modifier.id,
-        name: modifier.name,
-        price: modifier.price,
-        is_available: modifier.is_available,
-        sort_order: index,
-        modifier_action: modifier.modifier_action,
-        created_at: modifier.created_at ?? now,
-        updated_at: modifier.updated_at ?? now,
-      } satisfies ProductModifier;
-    })
-    .filter((modifier): modifier is ProductModifier => Boolean(modifier));
-
-  if (resolvedModifiers.length === 0) return [];
-
-  const now = new Date().toISOString();
-  const firstExistingGroup = existingGroups[0];
-  const nextGroup: ProductModifierGroup = {
-    id: firstExistingGroup?.id ?? crypto.randomUUID(),
-    name: firstExistingGroup?.name ?? 'Dodatki',
-    type: firstExistingGroup?.type ?? ModifierType.MULTIPLE,
-    required: firstExistingGroup?.required ?? false,
-    min_selections: firstExistingGroup?.min_selections ?? 0,
-    max_selections: Math.max(firstExistingGroup?.max_selections ?? 1, resolvedModifiers.length),
-    modifiers: resolvedModifiers,
-    created_at: firstExistingGroup?.created_at ?? now,
-    updated_at: now,
-  };
-
-  return [nextGroup];
 }
 
 function toDatetimeLocal(iso?: string | null): string {
@@ -155,17 +113,16 @@ export function ProductForm({
   categories,
   stockItems: _stockItems,
   recipes,
-  allModifiers = [],
-  initialModifierIds,
-  onCreateModifier,
+  allModifierGroups = [],
+  initialModifierGroupIds,
   onSubmit,
   onCancel,
   isSubmitting = false,
 }: ProductFormProps) {
   const [step, setStep] = useState(0);
   const [productId] = useState(() => product?.id ?? crypto.randomUUID());
-  const legacyModifierIds = useMemo(
-    () => extractModifierIdsFromLegacyGroups(product?.modifier_groups),
+  const legacyModifierGroupIds = useMemo(
+    () => extractModifierGroupIds(product?.modifier_groups),
     [product?.modifier_groups]
   );
   const hasExistingPromotion =
@@ -202,22 +159,17 @@ export function ProductForm({
   const [variants, setVariants] = useState<ProductVariant[]>(product?.variants ?? []);
 
   // Modifiers
-  const [selectedModifierIds, setSelectedModifierIds] = useState<string[]>(
-    () => (initialModifierIds && initialModifierIds.length > 0 ? initialModifierIds : legacyModifierIds)
+  const [selectedModifierGroupIds, setSelectedModifierGroupIds] = useState<string[]>(
+    () => resolveInitialModifierGroupIds(initialModifierGroupIds, legacyModifierGroupIds)
   );
-  const [modifierSelectionTouched, setModifierSelectionTouched] = useState(false);
+  const [modifierGroupSelectionTouched, setModifierGroupSelectionTouched] = useState(false);
 
-  // Sync selectedModifierIds when initialModifierIds arrives asynchronously
+  // Sync selectedModifierGroupIds when initialModifierGroupIds arrives asynchronously
   useEffect(() => {
-    if (initialModifierIds === undefined || modifierSelectionTouched) return;
+    if (initialModifierGroupIds === undefined || modifierGroupSelectionTouched) return;
 
-    if (initialModifierIds.length > 0) {
-      setSelectedModifierIds(initialModifierIds);
-      return;
-    }
-
-    setSelectedModifierIds(legacyModifierIds);
-  }, [initialModifierIds, legacyModifierIds, modifierSelectionTouched]);
+    setSelectedModifierGroupIds(initialModifierGroupIds);
+  }, [initialModifierGroupIds, modifierGroupSelectionTouched]);
 
   // Allergens
   const [selectedAllergens, setSelectedAllergens] = useState<Allergen[]>(
@@ -289,9 +241,9 @@ export function ProductForm({
     setVariants(variants.map((v) => (v.id === variantId ? { ...v, ...updates } : v)));
   };
 
-  const handleModifierIdsChange = (modifierIds: string[]) => {
-    setModifierSelectionTouched(true);
-    setSelectedModifierIds(normalizeModifierIds(modifierIds));
+  const handleModifierGroupIdsChange = (groupIds: string[]) => {
+    setModifierGroupSelectionTouched(true);
+    setSelectedModifierGroupIds(normalizeModifierGroupIds(groupIds));
   };
 
   const isPromotionPriceInvalid = isPromotionEnabled && (promoPrice <= 0 || promoPrice >= price);
@@ -313,21 +265,11 @@ export function ProductForm({
     }
 
     const selectedCategory = categories.find((c) => c.id === categoryId);
-    const existingModifierGroups = product?.modifier_groups ?? [];
-    const normalizedModifierIds = normalizeModifierIds(selectedModifierIds);
-    const nextModifierGroups = buildLegacyModifierGroups(
-      normalizedModifierIds,
-      allModifiers,
-      existingModifierGroups
-    );
-    const shouldPreserveExistingGroups =
-      !modifierSelectionTouched &&
-      nextModifierGroups.length === 0 &&
-      existingModifierGroups.length > 0;
+    const normalizedModifierGroupIds = normalizeModifierGroupIds(selectedModifierGroupIds);
     const regularPrice = price;
     const effectivePrice = isPromotionEnabled ? promoPrice : regularPrice;
 
-    const data: Omit<Product, 'created_at' | 'updated_at'> = {
+    const data: ProductWriteInput = {
       id: productId,
       name,
       slug,
@@ -346,7 +288,7 @@ export function ProductForm({
       allergens: selectedAllergens,
       nutritional_info: { calories, protein, carbs, fat },
       variants,
-      modifier_groups: shouldPreserveExistingGroups ? existingModifierGroups : nextModifierGroups,
+      modifier_group_ids: normalizedModifierGroupIds,
       recipe_id: recipeId || undefined,
       ingredients,
       preparation_time_minutes: prepTime,
@@ -359,7 +301,7 @@ export function ProductForm({
       point_ids: product?.point_ids ?? [],
       pricing: product?.pricing ?? createDefaultPricing(effectivePrice, 2),
     };
-    onSubmit(data, normalizedModifierIds);
+    onSubmit(data, normalizedModifierGroupIds);
   };
 
   const canGoNext = () => {
@@ -834,15 +776,13 @@ export function ProductForm({
               <div>
                 <h3 className="font-medium">Modyfikatory</h3>
                 <p className="text-sm text-muted-foreground">
-                  Wybierz modyfikatory dostepne dla tego produktu
+                  Wybierz grupy modyfikatorow dostepne dla tego produktu
                 </p>
               </div>
-              <ModifierPicker
-                allModifiers={allModifiers}
-                selectedModifierIds={selectedModifierIds}
-                onChange={handleModifierIdsChange}
-                recipes={recipes}
-                onCreateModifier={onCreateModifier ?? (async (data) => ({ ...data, id: crypto.randomUUID(), created_at: new Date().toISOString(), updated_at: new Date().toISOString() }))}
+              <ModifierGroupPicker
+                groups={allModifierGroups}
+                selectedGroupIds={selectedModifierGroupIds}
+                onChange={handleModifierGroupIdsChange}
               />
             </div>
           )}
@@ -965,8 +905,8 @@ export function ProductForm({
                       <dd className="font-medium">{variants.length}</dd>
                     </div>
                     <div className="flex justify-between">
-                      <dt className="text-muted-foreground">Modyfikatory:</dt>
-                      <dd className="font-medium">{selectedModifierIds.length}</dd>
+                      <dt className="text-muted-foreground">Grupy modyfikatorow:</dt>
+                      <dd className="font-medium">{selectedModifierGroupIds.length}</dd>
                     </div>
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">Alergeny:</dt>

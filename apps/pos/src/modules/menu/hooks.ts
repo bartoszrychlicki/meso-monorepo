@@ -88,5 +88,8 @@ export function useModifiers() {
     updateModifier: store.updateModifier,
     deleteModifier: store.deleteModifier,
     loadModifiers: store.loadModifiers,
+    createModifierGroup: store.createModifierGroup,
+    updateModifierGroup: store.updateModifierGroup,
+    deleteModifierGroup: store.deleteModifierGroup,
   };
 }

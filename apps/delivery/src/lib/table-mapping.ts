@@ -13,9 +13,12 @@ export const Tables = {
   // Menu
   categories: 'menu_categories',
   products: 'menu_products',
+  productsCatalog: 'menu_products_catalog_v',
   modifierGroups: 'menu_modifier_groups',
   modifiers: 'menu_modifiers',
+  modifierGroupModifiers: 'modifier_group_modifiers',
   productModifiers: 'product_modifiers',
+  productModifierGroups: 'product_modifier_groups',
 
   // CRM / Customers
   customers: 'crm_customers',
