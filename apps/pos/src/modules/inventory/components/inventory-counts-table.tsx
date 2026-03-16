@@ -35,32 +35,38 @@ export function InventoryCountsTable({ counts }: InventoryCountsTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Numer</TableHead>
-            <TableHead>Magazyn</TableHead>
+            <TableHead>Dokument</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="text-right">Policzone</TableHead>
-            <TableHead className="text-right">Roznice</TableHead>
-            <TableHead className="hidden md:table-cell">Data utworzenia</TableHead>
+            <TableHead className="text-right">Postep</TableHead>
+            <TableHead className="hidden xl:table-cell">Data utworzenia</TableHead>
             <TableHead className="w-[120px]">Akcje</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {counts.map((count) => (
             <TableRow key={count.id}>
-              <TableCell className="font-medium">{count.number}</TableCell>
-              <TableCell className="text-muted-foreground">
-                {count.warehouse_name ?? 'Wszystkie'}
+              <TableCell className="min-w-[220px]">
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">{count.number}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {count.warehouse_name ?? 'Wszystkie magazyny'}
+                  </span>
+                </div>
               </TableCell>
               <TableCell>
                 <InventoryCountStatusBadge status={count.status} />
               </TableCell>
               <TableCell className="text-right">
-                {count.counted_lines ?? 0}/{count.total_lines ?? 0}
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">
+                    {count.counted_lines ?? 0}/{count.total_lines ?? 0}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Roznice: {count.difference_lines ?? 0}
+                  </span>
+                </div>
               </TableCell>
-              <TableCell className="text-right">
-                {count.difference_lines ?? 0}
-              </TableCell>
-              <TableCell className="hidden md:table-cell text-muted-foreground">
+              <TableCell className="hidden xl:table-cell text-muted-foreground">
                 {new Date(count.created_at).toLocaleDateString('pl-PL')}
               </TableCell>
               <TableCell>

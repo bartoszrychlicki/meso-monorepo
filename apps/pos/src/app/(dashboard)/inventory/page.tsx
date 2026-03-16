@@ -19,6 +19,12 @@ import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/utils';
 import { Input } from '@/components/ui/input';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -35,6 +41,7 @@ import {
   Settings,
   Search,
   Tags,
+  MoreHorizontal,
 } from 'lucide-react';
 
 const ALL_CATEGORIES = '__all__';
@@ -150,25 +157,9 @@ export default function InventoryPage() {
         title="Magazyn"
         description={activeView === 'stock' ? 'Stany magazynowe' : 'Dokumenty inwentaryzacji'}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
             {activeView === 'stock' ? (
               <>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowWarehouseManager(true)}
-                  data-action="manage-warehouses"
-                >
-                  <Settings className="mr-2 h-4 w-4" />
-                  Zarzadzaj magazynami
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowCategoryManager(true)}
-                  data-action="manage-inventory-categories"
-                >
-                  <Tags className="mr-2 h-4 w-4" />
-                  Zarzadzaj kategoriami
-                </Button>
                 <Button
                   variant="outline"
                   onClick={() => setShowTransferDialog(true)}
@@ -184,6 +175,30 @@ export default function InventoryPage() {
                   <Plus className="mr-2 h-4 w-4" />
                   Nowa pozycja
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" data-action="inventory-more-actions">
+                      <MoreHorizontal className="mr-2 h-4 w-4" />
+                      Wiecej
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => setShowWarehouseManager(true)}
+                      data-action="manage-warehouses"
+                    >
+                      <Settings className="mr-2 h-4 w-4" />
+                      Zarzadzaj magazynami
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setShowCategoryManager(true)}
+                      data-action="manage-inventory-categories"
+                    >
+                      <Tags className="mr-2 h-4 w-4" />
+                      Zarzadzaj kategoriami
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             ) : null}
             <Button
@@ -227,17 +242,19 @@ export default function InventoryPage() {
         </TabsList>
 
         <TabsContent value="stock" className="space-y-6">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <KpiCard
               icon={<Package className="h-5 w-5" />}
               label="Pozycji lacznie"
               value={currentItems.length}
+              compact
               className="bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/20 dark:to-sky-950/20"
             />
             <KpiCard
               icon={<AlertTriangle className="h-5 w-5" />}
               label="Niski stan"
               value={lowStockItems.length}
+              compact
               className={lowStockItems.length > 0
                 ? 'border-red-200 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20'
                 : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20'
@@ -247,11 +264,12 @@ export default function InventoryPage() {
               icon={<DollarSign className="h-5 w-5" />}
               label="Wartosc magazynu"
               value={formatCurrency(stockValue)}
+              compact
               className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20"
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_280px]">
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_260px]">
             <div className="relative" data-component="stock-search">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -283,16 +301,23 @@ export default function InventoryPage() {
             onValueChange={handleTabChange}
             data-component="warehouse-tabs"
           >
-            <TabsList>
-              <TabsTrigger value="all" data-value="all">
-                Wszystkie
-              </TabsTrigger>
-              {warehouses.map((warehouse) => (
-                <TabsTrigger key={warehouse.id} value={warehouse.id} data-value={warehouse.id}>
-                  {warehouse.name}
+            <div className="overflow-x-auto pb-1">
+              <TabsList className="inline-flex min-w-max">
+                <TabsTrigger value="all" data-value="all" className="shrink-0">
+                  Wszystkie
                 </TabsTrigger>
-              ))}
-            </TabsList>
+                {warehouses.map((warehouse) => (
+                  <TabsTrigger
+                    key={warehouse.id}
+                    value={warehouse.id}
+                    data-value={warehouse.id}
+                    className="shrink-0"
+                  >
+                    {warehouse.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
 
             <TabsContent value="all">
               <StockTable

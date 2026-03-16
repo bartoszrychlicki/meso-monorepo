@@ -63,6 +63,13 @@ vi.mock('@/components/ui/input', () => ({
   Input: (props: HTMLAttributes<HTMLInputElement>) => <input {...props} />,
 }));
 
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
 vi.mock('@/components/ui/textarea', () => ({
   Textarea: (props: HTMLAttributes<HTMLTextAreaElement>) => <textarea {...props} />,
 }));
@@ -178,6 +185,7 @@ describe('InventoryCountDetailPage', () => {
     expect(screen.getByText('Zakres: Magazyn glowny')).toBeInTheDocument();
     expect(screen.getByText('Status:draft')).toBeInTheDocument();
     expect(screen.getByText('Wolowina mielona')).toBeInTheDocument();
+    expect(screen.getByText('Wiecej')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Zatwierdz' })).toBeDisabled();
   });
 

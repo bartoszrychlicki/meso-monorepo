@@ -46,6 +46,13 @@ vi.mock('@/components/ui/alert', () => ({
   AlertDescription: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}));
+
 vi.mock('@/components/ui/tabs', () => ({
   Tabs: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   TabsList: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -180,6 +187,7 @@ describe('InventoryPage', () => {
     expect(screen.getByText('Stany')).toBeInTheDocument();
     expect(screen.getByText('Inwentaryzacje')).toBeInTheDocument();
     expect(screen.getByText('Nowa inwentaryzacja')).toBeInTheDocument();
+    expect(screen.getByText('Wiecej')).toBeInTheDocument();
     expect(screen.getAllByText('StockTable:1')).toHaveLength(2);
     expect(screen.getByText('InventoryCountsTable:INW 1/2026')).toBeInTheDocument();
   });

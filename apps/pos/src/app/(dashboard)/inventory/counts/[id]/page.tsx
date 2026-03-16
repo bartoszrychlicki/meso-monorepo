@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { AlertTriangle, ArrowLeft, Check, ClipboardList, Plus, Sigma, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  ClipboardList,
+  MoreHorizontal,
+  Plus,
+  Sigma,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/page-header';
 import { KpiCard } from '@/components/dashboard/kpi-card';
@@ -11,6 +20,12 @@ import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -20,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { normalizeQuantity } from '@/lib/utils/format-quantity';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { InventoryCountLine } from '@/types/inventory';
 import { InventoryCountStatusBadge } from '@/modules/inventory/components/inventory-count-status-badge';
@@ -107,10 +123,7 @@ export default function InventoryCountDetailPage() {
         return false;
       }
 
-      if (
-        rowFilter === 'difference' &&
-        (line.counted_quantity === null || line.counted_quantity === line.expected_quantity)
-      ) {
+      if (rowFilter === 'difference' && !hasLineDifference(line)) {
         return false;
       }
 
@@ -169,9 +182,7 @@ export default function InventoryCountDetailPage() {
   }, [currentInventoryCountLines, pickerWarehouseId, stockItems]);
 
   const hasUncountedLines = currentInventoryCountLines.some((line) => line.counted_quantity === null);
-  const differenceLinesCount = currentInventoryCountLines.filter(
-    (line) => line.counted_quantity !== null && line.counted_quantity !== line.expected_quantity
-  ).length;
+  const differenceLinesCount = currentInventoryCountLines.filter(hasLineDifference).length;
 
   const handleCommentSave = async () => {
     if (!currentInventoryCount || currentInventoryCount.status !== 'draft') {
@@ -266,7 +277,7 @@ export default function InventoryCountDetailPage() {
         title={currentInventoryCount.number}
         description={`Zakres: ${currentInventoryCount.warehouse_name ?? 'Wszystkie magazyny'}`}
         actions={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto xl:justify-end">
             <Link href="/inventory">
               <Button variant="outline">
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -277,14 +288,6 @@ export default function InventoryCountDetailPage() {
             {isDraft && (
               <>
                 <Button
-                  variant="outline"
-                  onClick={() => setCancelDialogOpen(true)}
-                  data-action="cancel-inventory-count"
-                >
-                  <X className="mr-2 h-4 w-4" />
-                  Anuluj
-                </Button>
-                <Button
                   onClick={() => setApproveDialogOpen(true)}
                   disabled={hasUncountedLines}
                   data-action="approve-inventory-count"
@@ -292,6 +295,24 @@ export default function InventoryCountDetailPage() {
                   <Check className="mr-2 h-4 w-4" />
                   Zatwierdz
                 </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" data-action="inventory-count-more-actions">
+                      <MoreHorizontal className="mr-2 h-4 w-4" />
+                      Wiecej
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => setCancelDialogOpen(true)}
+                      variant="destructive"
+                      data-action="cancel-inventory-count"
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Anuluj dokument
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </>
             )}
           </div>
@@ -308,42 +329,46 @@ export default function InventoryCountDetailPage() {
         </Alert>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[repeat(3,minmax(0,1fr))_minmax(320px,1.2fr)]">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <KpiCard
           icon={<ClipboardList className="h-5 w-5" />}
           label="Pozycji lacznie"
           value={currentInventoryCount.total_lines ?? currentInventoryCountLines.length}
+          compact
         />
         <KpiCard
           icon={<Check className="h-5 w-5" />}
           label="Policzone"
           value={currentInventoryCount.counted_lines ?? 0}
+          compact
         />
         <KpiCard
           icon={<Sigma className="h-5 w-5" />}
           label="Roznice"
           value={differenceLinesCount}
+          compact
         />
-        <div className="rounded-xl border bg-card p-4 shadow-sm">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Komentarz dokumentu</p>
-            <Textarea
-              value={commentDraft}
-              onChange={(event) => setCommentDraft(event.target.value)}
-              onBlur={() => void handleCommentSave()}
-              disabled={!isDraft}
-              rows={4}
-              placeholder="Opcjonalny komentarz do calej inwentaryzacji..."
-              data-field="inventory-count-comment"
-            />
-            <p className="text-xs text-muted-foreground">
-              Zmiany w wierszach i komentarzu zapisuja sie automatycznie po opuszczeniu pola.
-            </p>
-          </div>
+      </div>
+
+      <div className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Komentarz dokumentu</p>
+          <Textarea
+            value={commentDraft}
+            onChange={(event) => setCommentDraft(event.target.value)}
+            onBlur={() => void handleCommentSave()}
+            disabled={!isDraft}
+            rows={3}
+            placeholder="Opcjonalny komentarz do calej inwentaryzacji..."
+            data-field="inventory-count-comment"
+          />
+          <p className="text-xs text-muted-foreground">
+            Zmiany w wierszach i komentarzu zapisuja sie automatycznie po opuszczeniu pola.
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_240px_220px]">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_220px_220px]">
         <Input
           placeholder="Szukaj po nazwie lub SKU..."
           value={searchQuery}
@@ -414,17 +439,14 @@ export default function InventoryCountDetailPage() {
                 Brak pozycji w aktualnym widoku.
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border bg-card">
-                <table className="min-w-full border-collapse text-sm">
+              <div className="overflow-hidden rounded-xl border bg-card">
+                <table className="w-full border-collapse text-sm">
                   <thead className="bg-muted/50 text-left">
                     <tr>
                       <th className="px-3 py-3 font-medium">Pozycja</th>
                       <th className="px-3 py-3 font-medium text-right">Stan teoretyczny</th>
                       <th className="px-3 py-3 font-medium">Stan policzony</th>
                       <th className="px-3 py-3 font-medium text-right">Roznica</th>
-                      <th className="px-3 py-3 font-medium">Kategoria</th>
-                      <th className="px-3 py-3 font-medium">Polozenie</th>
-                      <th className="px-3 py-3 font-medium">Uwagi</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -502,4 +524,12 @@ function lineWarehouseName(
   warehouseNameById: Map<string, string>
 ): string {
   return line.warehouse_name ?? warehouseNameById.get(warehouseId) ?? 'Nieznany magazyn';
+}
+
+function hasLineDifference(line: InventoryCountLine): boolean {
+  if (line.counted_quantity === null) {
+    return false;
+  }
+
+  return normalizeQuantity(line.counted_quantity - line.expected_quantity) !== 0;
 }
