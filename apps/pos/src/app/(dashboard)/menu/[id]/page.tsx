@@ -34,7 +34,9 @@ export default function EditProductPage() {
   const recipes = useRecipesStore((s) => s.recipes);
   const loadRecipes = useRecipesStore((s) => s.loadRecipes);
   useModifiers();
-  const [initialModifierGroupIds, setInitialModifierGroupIds] = useState<string[]>([]);
+  const [initialModifierGroupIds, setInitialModifierGroupIds] = useState<string[] | undefined>(
+    undefined
+  );
 
   useEffect(() => {
     if (stockItems.length === 0) {
