@@ -439,14 +439,17 @@ export default function InventoryCountDetailPage() {
                 Brak pozycji w aktualnym widoku.
               </div>
             ) : (
-              <div className="overflow-hidden rounded-xl border bg-card">
+              <div className="overflow-x-auto rounded-xl border bg-card">
                 <table className="w-full border-collapse text-sm">
                   <thead className="bg-muted/50 text-left">
                     <tr>
                       <th className="px-3 py-3 font-medium">Pozycja</th>
-                      <th className="px-3 py-3 font-medium text-right">Stan teoretyczny</th>
-                      <th className="px-3 py-3 font-medium">Stan policzony</th>
-                      <th className="px-3 py-3 font-medium text-right">Roznica</th>
+                      <th className="w-[170px] px-3 py-3 font-medium">Kategoria</th>
+                      <th className="w-[150px] px-3 py-3 font-medium text-right">Stan teoretyczny</th>
+                      <th className="w-[180px] px-3 py-3 font-medium">Stan policzony</th>
+                      <th className="w-[140px] px-3 py-3 font-medium text-right">Roznica</th>
+                      <th className="w-[200px] px-3 py-3 font-medium">Polozenie</th>
+                      <th className="w-[200px] px-3 py-3 font-medium">Uwaga</th>
                     </tr>
                   </thead>
                   <tbody>

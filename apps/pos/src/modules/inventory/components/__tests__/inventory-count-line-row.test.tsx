@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi } from 'vitest';
 import { InventoryCountLineRow } from '../inventory-count-line-row';
@@ -51,15 +51,15 @@ describe('InventoryCountLineRow', () => {
     );
 
     expect(screen.getByText('0,15 kg')).toBeInTheDocument();
-    expect(screen.getByText('0,05')).toBeInTheDocument();
+    expect(screen.getByText('+0,05 kg')).toBeInTheDocument();
 
     const countedInput = container.querySelector('[data-field="counted-quantity"]');
     expect(countedInput).toBeInTheDocument();
     expect(countedInput?.parentElement).toHaveTextContent('kg');
   });
 
-  it('renders note as a single-line input in expandable details', () => {
-    render(
+  it('renders category, location and note inline in the row', () => {
+    const { container } = render(
       <table>
         <tbody>
           <InventoryCountLineRow
@@ -72,10 +72,11 @@ describe('InventoryCountLineRow', () => {
       </table>
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /szczegoly/i }));
-
-    const noteField = screen.getByPlaceholderText('Opcjonalna uwaga...');
+    const noteField = screen.getByPlaceholderText('Uwaga...');
     expect(noteField.tagName).toBe('INPUT');
+    expect(screen.getByPlaceholderText('np. Regal A/2')).toBeInTheDocument();
+    expect(container.querySelector('[data-field="inventory-category"]')).toBeInTheDocument();
     expect(document.querySelector('textarea')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /szczegoly/i })).not.toBeInTheDocument();
   });
 });
