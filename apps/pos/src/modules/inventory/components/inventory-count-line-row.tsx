@@ -52,7 +52,20 @@ export function InventoryCountLineRow({
   }, [countedQuantity, line.expected_quantity]);
 
   const rowClassName =
-    difference == null ? 'bg-amber-50/50' : difference !== 0 ? 'bg-red-50/40' : '';
+    difference == null
+      ? 'bg-amber-50/50 dark:bg-amber-950/20'
+      : difference !== 0
+        ? 'bg-red-50/40 dark:bg-red-950/20'
+        : '';
+
+  const differenceClassName =
+    difference == null
+      ? 'text-amber-700 dark:text-amber-300'
+      : difference > 0
+        ? 'text-emerald-700 dark:text-emerald-300'
+        : difference < 0
+          ? 'text-red-700 dark:text-red-300'
+          : 'text-green-700 dark:text-green-300';
 
   const differenceLabel = useMemo(() => {
     if (difference == null) {
@@ -146,15 +159,7 @@ export function InventoryCountLineRow({
         </div>
       </td>
       <td
-        className={`px-3 py-3 align-top text-right font-medium whitespace-nowrap ${
-          difference == null
-            ? 'text-amber-700'
-            : difference > 0
-              ? 'text-emerald-700'
-              : difference < 0
-                ? 'text-red-700'
-                : 'text-green-700'
-        }`}
+        className={`px-3 py-3 align-top text-right font-medium whitespace-nowrap ${differenceClassName}`}
       >
         {differenceLabel}
       </td>

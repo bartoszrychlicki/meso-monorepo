@@ -79,4 +79,38 @@ describe('InventoryCountLineRow', () => {
     expect(document.querySelector('textarea')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /szczegoly/i })).not.toBeInTheDocument();
   });
+
+  it('uses dark-mode-safe highlight classes for uncounted and changed rows', () => {
+    const { container, rerender } = render(
+      <table>
+        <tbody>
+          <InventoryCountLineRow
+            line={{ ...line, counted_quantity: null }}
+            categories={categories}
+            isReadonly={false}
+            onSave={vi.fn(async () => undefined)}
+          />
+        </tbody>
+      </table>
+    );
+
+    expect(container.querySelector('tr')).toHaveClass('bg-amber-50/50', 'dark:bg-amber-950/20');
+    expect(screen.getByText('Brak')).toHaveClass('text-amber-700', 'dark:text-amber-300');
+
+    rerender(
+      <table>
+        <tbody>
+          <InventoryCountLineRow
+            line={line}
+            categories={categories}
+            isReadonly={false}
+            onSave={vi.fn(async () => undefined)}
+          />
+        </tbody>
+      </table>
+    );
+
+    expect(container.querySelector('tr')).toHaveClass('bg-red-50/40', 'dark:bg-red-950/20');
+    expect(screen.getByText('+0,05 kg')).toHaveClass('text-emerald-700', 'dark:text-emerald-300');
+  });
 });
