@@ -457,7 +457,11 @@ export const stockItems: StockItem[] = baseStockItems.map((item) => ({
   inventory_category_id: CATEGORY_BY_PRODUCT_TYPE[item.product_category],
 }));
 
-export const warehouseStock: WarehouseStock[] = [
+const legacyStorageByItemId = new Map(
+  stockItems.map((item) => [item.id, item.storage_location ?? null])
+);
+
+const rawWarehouseStock = [
   // Magazyn glowny - most items
   { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaa001', warehouse_id: WAREHOUSE_IDS.MAIN, stock_item_id: STOCK_ITEM_IDS.BEEF, quantity: 42, min_quantity: 20, created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' },
   { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaa002', warehouse_id: WAREHOUSE_IDS.MAIN, stock_item_id: STOCK_ITEM_IDS.BUNS, quantity: 130, min_quantity: 50, created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' },
@@ -489,6 +493,11 @@ export const warehouseStock: WarehouseStock[] = [
   { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaa024', warehouse_id: WAREHOUSE_IDS.CHEMISTRY, stock_item_id: STOCK_ITEM_IDS.CUPS, quantity: 200, min_quantity: 100, created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' },
   { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaa025', warehouse_id: WAREHOUSE_IDS.CHEMISTRY, stock_item_id: STOCK_ITEM_IDS.BAGS, quantity: 150, min_quantity: 75, created_at: '2024-01-01T00:00:00.000Z', updated_at: '2024-01-01T00:00:00.000Z' },
 ];
+
+export const warehouseStock: WarehouseStock[] = rawWarehouseStock.map((row) => ({
+  ...row,
+  storage_location: legacyStorageByItemId.get(row.stock_item_id) ?? null,
+}));
 
 export const stockItemComponents: StockItemComponent[] = [
   {

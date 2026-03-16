@@ -109,6 +109,7 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDelete
               <TableHead className="hidden md:table-cell">SKU</TableHead>
               {showWarehouseColumn && <TableHead className="hidden sm:table-cell">Magazyn</TableHead>}
               <TableHead className="hidden sm:table-cell">Jednostka</TableHead>
+              <TableHead className="hidden lg:table-cell">Polozenie</TableHead>
               <TableHead className="text-right">Ilosc</TableHead>
               <TableHead className="text-right hidden sm:table-cell">Min</TableHead>
               <TableHead className="text-right hidden md:table-cell">Koszt/jedn.</TableHead>
@@ -144,6 +145,9 @@ export function StockTable({ items, showWarehouseColumn, onAdjustStock, onDelete
                   )}
                   <TableCell className="hidden sm:table-cell text-muted-foreground">
                     {item.unit}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">
+                    {item.storage_location || '-'}
                   </TableCell>
                   <TableCell className={`text-right ${qtyColor}`}>
                     {item.quantity}

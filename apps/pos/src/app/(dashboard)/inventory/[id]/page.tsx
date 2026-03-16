@@ -12,6 +12,7 @@ import { DescriptionTab } from '@/modules/inventory/components/description-tab';
 import { OptionsTab } from '@/modules/inventory/components/options-tab';
 import { ComponentsTab } from '@/modules/inventory/components/components-tab';
 import { UsageTab } from '@/modules/inventory/components/usage-tab';
+import { StockItemWarehouseSummary } from '@/modules/inventory/components/stock-item-warehouse-summary';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
@@ -25,42 +26,47 @@ export default function StockItemDetailPage() {
 
   const {
     currentStockItem,
+    currentWarehouseAssignments,
     inventoryCategories,
     detailLoadError,
     isDetailLoading,
     loadStockItemDetail,
+    loadWarehouseAssignments,
     loadInventoryCategories,
     loadComponents,
     loadUsage,
     updateStockItem,
+    selectedWarehouseId,
   } = useInventoryStore();
-  const [isInitialLoadPending, setIsInitialLoadPending] = useState(true);
+  const [lastLoadedItemId, setLastLoadedItemId] = useState<string | null>(null);
 
   useBreadcrumbLabel(id, currentStockItem?.name);
 
   const loadDetailData = useCallback(async () => {
     await Promise.all([
       loadStockItemDetail(id),
+      loadWarehouseAssignments(id),
       loadInventoryCategories(),
       loadComponents(id),
       loadUsage(id),
     ]);
-  }, [id, loadStockItemDetail, loadInventoryCategories, loadComponents, loadUsage]);
+  }, [id, loadStockItemDetail, loadWarehouseAssignments, loadInventoryCategories, loadComponents, loadUsage]);
 
   useEffect(() => {
     let cancelled = false;
 
-    setIsInitialLoadPending(true);
     void loadDetailData().finally(() => {
       if (!cancelled) {
-        setIsInitialLoadPending(false);
+        setLastLoadedItemId(id);
       }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [loadDetailData]);
+  }, [id, loadDetailData]);
+
+  const isInitialLoadPending = lastLoadedItemId !== id;
 
   const handleTabChange = (value: string) => {
     const url = new URL(window.location.href);
@@ -137,6 +143,11 @@ export default function StockItemDetailPage() {
           </AlertDescription>
         </Alert>
       ) : null}
+
+      <StockItemWarehouseSummary
+        assignments={currentWarehouseAssignments}
+        selectedWarehouseId={selectedWarehouseId}
+      />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} data-component="stock-item-tabs">
         <TabsList>

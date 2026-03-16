@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/page-header';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { StockTable } from '@/modules/inventory/components/stock-table';
@@ -8,6 +9,8 @@ import { StockItemForm } from '@/modules/inventory/components/stock-item-form';
 import { TransferDialog } from '@/modules/inventory/components/transfer-dialog';
 import { WarehouseManager } from '@/modules/inventory/components/warehouse-manager';
 import { InventoryCategoryManager } from '@/modules/inventory/components/inventory-category-manager';
+import { InventoryCountCreateDialog } from '@/modules/inventory/components/inventory-count-create-dialog';
+import { InventoryCountsTable } from '@/modules/inventory/components/inventory-counts-table';
 import { useInventoryStore } from '@/modules/inventory/store';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -22,17 +25,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Package, AlertTriangle, DollarSign, Plus, ArrowLeftRight, Settings, Search, Tags } from 'lucide-react';
+import {
+  Package,
+  AlertTriangle,
+  ClipboardList,
+  DollarSign,
+  Plus,
+  ArrowLeftRight,
+  Settings,
+  Search,
+  Tags,
+} from 'lucide-react';
 
 const ALL_CATEGORIES = '__all__';
 const UNCATEGORIZED = '__uncategorized__';
 
 export default function InventoryPage() {
+  const router = useRouter();
   const {
     stockItems,
     inventoryCategories,
     warehouses,
     warehouseStockItems,
+    inventoryCounts,
     isLoading,
     loadError,
     loadAll,
@@ -48,14 +63,17 @@ export default function InventoryPage() {
     createInventoryCategory,
     updateInventoryCategory,
     deleteInventoryCategory,
+    createInventoryCount,
     selectedWarehouseId,
     setSelectedWarehouse,
   } = useInventoryStore();
 
+  const [activeView, setActiveView] = useState<'stock' | 'counts'>('stock');
   const [showNewItemForm, setShowNewItemForm] = useState(false);
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showWarehouseManager, setShowWarehouseManager] = useState(false);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [showCreateCountDialog, setShowCreateCountDialog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
 
@@ -130,39 +148,50 @@ export default function InventoryPage() {
     <div className="space-y-6" data-page="inventory">
       <PageHeader
         title="Magazyn"
-        description="Stany magazynowe"
+        description={activeView === 'stock' ? 'Stany magazynowe' : 'Dokumenty inwentaryzacji'}
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {activeView === 'stock' ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowWarehouseManager(true)}
+                  data-action="manage-warehouses"
+                >
+                  <Settings className="mr-2 h-4 w-4" />
+                  Zarzadzaj magazynami
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowCategoryManager(true)}
+                  data-action="manage-inventory-categories"
+                >
+                  <Tags className="mr-2 h-4 w-4" />
+                  Zarzadzaj kategoriami
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTransferDialog(true)}
+                  data-action="transfer-stock"
+                >
+                  <ArrowLeftRight className="mr-2 h-4 w-4" />
+                  Transfer
+                </Button>
+                <Button
+                  onClick={() => setShowNewItemForm(true)}
+                  data-action="add-stock-item"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nowa pozycja
+                </Button>
+              </>
+            ) : null}
             <Button
-              variant="outline"
-              onClick={() => setShowWarehouseManager(true)}
-              data-action="manage-warehouses"
+              onClick={() => setShowCreateCountDialog(true)}
+              data-action="add-inventory-count"
             >
-              <Settings className="mr-2 h-4 w-4" />
-              Zarzadzaj magazynami
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowCategoryManager(true)}
-              data-action="manage-inventory-categories"
-            >
-              <Tags className="mr-2 h-4 w-4" />
-              Zarzadzaj kategoriami
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowTransferDialog(true)}
-              data-action="transfer-stock"
-            >
-              <ArrowLeftRight className="mr-2 h-4 w-4" />
-              Transfer
-            </Button>
-            <Button
-              onClick={() => setShowNewItemForm(true)}
-              data-action="add-stock-item"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Nowa pozycja
+              <ClipboardList className="mr-2 h-4 w-4" />
+              Nowa inwentaryzacja
             </Button>
           </div>
         }
@@ -187,94 +216,111 @@ export default function InventoryPage() {
         </Alert>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KpiCard
-          icon={<Package className="h-5 w-5" />}
-          label="Pozycji lacznie"
-          value={currentItems.length}
-          className="bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/20 dark:to-sky-950/20"
-        />
-        <KpiCard
-          icon={<AlertTriangle className="h-5 w-5" />}
-          label="Niski stan"
-          value={lowStockItems.length}
-          className={lowStockItems.length > 0
-            ? 'border-red-200 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20'
-            : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20'
-          }
-        />
-        <KpiCard
-          icon={<DollarSign className="h-5 w-5" />}
-          label="Wartosc magazynu"
-          value={formatCurrency(stockValue)}
-          className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_280px]">
-        <div className="relative" data-component="stock-search">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Szukaj produktu po nazwie lub SKU..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-            data-field="stock-search"
-          />
-        </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger data-field="stock-category-filter">
-            <SelectValue placeholder="Wszystkie kategorie" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_CATEGORIES}>Wszystkie kategorie</SelectItem>
-            <SelectItem value={UNCATEGORIZED}>Bez kategorii</SelectItem>
-            {inventoryCategories.map((category) => (
-              <SelectItem key={category.id} value={category.id}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
       <Tabs
-        value={selectedWarehouseId ?? 'all'}
-        onValueChange={handleTabChange}
-        data-component="warehouse-tabs"
+        value={activeView}
+        onValueChange={(value) => setActiveView(value as 'stock' | 'counts')}
+        data-component="inventory-view-tabs"
       >
         <TabsList>
-          <TabsTrigger value="all" data-value="all">
-            Wszystkie
-          </TabsTrigger>
-          {warehouses.map((w) => (
-            <TabsTrigger key={w.id} value={w.id} data-value={w.id}>
-              {w.name}
-            </TabsTrigger>
-          ))}
+          <TabsTrigger value="stock">Stany</TabsTrigger>
+          <TabsTrigger value="counts">Inwentaryzacje</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all">
-          <StockTable
-            items={filteredItems}
-            showWarehouseColumn
-            onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
-              await adjustStock(warehouseId, stockItemId, quantity, reason);
-            }}
-            onDeleteStockItem={deleteStockItem}
-          />
-        </TabsContent>
-        {warehouses.map((w) => (
-          <TabsContent key={w.id} value={w.id}>
-            <StockTable
-              items={filteredItems}
-              onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
-                await adjustStock(warehouseId, stockItemId, quantity, reason);
-              }}
-              onDeleteStockItem={deleteStockItem}
+        <TabsContent value="stock" className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <KpiCard
+              icon={<Package className="h-5 w-5" />}
+              label="Pozycji lacznie"
+              value={currentItems.length}
+              className="bg-gradient-to-br from-blue-50 to-sky-50 dark:from-blue-950/20 dark:to-sky-950/20"
             />
-          </TabsContent>
-        ))}
+            <KpiCard
+              icon={<AlertTriangle className="h-5 w-5" />}
+              label="Niski stan"
+              value={lowStockItems.length}
+              className={lowStockItems.length > 0
+                ? 'border-red-200 bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20'
+                : 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20'
+              }
+            />
+            <KpiCard
+              icon={<DollarSign className="h-5 w-5" />}
+              label="Wartosc magazynu"
+              value={formatCurrency(stockValue)}
+              className="bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_280px]">
+            <div className="relative" data-component="stock-search">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Szukaj produktu po nazwie lub SKU..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-field="stock-search"
+              />
+            </div>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger data-field="stock-category-filter">
+                <SelectValue placeholder="Wszystkie kategorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CATEGORIES}>Wszystkie kategorie</SelectItem>
+                <SelectItem value={UNCATEGORIZED}>Bez kategorii</SelectItem>
+                {inventoryCategories.map((category) => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Tabs
+            value={selectedWarehouseId ?? 'all'}
+            onValueChange={handleTabChange}
+            data-component="warehouse-tabs"
+          >
+            <TabsList>
+              <TabsTrigger value="all" data-value="all">
+                Wszystkie
+              </TabsTrigger>
+              {warehouses.map((warehouse) => (
+                <TabsTrigger key={warehouse.id} value={warehouse.id} data-value={warehouse.id}>
+                  {warehouse.name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            <TabsContent value="all">
+              <StockTable
+                items={filteredItems}
+                showWarehouseColumn
+                onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
+                  await adjustStock(warehouseId, stockItemId, quantity, reason);
+                }}
+                onDeleteStockItem={deleteStockItem}
+              />
+            </TabsContent>
+            {warehouses.map((warehouse) => (
+              <TabsContent key={warehouse.id} value={warehouse.id}>
+                <StockTable
+                  items={filteredItems}
+                  onAdjustStock={async (warehouseId, stockItemId, quantity, reason) => {
+                    await adjustStock(warehouseId, stockItemId, quantity, reason);
+                  }}
+                  onDeleteStockItem={deleteStockItem}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
+        </TabsContent>
+
+        <TabsContent value="counts">
+          <InventoryCountsTable counts={inventoryCounts} />
+        </TabsContent>
       </Tabs>
 
       <StockItemForm
@@ -315,6 +361,17 @@ export default function InventoryPage() {
         onCreateCategory={createInventoryCategory}
         onUpdateCategory={updateInventoryCategory}
         onDeleteCategory={deleteInventoryCategory}
+      />
+
+      <InventoryCountCreateDialog
+        open={showCreateCountDialog}
+        onOpenChange={setShowCreateCountDialog}
+        warehouses={warehouses}
+        selectedWarehouseId={selectedWarehouseId}
+        onCreate={async (scope, warehouseId) => {
+          const count = await createInventoryCount(scope, warehouseId);
+          router.push(`/inventory/counts/${count.id}`);
+        }}
       />
     </div>
   );
