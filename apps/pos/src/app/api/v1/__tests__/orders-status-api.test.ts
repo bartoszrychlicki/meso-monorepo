@@ -1,17 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
-vi.mock('@/lib/api/auth', () => ({
-  authenticateRequest: vi.fn(),
-  isApiKey: vi.fn(),
-}))
-
-vi.mock('@/lib/api-keys', () => ({
-  hasPermission: vi.fn().mockReturnValue(true),
-}))
-
 vi.mock('@/modules/orders/server-loyalty', () => ({
   awardOrderLoyaltyPoints: vi.fn(),
+}))
+
+vi.mock('@/modules/orders/server/route-auth', () => ({
+  authorizeOrderRoute: vi.fn(),
 }))
 
 const { mockKitchenTicketsIn, mockKitchenTicketsEq, mockKitchenTicketsUpdate } = vi.hoisted(() => ({
@@ -75,19 +70,13 @@ vi.mock('@/lib/integrations/posbistro/service', () => ({
   submitPosbistroOrder: mockSubmitPosbistroOrder,
 }))
 
-import { authenticateRequest, isApiKey } from '@/lib/api/auth'
+import { authorizeOrderRoute } from '@/modules/orders/server/route-auth'
 import { awardOrderLoyaltyPoints } from '@/modules/orders/server-loyalty'
 import { PATCH } from '../orders/[id]/status/route'
 
-const mockAuth = authenticateRequest as ReturnType<typeof vi.fn>
-const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>
+const mockAuthorizeOrderRoute = authorizeOrderRoute as ReturnType<typeof vi.fn>
 const mockFindById = mockServerRepo.findById as ReturnType<typeof vi.fn>
 const mockAwardOrderLoyaltyPoints = awardOrderLoyaltyPoints as ReturnType<typeof vi.fn>
-
-const validApiKey = {
-  id: 'key-1',
-  permissions: ['orders:status'],
-}
 
 const baseOrder = {
   id: 'order-1',
@@ -133,8 +122,7 @@ describe('PATCH /api/v1/orders/:id/status', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.unstubAllEnvs()
-    mockAuth.mockResolvedValue(validApiKey)
-    mockIsApiKey.mockReturnValue(true)
+    mockAuthorizeOrderRoute.mockResolvedValue({ kind: 'session', actorId: 'user-1' })
     mockScheduleWebhookDispatch.mockReset()
     mockEnsureCustomerForOrder.mockImplementation(async (order) => order)
     mockSubmitPosbistroOrder.mockResolvedValue(null)

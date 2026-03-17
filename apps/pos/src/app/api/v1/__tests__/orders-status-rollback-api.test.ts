@@ -6,25 +6,8 @@ const { mockRollbackOrderStatus } = vi.hoisted(() => ({
   mockRollbackOrderStatus: vi.fn(),
 }));
 
-vi.mock('@/lib/api/auth', () => ({
-  authenticateRequest: vi.fn().mockResolvedValue({ status: 401 }),
-  isApiKey: vi.fn().mockReturnValue(false),
-}));
-
-vi.mock('@/lib/api-keys', () => ({
-  hasPermission: vi.fn().mockReturnValue(true),
-}));
-
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: {
-          user: { id: 'user-1' },
-        },
-      }),
-    },
-  })),
+vi.mock('@/modules/orders/server/route-auth', () => ({
+  authorizeOrderRoute: vi.fn(),
 }));
 
 vi.mock('@/lib/orders/status-transition', async (importOriginal) => {
@@ -38,6 +21,9 @@ vi.mock('@/lib/orders/status-transition', async (importOriginal) => {
 
 import { POST } from '../orders/[id]/status/rollback/route';
 import { InvalidOrderStatusRollbackError } from '@/lib/orders/status-transition';
+import { authorizeOrderRoute } from '@/modules/orders/server/route-auth';
+
+const mockAuthorizeOrderRoute = authorizeOrderRoute as ReturnType<typeof vi.fn>;
 
 function makeRequest(body: Record<string, unknown> = {}) {
   return new NextRequest(
@@ -59,6 +45,7 @@ function makeParams(id: string) {
 describe('POST /api/v1/orders/:id/status/rollback', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthorizeOrderRoute.mockResolvedValue({ kind: 'session', actorId: 'user-1' });
     mockRollbackOrderStatus.mockResolvedValue({
       id: 'order-1',
       status: 'preparing',
