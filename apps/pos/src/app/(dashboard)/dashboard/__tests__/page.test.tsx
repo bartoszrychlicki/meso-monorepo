@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import type { ReactNode } from 'react';
@@ -106,6 +106,8 @@ function createOrder({
 describe('DashboardPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-03-17T12:00:00.000Z'));
 
     mockUseOrders.mockReturnValue({
       orders: [
@@ -132,6 +134,10 @@ describe('DashboardPage', () => {
     });
     mockGetAllWarehouseStockItems.mockResolvedValue([]);
     mockGetLowStockItems.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('excludes cancelled orders from dashboard aggregates and shows them separately', async () => {
