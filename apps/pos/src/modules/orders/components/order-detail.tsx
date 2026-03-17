@@ -258,7 +258,7 @@ export function OrderDetail({
         </Alert>
       )}
 
-      {order.status === OrderStatus.PENDING && (
+      {order.status === OrderStatus.PENDING && order.payment_status !== PaymentStatus.PAID && (
         <Alert className="border-amber-300 bg-amber-50 text-amber-950" data-field="payment-pending-alert">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Zamówienie oczekuje na płatność</AlertTitle>

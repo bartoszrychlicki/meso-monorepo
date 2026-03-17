@@ -13,7 +13,9 @@ import {
   ModifierAction,
 } from '@/types/enums';
 
-const toastError = vi.fn();
+const { toastError } = vi.hoisted(() => ({
+  toastError: vi.fn(),
+}));
 
 vi.mock('sonner', () => ({
   toast: {
@@ -225,6 +227,19 @@ describe('OrderDetail', () => {
     expect(
       screen.getByText('To zamówienie nie zostało jeszcze opłacone i nie powinno być kierowane do realizacji.')
     ).toBeInTheDocument();
+  });
+
+  it('does not show unpaid warning for paid pending orders', () => {
+    renderOrderDetail({
+      ...baseOrder,
+      payment_status: PaymentStatus.PAID,
+    });
+
+    expect(screen.getAllByText('Oczekuje na płatność').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Zamówienie oczekuje na płatność')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('To zamówienie nie zostało jeszcze opłacone i nie powinno być kierowane do realizacji.')
+    ).not.toBeInTheDocument();
   });
 
   it('renders closure reason for cancelled orders', () => {
