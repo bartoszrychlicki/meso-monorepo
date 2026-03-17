@@ -26,6 +26,8 @@ import {
   buildRollbackStatusNote,
 } from '@/lib/orders/status-rollback';
 import { createServiceClient } from '@/lib/supabase/server';
+import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
+import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
 import { UpdateOrderSchema, type UpdateOrderInput } from '@/schemas/order';
 import { isValidPhoneNumber } from '@/lib/sms/templates';
 import { authorizeOrderRoute } from '@/modules/orders/server/route-auth';
@@ -481,6 +483,20 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     shouldSyncKitchenContents,
     resetKitchenCompletionState: shouldResetKitchenCompletionState,
   });
+
+  if (shouldRollbackReady) {
+    const rollbackNote = buildEditRollbackNote(itemsChanged, notesChanged);
+    const webhookData = buildOrderStatusChangedWebhookData(updatedOrder, {
+      status: nextStatus,
+      previousStatus: existing.status,
+      note: rollbackNote,
+    });
+
+    await scheduleWebhookDispatch(
+      'order.status_changed',
+      webhookData as unknown as Record<string, unknown>
+    );
+  }
 
   return apiSuccess(
     updatedOrder,
