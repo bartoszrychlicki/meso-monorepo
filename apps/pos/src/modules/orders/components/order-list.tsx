@@ -19,7 +19,7 @@ const CHANNEL_LABELS: Record<OrderChannel, string> = {
 
 const STATUS_TABS: Array<{ value: OrderStatus | 'all'; label: string }> = [
   { value: 'all', label: 'Wszystkie' },
-  { value: OrderStatus.PENDING, label: 'Oczekujace' },
+  { value: OrderStatus.PENDING, label: 'Oczekuje na płatność' },
   { value: OrderStatus.CONFIRMED, label: 'Potwierdzone' },
   { value: OrderStatus.PREPARING, label: 'W przygotowaniu' },
   { value: OrderStatus.READY, label: 'Gotowe' },

@@ -209,6 +209,16 @@ describe('OrderDetail', () => {
     expect(screen.getAllByText('Dostawa').length).toBeGreaterThan(0);
   });
 
+  it('shows payment pending label and alert for pending orders', () => {
+    renderOrderDetail(baseOrder);
+
+    expect(screen.getAllByText('Oczekuje na płatność').length).toBeGreaterThan(0);
+    expect(screen.getByText('Zamówienie oczekuje na płatność')).toBeInTheDocument();
+    expect(
+      screen.getByText('To zamówienie nie zostało jeszcze opłacone i nie powinno być kierowane do realizacji.')
+    ).toBeInTheDocument();
+  });
+
   it('renders closure reason for cancelled orders', () => {
     renderOrderDetail(cancelledOrder);
 

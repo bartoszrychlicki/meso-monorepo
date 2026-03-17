@@ -5,6 +5,52 @@ function getWebhookRepository() {
   return createServerRepository<WebhookSubscription>('webhook_subscriptions');
 }
 
+function canonicalizeEvents(events: WebhookEvent[]): WebhookEvent[] {
+  return [...new Set(events)].sort() as WebhookEvent[];
+}
+
+function eventsMatch(left: WebhookEvent[], right: WebhookEvent[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((event, index) => event === right[index]);
+}
+
+function isDuplicateWebhookError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+
+  const message = error.message.toLowerCase();
+  return message.includes('duplicate key value') &&
+    message.includes('idx_integrations_webhook_subscriptions_unique_target');
+}
+
+async function findExactMatches(
+  url: string,
+  secret: string,
+  events: WebhookEvent[]
+): Promise<WebhookSubscription[]> {
+  const baseRepo = getWebhookRepository();
+  const canonicalEvents = canonicalizeEvents(events);
+
+  const matches = await baseRepo.findMany(
+    (subscription) =>
+      subscription.url === url &&
+      subscription.secret === secret &&
+      eventsMatch(
+        canonicalizeEvents(subscription.events as WebhookEvent[]),
+        canonicalEvents
+      )
+  );
+
+  return matches.sort((left, right) => {
+    if (left.is_active !== right.is_active) {
+      return left.is_active ? -1 : 1;
+    }
+
+    const leftUpdated = new Date(left.updated_at).getTime();
+    const rightUpdated = new Date(right.updated_at).getTime();
+    return rightUpdated - leftUpdated;
+  });
+}
+
 async function register(
   url: string,
   events: WebhookEvent[],
@@ -12,15 +58,43 @@ async function register(
   description?: string
 ): Promise<WebhookSubscription> {
   const baseRepo = getWebhookRepository();
+  const canonicalEvents = canonicalizeEvents(events);
   // The current production table does not persist description yet.
   void description;
 
-  return baseRepo.create({
-    url,
-    events,
-    secret,
-    is_active: true,
-  } as Omit<WebhookSubscription, 'id' | 'created_at' | 'updated_at'>);
+  const exactMatches = await findExactMatches(url, secret, canonicalEvents);
+  const activeMatch = exactMatches.find((subscription) => subscription.is_active);
+  if (activeMatch) {
+    return activeMatch;
+  }
+
+  const inactiveMatch = exactMatches[0];
+  if (inactiveMatch) {
+    return baseRepo.update(inactiveMatch.id, {
+      is_active: true,
+      events: canonicalEvents,
+    });
+  }
+
+  try {
+    return await baseRepo.create({
+      url,
+      events: canonicalEvents,
+      secret,
+      is_active: true,
+    } as Omit<WebhookSubscription, 'id' | 'created_at' | 'updated_at'>);
+  } catch (error) {
+    if (!isDuplicateWebhookError(error)) {
+      throw error;
+    }
+
+    const concurrentMatch = (await findExactMatches(url, secret, canonicalEvents))[0];
+    if (concurrentMatch) {
+      return concurrentMatch;
+    }
+
+    throw error;
+  }
 }
 
 async function unregister(id: string): Promise<void> {
