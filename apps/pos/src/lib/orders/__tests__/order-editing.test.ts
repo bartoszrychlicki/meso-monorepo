@@ -124,6 +124,32 @@ describe('buildKitchenItemsFromOrderItems', () => {
       is_done: false,
     });
   });
+
+  it('preserves completion state when only notes change', () => {
+    const previousKitchenItems: KitchenItem[] = [
+      {
+        id: 'k-item-1',
+        order_item_id: 'item-1',
+        product_name: 'Ramen',
+        quantity: 1,
+        modifiers: ['Extra Chashu'],
+        notes: 'Bez sezamu',
+        is_done: true,
+      },
+    ];
+
+    const nextItems = buildKitchenItemsFromOrderItems(
+      [{ ...baseOrderItem, notes: 'Dodatkowy bulion' }],
+      previousKitchenItems
+    );
+
+    expect(nextItems[0]).toMatchObject({
+      id: 'k-item-1',
+      order_item_id: 'item-1',
+      notes: 'Dodatkowy bulion',
+      is_done: true,
+    });
+  });
 });
 
 describe('buildKitchenTicketStatusPatch', () => {

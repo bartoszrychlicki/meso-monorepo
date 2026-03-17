@@ -51,6 +51,17 @@ async function findExactMatches(
   });
 }
 
+async function reactivateExactMatch(
+  subscription: WebhookSubscription,
+  events: WebhookEvent[]
+): Promise<WebhookSubscription> {
+  const baseRepo = getWebhookRepository();
+  return baseRepo.update(subscription.id, {
+    is_active: true,
+    events,
+  });
+}
+
 async function register(
   url: string,
   events: WebhookEvent[],
@@ -70,10 +81,7 @@ async function register(
 
   const inactiveMatch = exactMatches[0];
   if (inactiveMatch) {
-    return baseRepo.update(inactiveMatch.id, {
-      is_active: true,
-      events: canonicalEvents,
-    });
+    return reactivateExactMatch(inactiveMatch, canonicalEvents);
   }
 
   try {
@@ -90,7 +98,9 @@ async function register(
 
     const concurrentMatch = (await findExactMatches(url, secret, canonicalEvents))[0];
     if (concurrentMatch) {
-      return concurrentMatch;
+      return concurrentMatch.is_active
+        ? concurrentMatch
+        : reactivateExactMatch(concurrentMatch, canonicalEvents);
     }
 
     throw error;
