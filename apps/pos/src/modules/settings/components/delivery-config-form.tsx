@@ -31,6 +31,7 @@ const ORDERING_REOPEN_FORMATTER = new Intl.DateTimeFormat('pl-PL', {
   hour: '2-digit',
   minute: '2-digit',
 });
+const MIN_ORDERING_PAUSE_OFFSET_MS = 60 * 60 * 1000;
 
 function trimTimeSeconds(time: string | undefined | null): string {
   if (!time) return '';
@@ -115,6 +116,33 @@ function isOrderingPauseActive(
   return reopenAt ? now < reopenAt : false;
 }
 
+function roundUpToQuarterHour(date: Date): Date {
+  const rounded = new Date(date);
+  rounded.setMinutes(Math.ceil(rounded.getMinutes() / 15) * 15, 0, 0);
+
+  if (rounded.getMinutes() === 60) {
+    rounded.setHours(rounded.getHours() + 1, 0, 0, 0);
+  }
+
+  return rounded;
+}
+
+function formatDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildMinimumOrderingPauseValues(now = new Date()) {
+  const minimumDate = roundUpToQuarterHour(new Date(now.getTime() + MIN_ORDERING_PAUSE_OFFSET_MS));
+
+  return {
+    date: formatDateInputValue(minimumDate),
+    time: minimumDate.toTimeString().slice(0, 5),
+  };
+}
+
 export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
   const { deliveryConfig, saveDeliveryConfig } = useLocationSettingsStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -167,6 +195,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
   const isDeliveryActive = form.watch('is_delivery_active');
   const orderingPausedUntilDate = form.watch('ordering_paused_until_date');
   const orderingPausedUntilTime = form.watch('ordering_paused_until_time');
+  const isOrderingPauseEnabled = Boolean(orderingPausedUntilDate || orderingPausedUntilTime);
   const orderingPauseSummary = formatOrderingPauseSummary(
     orderingPausedUntilDate,
     orderingPausedUntilTime
@@ -192,6 +221,27 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleOrderingPauseToggle = (checked: boolean) => {
+    if (!checked) {
+      form.setValue('ordering_paused_until_date', null, { shouldValidate: true });
+      form.setValue('ordering_paused_until_time', null, { shouldValidate: true });
+      return;
+    }
+
+    const minimumValues = buildMinimumOrderingPauseValues();
+    const existingReopenAt = buildLocalDateTime(orderingPausedUntilDate, orderingPausedUntilTime);
+    const minimumReopenAt = buildLocalDateTime(minimumValues.date, minimumValues.time);
+
+    if (existingReopenAt && minimumReopenAt && existingReopenAt >= minimumReopenAt) {
+      form.setValue('ordering_paused_until_date', orderingPausedUntilDate, { shouldValidate: true });
+      form.setValue('ordering_paused_until_time', orderingPausedUntilTime, { shouldValidate: true });
+      return;
+    }
+
+    form.setValue('ordering_paused_until_date', minimumValues.date, { shouldValidate: true });
+    form.setValue('ordering_paused_until_time', minimumValues.time, { shouldValidate: true });
   };
 
   return (
@@ -245,9 +295,21 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-2">
-            <CardTitle>Tymczasowe zamkniecie lokalu</CardTitle>
-            {orderingPauseIsActive && <Badge variant="destructive">Aktywne</Badge>}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <CardTitle>Tymczasowe zamkniecie lokalu</CardTitle>
+              {orderingPauseIsActive && <Badge variant="destructive">Aktywne</Badge>}
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="ordering_pause_enabled">Aktywne</Label>
+              <Switch
+                id="ordering_pause_enabled"
+                checked={isOrderingPauseEnabled}
+                onCheckedChange={handleOrderingPauseToggle}
+                aria-label="Tymczasowe zamkniecie aktywne"
+                data-field="ordering_pause_enabled"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -270,6 +332,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               <Input
                 id="ordering_paused_until_date"
                 type="date"
+                disabled={!isOrderingPauseEnabled}
                 value={orderingPausedUntilDate ?? ''}
                 onChange={(event) => {
                   const nextDate = event.target.value ? event.target.value : null;
@@ -286,10 +349,20 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
                   }
 
                   if (!form.getValues('ordering_paused_until_time')) {
+                    const openingTime =
+                      trimTimeSeconds(form.getValues('opening_time')) || DEFAULT_ORDERING_REOPEN_TIME;
+                    const nextReopenAt = buildLocalDateTime(nextDate, openingTime);
+                    const minimumValues = buildMinimumOrderingPauseValues();
+                    const minimumReopenAt = buildLocalDateTime(
+                      minimumValues.date,
+                      minimumValues.time
+                    );
+
                     form.setValue(
                       'ordering_paused_until_time',
-                      trimTimeSeconds(form.getValues('opening_time')) ||
-                        DEFAULT_ORDERING_REOPEN_TIME,
+                      nextReopenAt && minimumReopenAt && nextReopenAt >= minimumReopenAt
+                        ? openingTime
+                        : minimumValues.time,
                       { shouldValidate: true }
                     );
                   }
@@ -303,7 +376,7 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               <Input
                 id="ordering_paused_until_time"
                 type="time"
-                disabled={!orderingPausedUntilDate}
+                disabled={!isOrderingPauseEnabled || !orderingPausedUntilDate}
                 value={orderingPausedUntilTime ?? ''}
                 onChange={(event) =>
                   form.setValue(
