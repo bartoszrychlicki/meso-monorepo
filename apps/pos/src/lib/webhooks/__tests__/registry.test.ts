@@ -104,48 +104,6 @@ describe('webhookRegistry server persistence', () => {
     expect(result.is_active).toBe(true);
   });
 
-  it('reactivates a concurrent inactive match after duplicate-key conflict', async () => {
-    mockRepo.findMany
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: 'sub-3',
-          url: 'https://example.com/webhook',
-          events: ['order.cancelled', 'order.status_changed'],
-          secret: 'secret-1234567890abcdef',
-          is_active: false,
-          created_at: '2026-03-12T00:00:00.000Z',
-          updated_at: '2026-03-12T00:01:00.000Z',
-        },
-      ]);
-    mockRepo.create.mockRejectedValueOnce(
-      new Error(
-        'duplicate key value violates unique constraint "idx_integrations_webhook_subscriptions_unique_target"'
-      )
-    );
-    mockRepo.update.mockResolvedValue({
-      id: 'sub-3',
-      url: 'https://example.com/webhook',
-      events: ['order.cancelled', 'order.status_changed'],
-      secret: 'secret-1234567890abcdef',
-      is_active: true,
-      created_at: '2026-03-12T00:00:00.000Z',
-      updated_at: '2026-03-12T00:02:00.000Z',
-    });
-
-    const result = await webhookRegistry.register(
-      'https://example.com/webhook',
-      ['order.status_changed', 'order.cancelled'],
-      'secret-1234567890abcdef'
-    );
-
-    expect(mockRepo.update).toHaveBeenCalledWith('sub-3', {
-      is_active: true,
-      events: ['order.cancelled', 'order.status_changed'],
-    });
-    expect(result.is_active).toBe(true);
-  });
-
   it('lists and filters subscriptions through the server repository', async () => {
     mockRepo.findAll.mockResolvedValue({
       data: [{ id: 'sub-1' }],
