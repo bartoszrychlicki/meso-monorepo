@@ -567,6 +567,58 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     );
   });
 
+  it('falls back to the current ticket when ticket reload fails after pickup adjustment', async () => {
+    const newPickupTime = '2026-03-01T11:50:00.000Z';
+
+    mockKitchenRepo.findById
+      .mockResolvedValueOnce(baseTicket)
+      .mockRejectedValueOnce(new Error('temporary ticket lookup failure'));
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockResolvedValueOnce({
+        ...baseOrder,
+        estimated_ready_at: newPickupTime,
+        metadata: {
+          pickup_time_adjustments: [
+            {
+              previous_time: '2026-03-01T11:30:00.000Z',
+              new_time: newPickupTime,
+              changed_at: '2026-03-01T10:05:00.000Z',
+              source: 'kds',
+            },
+          ],
+        },
+      });
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      estimated_ready_at: newPickupTime,
+      metadata: {
+        pickup_time_adjustments: [
+          {
+            previous_time: '2026-03-01T11:30:00.000Z',
+            new_time: newPickupTime,
+            changed_at: '2026-03-01T10:05:00.000Z',
+            source: 'kds',
+          },
+        ],
+      },
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: newPickupTime }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.status).toBe(OrderStatus.PENDING);
+    expect(body.ticket.estimated_ready_at).toBe(newPickupTime);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[KDS transition] Pickup time adjusted for ticket ticket-1, but ticket reload was skipped:',
+      expect.any(Error)
+    );
+  });
+
   it('logs pickup time email failures without failing the adjustment', async () => {
     const newPickupTime = '2026-03-01T11:50:00.000Z';
 

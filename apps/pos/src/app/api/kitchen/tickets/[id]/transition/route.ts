@@ -261,7 +261,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
       }
 
-      const latestTicket = await kitchenRepo.findById(id);
+      let latestTicket: KitchenTicket | null = null;
+
+      try {
+        latestTicket = await kitchenRepo.findById(id);
+      } catch (error) {
+        console.warn(
+          `[KDS transition] Pickup time adjusted for ticket ${id}, but ticket reload was skipped:`,
+          error
+        );
+      }
+
       const responseTicket = buildAdjustedPickupResponseTicket(
         latestTicket ?? currentTicket,
         updatedOrder
