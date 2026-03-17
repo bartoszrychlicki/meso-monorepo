@@ -10,6 +10,7 @@ import { KdsTimer } from './kds-timer';
 import { cn } from '@/lib/utils';
 import { Check, ChefHat, ArrowRight, AlertTriangle, Clock3 } from 'lucide-react';
 import {
+  formatKitchenEstimatedReadyTime,
   formatKitchenScheduledTime,
   normalizeKitchenModifierLabels,
 } from '../formatting';
@@ -37,12 +38,17 @@ export function KdsCard({ ticket }: KdsCardProps) {
   const markServed = useKitchenStore((s) => s.markServed);
   const { color } = useTicketTimer(ticket);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const isEstimatedPickupTime = !ticket.scheduled_time && ticket.delivery_type === 'pickup';
   const scheduledTimeLabel = ticket.scheduled_time
     ? formatKitchenScheduledTime(ticket.scheduled_time)
+    : isEstimatedPickupTime
+      ? formatKitchenEstimatedReadyTime(ticket.created_at, ticket.estimated_minutes)
     : null;
   const scheduleLabelPrefix = ticket.delivery_type === 'delivery'
     ? 'Dostawa'
-    : ticket.delivery_type === 'pickup'
+    : isEstimatedPickupTime
+      ? 'Odbior ok.'
+      : ticket.delivery_type === 'pickup'
       ? 'Odbior'
       : null;
   const refundEligibility = ticket.linked_order

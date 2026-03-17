@@ -62,6 +62,23 @@ describe('KdsCard', () => {
     expect(screen.getByText('Odbior: jutro, 18:45')).toBeInTheDocument();
   });
 
+  it('renders estimated pickup time for asap pickup orders', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-03T12:00:00'));
+
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          id: 'ticket-asap',
+          scheduled_time: undefined,
+        }}
+      />
+    );
+
+    expect(screen.getByText('Odbior ok.: 11:10')).toBeInTheDocument();
+  });
+
   it('does not render modifiers row when modifiers list is empty', () => {
     const ticketWithoutModifiers: KitchenTicket = {
       ...ticketWithVariantAndModifiers,
@@ -100,12 +117,13 @@ describe('KdsCard', () => {
     expect(screen.getAllByText('Extra sos')).toHaveLength(2);
   });
 
-  it('does not render scheduled pickup time when order is not scheduled', () => {
+  it('does not render pickup time badge when order is not scheduled and delivery type is unknown', () => {
     render(
       <KdsCard
         ticket={{
           ...ticketWithVariantAndModifiers,
           id: 'ticket-4',
+          delivery_type: undefined,
           scheduled_time: undefined,
         }}
       />

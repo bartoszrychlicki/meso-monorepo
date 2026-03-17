@@ -1,4 +1,4 @@
-import { addDays, format, isSameDay } from 'date-fns';
+import { addDays, addMinutes, format, isSameDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { ModifierAction } from '@/types/enums';
 import type { OrderItemModifier } from '@/types/order';
@@ -58,4 +58,24 @@ export function formatKitchenScheduledTime(
   }
 
   return format(scheduledAt, 'd MMM, HH:mm', { locale: pl });
+}
+
+export function formatKitchenEstimatedReadyTime(
+  createdAt: string,
+  estimatedMinutes: number,
+  referenceDate: Date = new Date()
+): string | null {
+  if (!Number.isFinite(estimatedMinutes) || estimatedMinutes <= 0) {
+    return null;
+  }
+
+  const createdAtDate = new Date(createdAt);
+  if (Number.isNaN(createdAtDate.getTime())) {
+    return null;
+  }
+
+  return formatKitchenScheduledTime(
+    addMinutes(createdAtDate, estimatedMinutes).toISOString(),
+    referenceDate
+  );
 }
