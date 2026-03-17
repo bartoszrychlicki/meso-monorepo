@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
+import {
+  ModifierAction,
+  OrderChannel,
+  OrderSource,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from '@/types/enums';
 import type { Order } from '@/types/order';
 import { mapOrderToPosbistroPayload } from '../mapper';
 
@@ -22,7 +29,7 @@ const baseOrder: Order = {
   order_number: 'WEB-20260310-001',
   status: OrderStatus.CONFIRMED,
   channel: OrderChannel.DELIVERY_APP,
-  source: 'delivery',
+  source: OrderSource.DELIVERY,
   location_id: 'location-1',
   customer_name: 'Jan Kowalski',
   customer_phone: '+48123456789',
@@ -53,7 +60,7 @@ const baseOrder: Order = {
           name: 'Extra jajko',
           price: 4,
           quantity: 1,
-          modifier_action: 'add',
+          modifier_action: ModifierAction.ADD,
         },
       ],
       subtotal: 72,
@@ -65,7 +72,7 @@ const baseOrder: Order = {
   discount: 0,
   total: 72,
   payment_status: PaymentStatus.PAID,
-  payment_method: 'online',
+  payment_method: PaymentMethod.ONLINE,
   notes: 'Zadzwonić domofonem',
   status_history: [],
   created_at: '2026-03-10T10:00:00.000Z',

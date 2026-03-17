@@ -46,7 +46,7 @@ describe('PosbistroClient', () => {
         },
         products: [],
       })
-    ).rejects.toMatchObject<Partial<PosbistroSubmitError>>({
+    ).rejects.toMatchObject({
       name: 'PosbistroSubmitError',
       responseBody: expect.objectContaining({
         code: 'invalid_cart_param',

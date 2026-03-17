@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
+import {
+  ModifierAction,
+  OrderChannel,
+  OrderSource,
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from '@/types/enums';
 import type { Order } from '@/types/order';
 import type { PosbistroMenuMapping } from '../types';
 import {
@@ -14,7 +21,7 @@ function createOrder(overrides: Partial<Order> = {}): Order {
     order_number: 'WEB-20260311-100',
     status: OrderStatus.CONFIRMED,
     channel: OrderChannel.DELIVERY_APP,
-    source: 'delivery',
+    source: OrderSource.DELIVERY,
     location_id: 'location-1',
     customer_name: 'Jan Kowalski',
     customer_phone: '+48123456789',
@@ -42,7 +49,7 @@ function createOrder(overrides: Partial<Order> = {}): Order {
             name: 'Extra nori',
             price: 4,
             quantity: 1,
-            modifier_action: 'add',
+            modifier_action: ModifierAction.ADD,
           },
         ],
         subtotal: 36,
@@ -53,7 +60,7 @@ function createOrder(overrides: Partial<Order> = {}): Order {
     discount: 0,
     total: 36,
     payment_status: PaymentStatus.PAID,
-    payment_method: 'online',
+    payment_method: PaymentMethod.ONLINE,
     notes: '',
     status_history: [],
     created_at: '2026-03-11T10:00:00.000Z',
@@ -146,7 +153,7 @@ describe('resolvePosbistroMappingsForOrder', () => {
       resolvePosbistroMappingsForOrder(createOrder({ items: [{ ...createOrder().items[0], variant_id: undefined }] }), {
         mappingRepo: mappingRepo as never,
       })
-    ).rejects.toMatchObject<Partial<PosbistroMenuMappingError>>({
+    ).rejects.toMatchObject({
       name: 'PosbistroMenuMappingError',
       details: expect.objectContaining({
         meso_product_id: 'product-1',

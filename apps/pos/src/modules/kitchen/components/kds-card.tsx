@@ -12,12 +12,14 @@ import { Check, ChefHat, ArrowRight, AlertTriangle, Clock3 } from 'lucide-react'
 import {
   formatKitchenScheduledTime,
   normalizeKitchenModifierLabels,
+  resolveKitchenTicketCurrentPickupTime,
 } from '../formatting';
 import { toast } from 'sonner';
 import {
   OrderCancelDialog,
   type OrderCancelInput,
 } from '@/components/shared/order-cancel-dialog';
+import { PickupTimeAdjustDialog } from './pickup-time-adjust-dialog';
 
 interface KdsCardProps {
   ticket: KitchenTicket;
@@ -35,16 +37,25 @@ export function KdsCard({ ticket }: KdsCardProps) {
   const markItemDone = useKitchenStore((s) => s.markItemDone);
   const markReady = useKitchenStore((s) => s.markReady);
   const markServed = useKitchenStore((s) => s.markServed);
+  const adjustPickupTime = useKitchenStore((s) => s.adjustPickupTime);
   const { color } = useTicketTimer(ticket);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const scheduledTimeLabel = ticket.scheduled_time
-    ? formatKitchenScheduledTime(ticket.scheduled_time)
+  const [pickupAdjustDialogOpen, setPickupAdjustDialogOpen] = useState(false);
+  const currentPickupTime = resolveKitchenTicketCurrentPickupTime(ticket);
+  const isEstimatedPickupTime = !ticket.estimated_ready_at && !ticket.scheduled_time && ticket.delivery_type === 'pickup';
+  const scheduledTimeLabel = currentPickupTime
+    ? formatKitchenScheduledTime(currentPickupTime)
     : null;
   const scheduleLabelPrefix = ticket.delivery_type === 'delivery'
     ? 'Dostawa'
-    : ticket.delivery_type === 'pickup'
+    : isEstimatedPickupTime
+      ? 'Odbior ok.'
+      : ticket.delivery_type === 'pickup'
       ? 'Odbior'
       : null;
+  const canAdjustPickupTime = ticket.delivery_type === 'pickup' &&
+    currentPickupTime &&
+    (ticket.status === OrderStatus.PENDING || ticket.status === OrderStatus.PREPARING);
   const refundEligibility = ticket.linked_order
     ? getAutomaticRefundEligibility(ticket.linked_order)
     : { eligible: false };
@@ -72,6 +83,13 @@ export function KdsCard({ ticket }: KdsCardProps) {
     }
 
     toast.success('Zamowienie anulowane.');
+  };
+
+  const handlePickupTimeAdjust = async (pickupTime: string) => {
+    await adjustPickupTime(ticket.id, pickupTime);
+    setPickupAdjustDialogOpen(false);
+    const pickupTimeLabel = formatKitchenScheduledTime(pickupTime) ?? pickupTime;
+    toast.success(`Nowy czas odbioru: ${pickupTimeLabel}`);
   };
 
   return (
@@ -205,6 +223,17 @@ export function KdsCard({ ticket }: KdsCardProps) {
               <ChefHat className="h-6 w-6" />
               Rozpocznij
             </button>
+            {canAdjustPickupTime && (
+              <button
+                type="button"
+                onClick={() => setPickupAdjustDialogOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-6 py-3 text-base font-bold text-sky-700 transition-colors hover:bg-sky-100"
+                data-action="adjust-pickup-time"
+              >
+                <Clock3 className="h-5 w-5" />
+                Skoryguj odbiór
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setCancelDialogOpen(true)}
@@ -218,22 +247,35 @@ export function KdsCard({ ticket }: KdsCardProps) {
         )}
 
         {ticket.status === OrderStatus.PREPARING && (
-          <button
-            type="button"
-            onClick={() => markReady(ticket.id)}
-            disabled={!allItemsDone}
-            className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-lg font-bold transition-colors',
-              allItemsDone
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800'
-                : 'cursor-not-allowed bg-slate-200 text-slate-400'
+          <div className="space-y-2">
+            {canAdjustPickupTime && (
+              <button
+                type="button"
+                onClick={() => setPickupAdjustDialogOpen(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-6 py-3 text-base font-bold text-sky-700 transition-colors hover:bg-sky-100"
+                data-action="adjust-pickup-time"
+              >
+                <Clock3 className="h-5 w-5" />
+                Skoryguj odbiór
+              </button>
             )}
-            data-action="mark-ready"
-            aria-label={allItemsDone ? `Oznacz zamowienie #${orderNum} jako gotowe` : `Gotowe ${ticket.items.filter(i => i.is_done).length} z ${ticket.items.length}`}
-          >
-            <Check className="h-6 w-6" />
-            {allItemsDone ? 'Gotowe' : `Gotowe (${ticket.items.filter(i => i.is_done).length}/${ticket.items.length})`}
-          </button>
+            <button
+              type="button"
+              onClick={() => markReady(ticket.id)}
+              disabled={!allItemsDone}
+              className={cn(
+                'flex w-full items-center justify-center gap-2 rounded-xl px-6 py-4 text-lg font-bold transition-colors',
+                allItemsDone
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800'
+                  : 'cursor-not-allowed bg-slate-200 text-slate-400'
+              )}
+              data-action="mark-ready"
+              aria-label={allItemsDone ? `Oznacz zamowienie #${orderNum} jako gotowe` : `Gotowe ${ticket.items.filter(i => i.is_done).length} z ${ticket.items.length}`}
+            >
+              <Check className="h-6 w-6" />
+              {allItemsDone ? 'Gotowe' : `Gotowe (${ticket.items.filter(i => i.is_done).length}/${ticket.items.length})`}
+            </button>
+          </div>
         )}
 
         {ticket.status === OrderStatus.READY && (
@@ -257,6 +299,14 @@ export function KdsCard({ ticket }: KdsCardProps) {
         orderNumber={`#${orderNum}`}
         refundableAmount={refundEligibility.eligible ? ticket.linked_order?.total : undefined}
       />
+      {currentPickupTime && (
+        <PickupTimeAdjustDialog
+          open={pickupAdjustDialogOpen}
+          onOpenChange={setPickupAdjustDialogOpen}
+          currentPickupTime={currentPickupTime}
+          onConfirm={handlePickupTimeAdjust}
+        />
+      )}
     </div>
   );
 }

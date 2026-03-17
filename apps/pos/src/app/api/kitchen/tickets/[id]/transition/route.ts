@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { normalizeOrderClosureReason } from '@meso/core';
+import { appendPickupTimeAdjustment, normalizeOrderClosureReason } from '@meso/core';
 import { OrderClosureReasonCode } from '@/types/enums';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { cancelOrderWithOptionalRefund } from '@/lib/orders/cancel-order';
+import { sendPickupTimeAdjustedEmail } from '@/lib/orders/pickup-time-adjustment-email';
 import {
   InvalidOrderCancellationReasonError,
   transitionOrderStatus,
@@ -13,6 +14,7 @@ import {
 } from '@/modules/kitchen/server-enrichment';
 import { OrderStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
+import type { Order } from '@/types/order';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -24,13 +26,15 @@ type TransitionAction =
   | 'mark_served'
   | 'cancel_order'
   | 'toggle_item'
-  | 'set_priority';
+  | 'set_priority'
+  | 'adjust_pickup_time';
 
 interface TransitionBody {
   action: TransitionAction;
   itemId?: string;
   isDone?: boolean;
   priority?: number;
+  pickupTime?: string;
   reasonCode?: OrderClosureReasonCode | null;
   reasonText?: string;
   requestRefund?: boolean;
@@ -43,6 +47,32 @@ interface StatusUpdate {
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseIsoTimestamp(value: string | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function buildFallbackPickupTime(ticket: KitchenTicket): string | null {
+  if (!Number.isFinite(ticket.estimated_minutes) || ticket.estimated_minutes <= 0) {
+    return null;
+  }
+
+  const createdAt = parseIsoTimestamp(ticket.created_at);
+  if (createdAt === null) {
+    return null;
+  }
+
+  return new Date(createdAt + ticket.estimated_minutes * 60_000).toISOString();
+}
+
+function resolveCurrentPickupTime(order: Order, ticket: KitchenTicket): string | null {
+  return order.estimated_ready_at || order.scheduled_time || buildFallbackPickupTime(ticket);
+}
 
 function getStatusUpdate(action: TransitionAction): StatusUpdate | null {
   switch (action) {
@@ -150,6 +180,69 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
     }
 
+    const orderId = currentTicket.order_id?.trim();
+
+    if (body.action === 'adjust_pickup_time') {
+      if (!orderId || !UUID_REGEX.test(orderId)) {
+        return NextResponse.json({ error: 'Pickup time adjustment requires a linked order' }, { status: 400 });
+      }
+
+      if (currentTicket.status !== OrderStatus.PENDING && currentTicket.status !== OrderStatus.PREPARING) {
+        return NextResponse.json({ error: 'Pickup time can be adjusted only for active pickup tickets' }, { status: 422 });
+      }
+
+      if (!body.pickupTime) {
+        return NextResponse.json({ error: 'Missing pickupTime for adjust_pickup_time' }, { status: 400 });
+      }
+
+      const newPickupTimestamp = parseIsoTimestamp(body.pickupTime);
+      if (newPickupTimestamp === null) {
+        return NextResponse.json({ error: 'Invalid pickupTime format' }, { status: 400 });
+      }
+
+      if (newPickupTimestamp <= Date.now()) {
+        return NextResponse.json({ error: 'Pickup time cannot be in the past' }, { status: 400 });
+      }
+
+      const ordersRepo = createServerRepository<Order>('orders');
+      const order = await ordersRepo.findById(orderId);
+      if (!order) {
+        return NextResponse.json({ error: 'Linked order not found' }, { status: 404 });
+      }
+
+      if (order.delivery_type !== 'pickup') {
+        return NextResponse.json({ error: 'Pickup time can be adjusted only for pickup orders' }, { status: 422 });
+      }
+
+      const previousPickupTime = resolveCurrentPickupTime(order, currentTicket);
+      if (!previousPickupTime) {
+        return NextResponse.json({ error: 'Current pickup time is unavailable' }, { status: 422 });
+      }
+
+      if (parseIsoTimestamp(previousPickupTime) === newPickupTimestamp) {
+        return NextResponse.json({ error: 'Pickup time was not changed' }, { status: 400 });
+      }
+
+      const updatedOrder = await ordersRepo.update(orderId, {
+        estimated_ready_at: new Date(newPickupTimestamp).toISOString(),
+        metadata: appendPickupTimeAdjustment(order.metadata, {
+          previous_time: previousPickupTime,
+          new_time: new Date(newPickupTimestamp).toISOString(),
+          changed_at: now,
+          source: 'kds',
+        }),
+      } as Partial<Order>);
+
+      if (updatedOrder.delivery_address?.email?.trim()) {
+        void sendPickupTimeAdjustedEmail(updatedOrder, previousPickupTime, updatedOrder.estimated_ready_at!)
+          .catch((error) => {
+            console.error('[KDS pickup time email] Failed:', error);
+          });
+      }
+
+      return NextResponse.json({ ticket: await enrichKitchenTicket(currentTicket) });
+    }
+
     const normalizedCancellation = body.action === 'cancel_order'
       ? normalizeOrderClosureReason({
           closure_reason_code: body.reasonCode,
@@ -173,7 +266,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
     }
 
-    const orderId = currentTicket.order_id?.trim();
     if (!orderId || !UUID_REGEX.test(orderId)) {
       return NextResponse.json({ ticket: await enrichKitchenTicket(updatedTicket) });
     }
