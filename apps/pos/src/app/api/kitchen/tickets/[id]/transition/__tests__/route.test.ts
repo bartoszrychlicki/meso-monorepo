@@ -86,6 +86,7 @@ function makeParams(id = 'ticket-1') {
 
 describe('POST /api/kitchen/tickets/:id/transition', () => {
   const orderId = '11111111-1111-4111-8111-111111111111';
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   const baseOrder = {
     id: orderId,
     order_number: 'WEB-20260301-001',
@@ -145,6 +146,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     vi.setSystemTime(new Date('2026-03-01T10:05:00.000Z'));
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
     mockKitchenRepo.findById.mockResolvedValue(baseTicket);
     mockKitchenRepo.update.mockResolvedValue({
@@ -176,6 +178,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
   });
 
   afterEach(() => {
+    consoleErrorSpy.mockRestore();
     vi.useRealTimers();
   });
 
@@ -470,6 +473,56 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
       }),
       '2026-03-01T11:30:00.000Z',
       newPickupTime
+    );
+  });
+
+  it('logs pickup time email failures without failing the adjustment', async () => {
+    const newPickupTime = '2026-03-01T11:50:00.000Z';
+
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockResolvedValueOnce({
+        ...baseOrder,
+        estimated_ready_at: newPickupTime,
+        metadata: {
+          pickup_time_adjustments: [
+            {
+              previous_time: '2026-03-01T11:30:00.000Z',
+              new_time: newPickupTime,
+              changed_at: '2026-03-01T10:05:00.000Z',
+              source: 'kds',
+            },
+          ],
+        },
+      });
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      estimated_ready_at: newPickupTime,
+      metadata: {
+        pickup_time_adjustments: [
+          {
+            previous_time: '2026-03-01T11:30:00.000Z',
+            new_time: newPickupTime,
+            changed_at: '2026-03-01T10:05:00.000Z',
+            source: 'kds',
+          },
+        ],
+      },
+    });
+    mockSendPickupTimeAdjustedEmail.mockResolvedValueOnce({
+      success: false,
+      error: 'Resend unavailable',
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: newPickupTime }),
+      makeParams('ticket-1')
+    );
+
+    expect(response.status).toBe(200);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[KDS pickup time email] Failed:',
+      'Resend unavailable'
     );
   });
 

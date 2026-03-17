@@ -234,10 +234,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       } as Partial<Order>);
 
       if (updatedOrder.delivery_address?.email?.trim()) {
-        void sendPickupTimeAdjustedEmail(updatedOrder, previousPickupTime, updatedOrder.estimated_ready_at!)
-          .catch((error) => {
-            console.error('[KDS pickup time email] Failed:', error);
-          });
+        try {
+          const emailResult = await sendPickupTimeAdjustedEmail(
+            updatedOrder,
+            previousPickupTime,
+            updatedOrder.estimated_ready_at!
+          );
+
+          if (!emailResult.success) {
+            console.error('[KDS pickup time email] Failed:', emailResult.error ?? 'Unknown error');
+          }
+        } catch (error) {
+          console.error('[KDS pickup time email] Failed:', error);
+        }
       }
 
       return NextResponse.json({ ticket: await enrichKitchenTicket(currentTicket) });

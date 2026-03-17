@@ -11,6 +11,8 @@ interface PickupTimeAdjustedEmailData {
   trackingUrl?: string;
 }
 
+const PICKUP_TIME_EMAIL_TIME_ZONE = 'Europe/Warsaw';
+
 function resolveTrackingUrl(orderId: string): string | undefined {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
     || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
@@ -21,6 +23,7 @@ function resolveTrackingUrl(orderId: string): string | undefined {
 
 function formatPickupDateTime(dateString: string): string {
   return new Intl.DateTimeFormat('pl-PL', {
+    timeZone: PICKUP_TIME_EMAIL_TIME_ZONE,
     day: 'numeric',
     month: 'long',
     hour: '2-digit',

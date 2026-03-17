@@ -31,6 +31,8 @@ describe('pickup-time-adjustment-email', () => {
 
     expect(html).toContain('Zmiana czasu odbioru');
     expect(html).toContain('WEB-001');
+    expect(html).toContain('17 marca, 13:30');
+    expect(html).toContain('17 marca, 13:45');
     expect(html).toContain('Sledz zamowienie');
   });
 
