@@ -82,7 +82,7 @@ const catalogProducts = [
     name: 'Ramen',
     slug: 'ramen',
     category_id: 'cat-1',
-    type: ProductType.SINGLE,
+    type: ProductType.FOOD,
     price: 32,
     images: [],
     is_available: true,
@@ -103,7 +103,7 @@ const catalogProducts = [
     name: 'Gyoza',
     slug: 'gyoza',
     category_id: 'cat-1',
-    type: ProductType.SINGLE,
+    type: ProductType.FOOD,
     price: 18,
     images: [],
     is_available: true,
@@ -177,7 +177,6 @@ describe('OrderEditForm', () => {
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          customer_name: 'Anna',
           customer_phone: '+48 500 222 333',
           notes: 'Dorzucic sztucce',
           items: [
@@ -259,43 +258,27 @@ describe('OrderEditForm', () => {
     expect(screen.getByRole('button', { name: /Zapisz zmiany/i })).toBeDisabled();
   });
 
-  it('allows saving non-phone changes when a legacy invalid phone stays unchanged', async () => {
+  it('does not send items when only non-item fields changed', async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <OrderEditForm
-        order={{
-          ...baseOrder,
-          customer_phone: '500 100 200',
-        }}
-        onSave={onSave}
-      />
-    );
+    render(<OrderEditForm order={baseOrder} onSave={onSave} />);
 
     await screen.findByText('Gyoza');
 
+    fireEvent.change(screen.getByLabelText('Telefon klienta'), {
+      target: { value: '+48 500 222 333' },
+    });
     fireEvent.change(screen.getByLabelText('Notatka do zamówienia'), {
       target: { value: 'Dorzucic sztucce' },
     });
 
-    const saveButton = screen.getByRole('button', { name: /Zapisz zmiany/i });
-    expect(saveButton).not.toBeDisabled();
-
-    fireEvent.click(saveButton);
+    fireEvent.click(screen.getByRole('button', { name: /Zapisz zmiany/i }));
 
     await waitFor(() => {
-      expect(onSave).toHaveBeenCalledWith(
-        expect.not.objectContaining({
-          customer_phone: expect.anything(),
-        })
-      );
-    });
-
-    expect(onSave).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customer_name: 'Anna',
+      expect(onSave).toHaveBeenCalledWith({
+        customer_phone: '+48 500 222 333',
         notes: 'Dorzucic sztucce',
-      })
-    );
+      });
+    });
   });
 });

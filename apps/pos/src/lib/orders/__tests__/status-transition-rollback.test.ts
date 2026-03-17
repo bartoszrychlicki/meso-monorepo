@@ -190,42 +190,6 @@ describe('rollbackOrderStatus', () => {
     );
   });
 
-  it('sets the target lifecycle timestamp when rollback reopens a previously cleared status', async () => {
-    mockFindById.mockResolvedValue({
-      ...baseOrder,
-      status: 'preparing',
-      status_history: [
-        { status: 'pending', timestamp: '2026-03-03T10:00:00.000Z' },
-        { status: 'confirmed', timestamp: '2026-03-03T10:01:00.000Z' },
-        { status: 'preparing', timestamp: '2026-03-03T10:03:00.000Z' },
-        { status: 'ready', timestamp: '2026-03-03T10:04:00.000Z' },
-        { status: 'preparing', timestamp: '2026-03-03T10:05:00.000Z' },
-      ],
-      ready_at: null,
-    });
-    mockUpdate.mockResolvedValue({
-      ...baseOrder,
-      status: 'ready',
-      ready_at: '2026-03-03T10:06:00.000Z',
-    });
-
-    await rollbackOrderStatus(
-      { orderId: 'order-1' },
-      {
-        orderRepo: mockServerRepo,
-        now: () => new Date('2026-03-03T10:06:00.000Z'),
-      }
-    );
-
-    expect(mockUpdate).toHaveBeenCalledWith(
-      'order-1',
-      expect.objectContaining({
-        status: 'ready',
-        ready_at: '2026-03-03T10:06:00.000Z',
-      })
-    );
-  });
-
   it('blocks rollback for terminal statuses', async () => {
     mockFindById.mockResolvedValue({
       ...baseOrder,

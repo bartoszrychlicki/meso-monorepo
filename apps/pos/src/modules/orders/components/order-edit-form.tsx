@@ -156,16 +156,20 @@ export function OrderEditForm({
     order.payment_method === PaymentMethod.ONLINE &&
     order.payment_status === PaymentStatus.PAID;
   const amountChanged = total !== order.total;
-  const originalPhoneValue = order.customer_phone?.trim() ?? '';
-  const phoneWasPresent = originalPhoneValue.length > 0;
+  const phoneWasPresent = Boolean(order.customer_phone?.trim());
   const phoneValue = customerPhone.trim();
-  const phoneChanged = phoneValue !== originalPhoneValue;
+  const draftItemsPayload = draftItems.map(editableItemToUpdateItemInput);
+  const originalItemsPayload = order.items.map((item) =>
+    editableItemToUpdateItemInput(orderItemToEditableItem(item))
+  );
+  const itemsChanged =
+    JSON.stringify(draftItemsPayload) !== JSON.stringify(originalItemsPayload);
+  const customerNameChanged = customerName.trim() !== (order.customer_name ?? '');
+  const notesChanged = notes !== (order.notes ?? '');
+  const customerPhoneChanged = phoneValue !== (order.customer_phone ?? '');
   const phoneInvalid =
-    phoneChanged &&
-    (
-      (phoneValue.length > 0 && !isValidPhoneNumber(phoneValue)) ||
-      (phoneWasPresent && phoneValue.length === 0)
-    );
+    (phoneValue.length > 0 && !isValidPhoneNumber(phoneValue)) ||
+    (phoneWasPresent && phoneValue.length === 0);
   const saveDisabled =
     !isEditable ||
     isSaving ||
@@ -347,14 +351,27 @@ export function OrderEditForm({
       return;
     }
 
-    const payload: UpdateOrderInput = {
-      items: draftItems.map(editableItemToUpdateItemInput),
-      customer_name: customerName.trim(),
-      notes,
-    };
+    const payload: UpdateOrderInput = {};
 
-    if (phoneChanged && phoneValue) {
+    if (itemsChanged) {
+      payload.items = draftItemsPayload;
+    }
+
+    if (customerNameChanged) {
+      payload.customer_name = customerName.trim();
+    }
+
+    if (notesChanged) {
+      payload.notes = notes;
+    }
+
+    if (customerPhoneChanged) {
       payload.customer_phone = phoneValue;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      toast.info('Brak zmian do zapisania');
+      return;
     }
 
     await onSave(payload);

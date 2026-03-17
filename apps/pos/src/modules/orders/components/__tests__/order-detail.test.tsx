@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { OrderDetail } from '../order-detail';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
@@ -12,6 +12,16 @@ import {
   PaymentStatus,
   ModifierAction,
 } from '@/types/enums';
+
+const { toastError } = vi.hoisted(() => ({
+  toastError: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastError,
+  },
+}));
 
 // Polyfill for Radix components (Dialog, etc.)
 beforeAll(() => {
@@ -207,6 +217,29 @@ describe('OrderDetail', () => {
     // Channel & source labels
     expect(screen.getByText('Online')).toBeInTheDocument();
     expect(screen.getAllByText('Dostawa').length).toBeGreaterThan(0);
+  });
+
+  it('shows payment pending label and alert for pending orders', () => {
+    renderOrderDetail(baseOrder);
+
+    expect(screen.getAllByText('Oczekuje na płatność').length).toBeGreaterThan(0);
+    expect(screen.getByText('Zamówienie oczekuje na płatność')).toBeInTheDocument();
+    expect(
+      screen.getByText('To zamówienie nie zostało jeszcze opłacone i nie powinno być kierowane do realizacji.')
+    ).toBeInTheDocument();
+  });
+
+  it('does not show unpaid warning for paid pending orders', () => {
+    renderOrderDetail({
+      ...baseOrder,
+      payment_status: PaymentStatus.PAID,
+    });
+
+    expect(screen.getAllByText('Oczekuje na płatność').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Zamówienie oczekuje na płatność')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('To zamówienie nie zostało jeszcze opłacone i nie powinno być kierowane do realizacji.')
+    ).not.toBeInTheDocument();
   });
 
   it('renders closure reason for cancelled orders', () => {
@@ -446,5 +479,33 @@ describe('OrderDetail', () => {
     fireEvent.click(rollbackButton);
 
     expect(rollbackButton).toBeDisabled();
+  });
+
+  it('shows an error toast when rollback fails', async () => {
+    const failingRollback = vi.fn().mockRejectedValue(new Error('Rollback failed'));
+
+    render(
+      <OrderDetail
+        order={{
+          ...orderWithModifiers,
+          status: OrderStatus.READY,
+          status_history: [
+            { status: OrderStatus.PENDING, timestamp: '2024-06-15T12:00:00Z' },
+            { status: OrderStatus.CONFIRMED, timestamp: '2024-06-15T12:05:00Z' },
+            { status: OrderStatus.PREPARING, timestamp: '2024-06-15T12:10:00Z' },
+            { status: OrderStatus.READY, timestamp: '2024-06-15T12:20:00Z' },
+          ],
+        }}
+        onStatusChange={noopStatusChange}
+        onRollbackStatus={failingRollback}
+        onCancel={noopCancel}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cofnij do: W przygotowaniu' }));
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith('Rollback failed');
+    });
   });
 });

@@ -1,14 +1,11 @@
 import { NextRequest } from 'next/server';
-import { authenticateRequest, authorizeRequest, isApiKey } from '@/lib/api/auth';
-import { hasPermission } from '@/lib/api-keys';
+import { authorizeRequest, isApiKey } from '@/lib/api/auth';
 import {
   type ApiResponseWarning,
   apiSuccess,
   apiNotFound,
   apiValidationError,
   apiError,
-  apiForbidden,
-  apiUnauthorized,
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
 import {
@@ -28,9 +25,12 @@ import {
   buildRollbackLifecycleTimestampPatch,
   buildRollbackStatusNote,
 } from '@/lib/orders/status-rollback';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { buildOrderStatusChangedWebhookData } from '@/lib/webhooks/order-payload';
+import { scheduleWebhookDispatch } from '@/lib/webhooks/schedule';
 import { UpdateOrderSchema, type UpdateOrderInput } from '@/schemas/order';
 import { isValidPhoneNumber } from '@/lib/sms/templates';
+import { authorizeOrderRoute } from '@/modules/orders/server/route-auth';
 import type { Customer } from '@/types/crm';
 import { OrderStatus, PaymentMethod, PaymentStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
@@ -127,31 +127,22 @@ function buildEditRollbackNote(itemsChanged: boolean, notesChanged: boolean): st
 
 async function authorizeOrderWrite(
   request: NextRequest
-): Promise<MutationActor | ReturnType<typeof apiForbidden | typeof apiUnauthorized>> {
-  const apiKeyAuth = await authenticateRequest(request);
-  if (isApiKey(apiKeyAuth)) {
-    if (!hasPermission(apiKeyAuth, 'orders:write')) {
-      return apiForbidden('orders:write');
-    }
-
-    return {
-      authType: 'api_key',
-      actorId: apiKeyAuth.id ?? null,
-    };
+): Promise<MutationActor | Response> {
+  const access = await authorizeOrderRoute(request, 'orders:write');
+  if ('status' in access) {
+    return access;
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return apiUnauthorized();
+  if (access.kind === 'api_key') {
+    return {
+      authType: 'api_key',
+      actorId: access.actorId,
+    };
   }
 
   return {
     authType: 'session',
-    actorId: user.id,
+    actorId: access.actorId,
   };
 }
 
@@ -492,6 +483,20 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     shouldSyncKitchenContents,
     resetKitchenCompletionState: shouldResetKitchenCompletionState,
   });
+
+  if (shouldRollbackReady) {
+    const rollbackNote = buildEditRollbackNote(itemsChanged, notesChanged);
+    const webhookData = buildOrderStatusChangedWebhookData(updatedOrder, {
+      status: nextStatus,
+      previousStatus: existing.status,
+      note: rollbackNote,
+    });
+
+    await scheduleWebhookDispatch(
+      'order.status_changed',
+      webhookData as unknown as Record<string, unknown>
+    );
+  }
 
   return apiSuccess(
     updatedOrder,

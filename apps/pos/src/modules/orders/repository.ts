@@ -192,29 +192,6 @@ function hasOwnProperty<T extends object>(value: T, key: keyof T): boolean {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-function buildRollbackTargetTimestampPatch(
-  order: Order,
-  targetStatus: OrderStatus,
-  nowIso: string
-): Partial<Order> {
-  switch (targetStatus) {
-    case OrderStatus.CONFIRMED:
-      return order.confirmed_at ? {} : { confirmed_at: nowIso };
-    case OrderStatus.PREPARING:
-      return order.preparing_at ? {} : { preparing_at: nowIso };
-    case OrderStatus.READY:
-      return order.ready_at ? {} : { ready_at: nowIso };
-    case OrderStatus.OUT_FOR_DELIVERY:
-      return order.picked_up_at ? {} : { picked_up_at: nowIso };
-    case OrderStatus.DELIVERED:
-      return order.delivered_at ? {} : { delivered_at: nowIso };
-    case OrderStatus.CANCELLED:
-      return order.cancelled_at ? {} : { cancelled_at: nowIso };
-    default:
-      return {};
-  }
-}
-
 function buildOrderItems(items: NonNullable<UpdateOrderInput['items']>): Order['items'] {
   return items.map((item) => ({
     id: item.id?.trim() || crypto.randomUUID(),
@@ -449,7 +426,6 @@ async function rollbackStatus(id: string, note?: string): Promise<Order> {
         note: rollbackNote,
       },
     ],
-    ...buildRollbackTargetTimestampPatch(order, resolution.targetStatus, nowIso),
     ...buildRollbackLifecycleTimestampPatch(resolution.targetStatus),
   } as Partial<Order>);
 
