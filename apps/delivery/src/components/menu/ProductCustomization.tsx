@@ -84,9 +84,8 @@ export function ProductCustomization({
             const fetchProduct = async () => {
                 const supabase = createClient()
 
-                // Fetch product — POS stores variants and modifier_groups as JSONB
                 const { data: productData, error } = await supabase
-                    .from(Tables.products)
+                    .from(Tables.productsCatalog)
                     .select('*')
                     .eq('slug', productSlug)
                     .single()

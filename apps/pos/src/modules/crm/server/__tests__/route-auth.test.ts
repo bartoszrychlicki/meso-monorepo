@@ -16,7 +16,7 @@ import { authorizeSessionOrApiKey } from '@/modules/crm/server/route-auth';
 
 const mockCreateClient = createClient as ReturnType<typeof vi.fn>;
 const mockAuthorizeRequest = authorizeRequest as ReturnType<typeof vi.fn>;
-const mockIsApiKey = isApiKey as ReturnType<typeof vi.fn>;
+const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>;
 
 function makeRequest() {
   return new NextRequest('http://localhost:3000/api/v1/crm/promo-codes');

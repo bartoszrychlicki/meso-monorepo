@@ -10,16 +10,15 @@ interface PageProps {
 async function getProduct(slug: string) {
   const supabase = await createClient()
 
-  // POS stores variants and modifier_groups (addons) as JSONB on the product
   const { data: product, error: productError } = await supabase
-    .from(Tables.products)
+    .from(Tables.productsCatalog)
     .select(`
       *,
       category:menu_categories(id, name, name_jp, slug)
     `)
     .eq('slug', slug)
     .eq('is_active', true)
-    .eq('is_available', true)
+    .eq('is_hidden_in_menu', false)
     .single()
 
   if (productError || !product) {

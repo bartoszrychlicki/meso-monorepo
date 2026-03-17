@@ -13,6 +13,8 @@ const mockProductsCreate = vi.fn();
 const mockProductsUpdate = vi.fn();
 const mockProductsFindById = vi.fn();
 const mockRecipesFindById = vi.fn();
+const mockGetProductModifiersWithClient = vi.fn();
+const mockCountProductsUsingModifierWithClient = vi.fn();
 
 function createBaseRepositoryMock() {
   return {
@@ -47,6 +49,16 @@ vi.mock('@/lib/data/repository-factory', () => ({
 
     return createBaseRepositoryMock();
   }),
+}));
+
+vi.mock('../relations', () => ({
+  getProductModifiersWithClient: (...args: unknown[]) => mockGetProductModifiersWithClient(...args),
+  countProductsUsingModifierWithClient: (...args: unknown[]) => mockCountProductsUsingModifierWithClient(...args),
+  getProductModifierGroupIdsWithClient: vi.fn(),
+  setProductModifierGroupsWithClient: vi.fn(),
+  getModifierGroupModifierIdsWithClient: vi.fn(),
+  setModifierGroupModifiersWithClient: vi.fn(),
+  listModifierGroupsWithClient: vi.fn(),
 }));
 
 import {
@@ -207,60 +219,35 @@ function createMockChain() {
 }
 
 describe('getProductModifierIds', () => {
-  let chain: ReturnType<typeof createMockChain>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    chain = createMockChain();
-    mockFrom.mockReturnValue(chain);
   });
 
   it('returns array of modifier IDs', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: [
-        { modifier_id: 'mod-1' },
-        { modifier_id: 'mod-2' },
-        { modifier_id: 'mod-3' },
-      ],
-      error: null,
-    });
+    mockGetProductModifiersWithClient.mockResolvedValueOnce([
+      { id: 'mod-1' },
+      { id: 'mod-2' },
+      { id: 'mod-3' },
+    ]);
 
     const result = await getProductModifierIds('product-1');
     expect(result).toEqual(['mod-1', 'mod-2', 'mod-3']);
-    expect(mockFrom).toHaveBeenCalledWith('product_modifiers');
-    expect(chain.select).toHaveBeenCalledWith('modifier_id');
-    expect(chain.eq).toHaveBeenCalledWith('product_id', 'product-1');
-    expect(chain.order).toHaveBeenCalledWith('sort_order', { ascending: true });
   });
 
   it('returns empty array when no modifiers', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: [],
-      error: null,
-    });
+    mockGetProductModifiersWithClient.mockResolvedValueOnce([]);
 
     const result = await getProductModifierIds('product-no-mods');
     expect(result).toEqual([]);
   });
 
-  it('returns empty array when data is null', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: null,
-      error: null,
-    });
-
-    const result = await getProductModifierIds('product-null');
-    expect(result).toEqual([]);
-  });
-
   it('throws on error', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: null,
-      error: { message: 'connection refused' },
-    });
+    mockGetProductModifiersWithClient.mockRejectedValueOnce(
+      new Error('getProductModifiers failed: connection refused')
+    );
 
     await expect(getProductModifierIds('product-1')).rejects.toThrow(
-      'getProductModifierIds failed: connection refused'
+      'getProductModifiers failed: connection refused'
     );
   });
 });
@@ -339,15 +326,11 @@ describe('setProductModifiers', () => {
 });
 
 describe('getProductModifiers', () => {
-  let chain: ReturnType<typeof createMockChain>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    chain = createMockChain();
-    mockFrom.mockReturnValue(chain);
   });
 
-  it('returns full modifier objects ordered by junction sort_order', async () => {
+  it('returns full modifier objects from relational helpers', async () => {
     const modifiers = [
       {
         id: 'mod-2',
@@ -373,123 +356,55 @@ describe('getProductModifiers', () => {
       },
     ];
 
-    // First call: get modifier IDs from junction table (ordered by sort_order)
-    chain.order.mockResolvedValueOnce({
-      data: [{ modifier_id: 'mod-1' }, { modifier_id: 'mod-2' }],
-      error: null,
-    });
-    // Second call: get full modifier objects (unordered from menu_modifiers)
-    chain.in.mockResolvedValueOnce({
-      data: modifiers,
-      error: null,
-    });
+    mockGetProductModifiersWithClient.mockResolvedValueOnce(modifiers);
 
     const result = await getProductModifiers('product-1');
     expect(result).toHaveLength(2);
-    // Should be re-sorted by junction sort_order, not menu_modifiers order
-    expect(result[0].name).toBe('Extra Cheese');
-    expect(result[1].name).toBe('No Onion');
-    expect(mockFrom).toHaveBeenCalledWith('product_modifiers');
-    expect(mockFrom).toHaveBeenCalledWith('menu_modifiers');
+    expect(result[0].name).toBe('No Onion');
+    expect(result[1].name).toBe('Extra Cheese');
   });
 
   it('returns empty array when no links exist', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: [],
-      error: null,
-    });
+    mockGetProductModifiersWithClient.mockResolvedValueOnce([]);
 
     const result = await getProductModifiers('product-no-mods');
     expect(result).toEqual([]);
   });
 
-  it('returns empty array when data is null', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: null,
-      error: null,
-    });
-
-    const result = await getProductModifiers('product-null');
-    expect(result).toEqual([]);
-  });
-
-  it('throws on junction table error', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: null,
-      error: { message: 'table not found' },
-    });
+  it('throws on relation helper error', async () => {
+    mockGetProductModifiersWithClient.mockRejectedValueOnce(
+      new Error('getProductModifiers failed: table not found')
+    );
 
     await expect(getProductModifiers('product-1')).rejects.toThrow(
       'getProductModifiers failed: table not found'
     );
   });
-
-  it('throws on modifiers fetch error', async () => {
-    chain.order.mockResolvedValueOnce({
-      data: [{ modifier_id: 'mod-1' }],
-      error: null,
-    });
-    chain.in.mockResolvedValueOnce({
-      data: null,
-      error: { message: 'query timeout' },
-    });
-
-    await expect(getProductModifiers('product-1')).rejects.toThrow(
-      'getProductModifiers fetch failed: query timeout'
-    );
-  });
 });
 
 describe('countProductsUsingModifier', () => {
-  let chain: ReturnType<typeof createMockChain>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    chain = createMockChain();
-    mockFrom.mockReturnValue(chain);
   });
 
   it('returns count of products using a modifier', async () => {
-    chain.eq.mockResolvedValue({
-      count: 5,
-      error: null,
-    });
+    mockCountProductsUsingModifierWithClient.mockResolvedValueOnce(5);
 
     const result = await countProductsUsingModifier('mod-1');
     expect(result).toBe(5);
-    expect(mockFrom).toHaveBeenCalledWith('product_modifiers');
-    expect(chain.select).toHaveBeenCalledWith('product_id', {
-      count: 'exact',
-      head: true,
-    });
-    expect(chain.eq).toHaveBeenCalledWith('modifier_id', 'mod-1');
   });
 
   it('returns 0 when no products use the modifier', async () => {
-    chain.eq.mockResolvedValue({
-      count: 0,
-      error: null,
-    });
+    mockCountProductsUsingModifierWithClient.mockResolvedValueOnce(0);
 
     const result = await countProductsUsingModifier('mod-unused');
     expect(result).toBe(0);
   });
 
-  it('returns 0 when count is null', async () => {
-    chain.eq.mockResolvedValue({
-      count: null,
-      error: null,
-    });
-
-    const result = await countProductsUsingModifier('mod-null');
-    expect(result).toBe(0);
-  });
-
   it('throws on error', async () => {
-    chain.eq.mockResolvedValue({
-      count: null,
-      error: { message: 'permission denied' },
-    });
+    mockCountProductsUsingModifierWithClient.mockRejectedValueOnce(
+      new Error('countProductsUsingModifier failed: permission denied')
+    );
 
     await expect(countProductsUsingModifier('mod-1')).rejects.toThrow(
       'countProductsUsingModifier failed: permission denied'

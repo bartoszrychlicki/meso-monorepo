@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 import { Customer, CustomerAddress, LoyaltyTransaction } from '@/types/crm';
 import { formatCurrency } from '@/lib/utils';
 import { useBreadcrumbLabel } from '@/components/layout/breadcrumb-context';
+import { getCustomerOrderHistory } from '@/modules/crm/utils/customer-list';
 
 /**
  * Customer Detail Page
@@ -109,6 +110,8 @@ export default function CustomerDetailPage() {
   if (!customer) {
     return null;
   }
+
+  const orderHistory = getCustomerOrderHistory(customer);
 
   return (
     <div className="space-y-6" data-page="customer-detail" data-id={customerId}>
@@ -333,37 +336,37 @@ export default function CustomerDetailPage() {
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Zamówienia:</span>
                 <span className="font-medium">
-                  {customer.order_history.total_orders}
+                  {orderHistory.total_orders}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Łącznie wydane:</span>
                 <span className="font-medium">
-                  {formatCurrency(customer.order_history.total_spent)}
+                  {formatCurrency(orderHistory.total_spent)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Średnia wartość:</span>
                 <span className="font-medium">
-                  {formatCurrency(customer.order_history.average_order_value)}
+                  {formatCurrency(orderHistory.average_order_value)}
                 </span>
               </div>
-              {customer.order_history.first_order_date && (
+              {orderHistory.first_order_date && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Pierwszy zakup:</span>
                   <span className="font-medium">
                     {new Date(
-                      customer.order_history.first_order_date
+                      orderHistory.first_order_date
                     ).toLocaleDateString('pl-PL')}
                   </span>
                 </div>
               )}
-              {customer.order_history.last_order_date && (
+              {orderHistory.last_order_date && (
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Ostatni zakup:</span>
                   <span className="font-medium">
                     {new Date(
-                      customer.order_history.last_order_date
+                      orderHistory.last_order_date
                     ).toLocaleDateString('pl-PL')}
                   </span>
                 </div>

@@ -16,7 +16,7 @@ export async function GET() {
   }
 
   const { data: products, error: prodError } = await supabase
-    .from(Tables.products)
+    .from(Tables.productsCatalog)
     .select(`
       id,
       category_id,
@@ -29,6 +29,8 @@ export async function GET() {
       promo_label,
       image_url,
       images,
+      is_available,
+      is_hidden_in_menu,
       is_vegetarian,
       is_vegan,
       is_bestseller,
@@ -42,12 +44,15 @@ export async function GET() {
       modifier_groups
     `)
     .eq('is_active', true)
-    .eq('is_available', true)
+    .eq('is_hidden_in_menu', false)
     .order('sort_order')
 
   if (prodError) {
     return NextResponse.json({ error: prodError.message }, { status: 500 })
   }
+
+  const safeCategories = categories || []
+  const safeProducts = products || []
 
   // POS stores location address as JSONB, not flat columns
   // Also fetch delivery config from separate table
@@ -72,8 +77,8 @@ export async function GET() {
     .single()
 
   return NextResponse.json({
-    categories,
-    products,
+    categories: safeCategories,
+    products: safeProducts,
     location: {
       ...location,
       // Flatten JSONB address for backward compatibility with Delivery frontend
@@ -85,8 +90,8 @@ export async function GET() {
       min_order_value: deliveryConfig?.min_order_amount,
     },
     meta: {
-      totalProducts: products.length,
-      totalCategories: categories.length,
+      totalProducts: safeProducts.length,
+      totalCategories: safeCategories.length,
     }
   })
 }

@@ -10,8 +10,12 @@ const mockModifiersFindAll = vi.fn();
 const mockModifiersCreate = vi.fn();
 const mockModifiersUpdate = vi.fn();
 const mockModifiersDelete = vi.fn();
+const mockListModifierGroups = vi.fn();
+const mockSetModifierGroupModifiers = vi.fn();
 const mockCreateProductWithFoodCost = vi.fn();
 const mockUpdateProductWithFoodCost = vi.fn();
+const mockToggleAvailability = vi.fn();
+const mockToggleMenuVisibility = vi.fn();
 
 // Mock the repository module
 vi.mock('../repository', () => ({
@@ -36,9 +40,12 @@ vi.mock('../repository', () => ({
     update: (...args: unknown[]) => mockModifiersUpdate(...args),
     delete: (...args: unknown[]) => mockModifiersDelete(...args),
   },
+  listModifierGroups: (...args: unknown[]) => mockListModifierGroups(...args),
+  setModifierGroupModifiers: (...args: unknown[]) => mockSetModifierGroupModifiers(...args),
   createProductWithFoodCost: (...args: unknown[]) => mockCreateProductWithFoodCost(...args),
   updateProductWithFoodCost: (...args: unknown[]) => mockUpdateProductWithFoodCost(...args),
-  toggleAvailability: vi.fn(),
+  toggleAvailability: (...args: unknown[]) => mockToggleAvailability(...args),
+  toggleMenuVisibility: (...args: unknown[]) => mockToggleMenuVisibility(...args),
 }));
 
 // Mock supabase storage
@@ -64,6 +71,7 @@ const makeModifier = (overrides: Partial<MenuModifier> = {}): MenuModifier => ({
 describe('useMenuStore — Modifiers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockListModifierGroups.mockResolvedValue([]);
     useMenuStore.setState({
       modifiers: [],
       products: [],
@@ -203,13 +211,96 @@ describe('useMenuStore — Modifiers', () => {
       const modifiers = [makeModifier({ id: 'mod-all-1' })];
       mockProductsFindAll.mockResolvedValue({ data: [] });
       mockCategoriesFindAll.mockResolvedValue({ data: [] });
-      mockModifierGroupsFindAll.mockResolvedValue({ data: [] });
+      mockListModifierGroups.mockResolvedValue([]);
       mockModifiersFindAll.mockResolvedValue({ data: modifiers });
 
       await useMenuStore.getState().loadAll();
 
       expect(mockModifiersFindAll).toHaveBeenCalled();
       expect(useMenuStore.getState().modifiers).toEqual(modifiers);
+    });
+  });
+
+  describe('product toggles', () => {
+    it('toggleProductAvailability replaces product in state', async () => {
+      useMenuStore.setState({
+        products: [
+          {
+            id: 'prod-1',
+            name: 'Ramen',
+            slug: 'ramen',
+            category_id: 'cat-1',
+            type: 'single',
+            price: 39,
+            images: [],
+            is_available: true,
+            is_featured: false,
+            allergens: [],
+            variants: [],
+            modifier_groups: [],
+            ingredients: [],
+            sort_order: 0,
+            sku: 'RAM-1',
+            tax_rate: 8,
+            is_active: true,
+            point_ids: [],
+            pricing: [],
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          } as never,
+        ],
+      });
+
+      mockToggleAvailability.mockResolvedValue({
+        ...useMenuStore.getState().products[0],
+        is_available: false,
+      });
+
+      await useMenuStore.getState().toggleProductAvailability('prod-1');
+
+      expect(mockToggleAvailability).toHaveBeenCalledWith('prod-1');
+      expect(useMenuStore.getState().products[0].is_available).toBe(false);
+    });
+
+    it('toggleProductMenuVisibility replaces product in state', async () => {
+      useMenuStore.setState({
+        products: [
+          {
+            id: 'prod-1',
+            name: 'Ramen',
+            slug: 'ramen',
+            category_id: 'cat-1',
+            type: 'single',
+            price: 39,
+            images: [],
+            is_available: true,
+            is_hidden_in_menu: false,
+            is_featured: false,
+            allergens: [],
+            variants: [],
+            modifier_groups: [],
+            ingredients: [],
+            sort_order: 0,
+            sku: 'RAM-1',
+            tax_rate: 8,
+            is_active: true,
+            point_ids: [],
+            pricing: [],
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          } as never,
+        ],
+      });
+
+      mockToggleMenuVisibility.mockResolvedValue({
+        ...useMenuStore.getState().products[0],
+        is_hidden_in_menu: true,
+      });
+
+      await useMenuStore.getState().toggleProductMenuVisibility('prod-1');
+
+      expect(mockToggleMenuVisibility).toHaveBeenCalledWith('prod-1');
+      expect(useMenuStore.getState().products[0].is_hidden_in_menu).toBe(true);
     });
   });
 });

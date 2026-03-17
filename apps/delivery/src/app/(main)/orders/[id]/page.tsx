@@ -17,6 +17,7 @@ import { isOrderActive } from '@/lib/order-confirmation-utils'
 import { formatOrderDisplayId } from '@/lib/format-order-display-id'
 import { getLocationAddressParts } from '@/lib/location-address'
 import { readOrderDeliveryFee, readOrderDiscount, readOrderPaymentFee } from '@/lib/order-financials'
+import { formatCustomerPickupTime, getPickupTimeDetails } from '@/lib/pickup-time'
 
 export default function OrderDetailsPage() {
     const params = useParams()
@@ -67,6 +68,13 @@ export default function OrderDetailsPage() {
     const deliveryFee = readOrderDeliveryFee(order)
     const paymentFee = readOrderPaymentFee(order)
     const discount = readOrderDiscount(order)
+    const pickupTimeDetails = getPickupTimeDetails(order)
+    const pickupCurrentLabel = pickupTimeDetails.currentTime
+        ? formatCustomerPickupTime(pickupTimeDetails.currentTime)
+        : null
+    const pickupPreviousLabel = pickupTimeDetails.previousTime
+        ? formatCustomerPickupTime(pickupTimeDetails.previousTime)
+        : null
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-6 pb-24 space-y-6">
@@ -154,7 +162,21 @@ export default function OrderDetailsPage() {
                         </div>
                     )}
 
-                    {order.scheduled_time && (
+                    {order.delivery_type === 'pickup' && pickupCurrentLabel && (
+                        <div className="flex items-center gap-3">
+                            <Clock className="w-5 h-5 text-primary" />
+                            <div>
+                                <p className="text-foreground">
+                                    {pickupTimeDetails.isAdjusted ? 'Nowy czas odbioru' : 'Czas odbioru'}: {pickupCurrentLabel}
+                                </p>
+                                {pickupTimeDetails.isAdjusted && pickupPreviousLabel && (
+                                    <p className="text-sm text-muted-foreground">Było: {pickupPreviousLabel}</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {order.delivery_type !== 'pickup' && order.scheduled_time && (
                         <div className="flex items-center gap-3">
                             <Clock className="w-5 h-5 text-primary" />
                             <p className="text-foreground">

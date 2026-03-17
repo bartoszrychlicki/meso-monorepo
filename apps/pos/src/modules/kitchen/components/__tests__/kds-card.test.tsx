@@ -5,6 +5,7 @@ import '@testing-library/jest-dom/vitest';
 import { KdsCard } from '../kds-card';
 import { KitchenTicket } from '@/types/kitchen';
 import { OrderStatus } from '@/types/enums';
+import { formatKitchenEstimatedReadyTime } from '../../formatting';
 
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual<typeof import('../../hooks')>('../../hooks');
@@ -62,6 +63,46 @@ describe('KdsCard', () => {
     expect(screen.getByText('Odbior: jutro, 18:45')).toBeInTheDocument();
   });
 
+  it('renders estimated pickup time for asap pickup orders', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-03T12:00:00'));
+
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          id: 'ticket-asap',
+          scheduled_time: undefined,
+        }}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        `Odbior ok.: ${formatKitchenEstimatedReadyTime(
+          ticketWithVariantAndModifiers.created_at,
+          ticketWithVariantAndModifiers.estimated_minutes
+        )}`
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('prefers adjusted pickup time over the original scheduled time', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-03T12:00:00'));
+
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          estimated_ready_at: '2026-03-04T19:05:00',
+        }}
+      />
+    );
+
+    expect(screen.getByText('Odbior: jutro, 19:05')).toBeInTheDocument();
+    expect(screen.queryByText('Odbior: jutro, 18:45')).not.toBeInTheDocument();
+  });
   it('does not render modifiers row when modifiers list is empty', () => {
     const ticketWithoutModifiers: KitchenTicket = {
       ...ticketWithVariantAndModifiers,
@@ -100,12 +141,13 @@ describe('KdsCard', () => {
     expect(screen.getAllByText('Extra sos')).toHaveLength(2);
   });
 
-  it('does not render scheduled pickup time when order is not scheduled', () => {
+  it('does not render pickup time badge when order is not scheduled and delivery type is unknown', () => {
     render(
       <KdsCard
         ticket={{
           ...ticketWithVariantAndModifiers,
           id: 'ticket-4',
+          delivery_type: undefined,
           scheduled_time: undefined,
         }}
       />
@@ -139,6 +181,12 @@ describe('KdsCard', () => {
     expect(screen.getByText('Anuluj')).toBeInTheDocument();
   });
 
+  it('shows pickup time adjustment action for pending pickup tickets', () => {
+    render(<KdsCard ticket={ticketWithVariantAndModifiers} />);
+
+    expect(screen.getByText('Skoryguj odbiór')).toBeInTheDocument();
+  });
+
   it('hides cancel action after preparation starts', () => {
     render(
       <KdsCard
@@ -151,6 +199,20 @@ describe('KdsCard', () => {
     );
 
     expect(screen.queryByText('Anuluj')).not.toBeInTheDocument();
+  });
+
+  it('hides pickup time adjustment action for ready tickets', () => {
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          id: 'ticket-ready',
+          status: OrderStatus.READY,
+        }}
+      />
+    );
+
+    expect(screen.queryByText('Skoryguj odbiór')).not.toBeInTheDocument();
   });
 
   it('shows refund prompt in cancel dialog for paid online orders', async () => {
@@ -180,7 +242,7 @@ describe('KdsCard', () => {
                 ],
               },
             },
-          },
+          } as never,
         }}
       />
     );

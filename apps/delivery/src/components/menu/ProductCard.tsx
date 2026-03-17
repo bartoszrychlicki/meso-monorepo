@@ -30,6 +30,8 @@ interface Product {
   has_variants?: boolean
   has_addons?: boolean
   has_spice_level?: boolean
+  is_available?: boolean
+  is_hidden_in_menu?: boolean
 }
 
 const badgeStyles: Record<string, string> = {
@@ -73,10 +75,16 @@ export function ProductCard({
   const imageUrl = getProductImageUrl(product)
   const hasPromotion = Boolean(product.original_price && product.original_price > product.price)
   const promotionLabel = product.promo_label?.trim() || 'Promocja'
+  const isUnavailable = product.is_available === false
 
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+    if (isUnavailable) {
+      toast.error(`${product.name} jest chwilowo niedostępny`)
+      return
+    }
+
     addItem({
       productId: product.id,
       name: product.name,
@@ -94,6 +102,7 @@ export function ProductCard({
         href={`/product/${product.slug || product.id}`}
         className={cn(
           'group flex-shrink-0 w-36 sm:w-auto block rounded-xl border border-border bg-card p-2 transition-all hover:border-primary/30 hover:neon-glow-sm',
+          isUnavailable && 'opacity-60',
           className
         )}
       >
@@ -133,6 +142,11 @@ export function ProductCard({
               {promotionLabel}
             </span>
           )}
+          {isUnavailable && (
+            <span className="absolute bottom-1.5 left-1.5 rounded-md border border-slate-200/20 bg-slate-950/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white shadow-sm">
+              Niedostępne
+            </span>
+          )}
         </div>
         <h3 className="mb-0.5 font-display text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
           {product.name}
@@ -154,8 +168,13 @@ export function ProductCard({
             )}
           </div>
           <button
+            type="button"
             onClick={quickAdd ? handleQuickAdd : undefined}
-            className="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-primary-foreground transition-transform group-hover:scale-110"
+            aria-disabled={isUnavailable}
+            className={cn(
+              'flex h-6 w-6 items-center justify-center rounded-md text-primary-foreground transition-transform group-hover:scale-110',
+              isUnavailable ? 'bg-muted text-muted-foreground group-hover:scale-100' : 'bg-primary'
+            )}
           >
             <Plus className="h-3 w-3" />
           </button>
@@ -169,6 +188,7 @@ export function ProductCard({
       href={`/product/${product.slug || product.id}`}
       className={cn(
         'group block rounded-xl border border-border bg-card p-3 transition-all hover:border-primary/30 hover:neon-glow-sm',
+        isUnavailable && 'opacity-60',
         className
       )}
     >
@@ -210,6 +230,11 @@ export function ProductCard({
             {promotionLabel}
           </span>
         )}
+        {isUnavailable && (
+          <span className="absolute bottom-2 left-2 rounded-md border border-slate-200/20 bg-slate-950/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
+            Niedostępne
+          </span>
+        )}
       </div>
 
       {/* Info */}
@@ -239,8 +264,13 @@ export function ProductCard({
           )}
         </div>
         <button
+          type="button"
           onClick={quickAdd ? handleQuickAdd : undefined}
-          className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-transform group-hover:scale-110"
+          aria-disabled={isUnavailable}
+          className={cn(
+            'flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground transition-transform group-hover:scale-110',
+            isUnavailable ? 'bg-muted text-muted-foreground group-hover:scale-100' : 'bg-primary'
+          )}
         >
           <Plus className="h-4 w-4" />
         </button>

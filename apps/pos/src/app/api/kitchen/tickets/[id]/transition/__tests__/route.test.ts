@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { OrderStatus } from '@/types/enums';
 
@@ -11,6 +11,13 @@ const { mockCancelOrderWithOptionalRefund } = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/orders/cancel-order', () => ({
   cancelOrderWithOptionalRefund: mockCancelOrderWithOptionalRefund,
+}))
+
+const { mockSendPickupTimeAdjustedEmail } = vi.hoisted(() => ({
+  mockSendPickupTimeAdjustedEmail: vi.fn().mockResolvedValue({ success: true }),
+}))
+vi.mock('@/lib/orders/pickup-time-adjustment-email', () => ({
+  sendPickupTimeAdjustedEmail: mockSendPickupTimeAdjustedEmail,
 }))
 
 const { mockScheduleWebhookDispatch } = vi.hoisted(() => ({
@@ -79,6 +86,7 @@ function makeParams(id = 'ticket-1') {
 
 describe('POST /api/kitchen/tickets/:id/transition', () => {
   const orderId = '11111111-1111-4111-8111-111111111111';
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
   const baseOrder = {
     id: orderId,
     order_number: 'WEB-20260301-001',
@@ -91,6 +99,10 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     scheduled_time: '2026-03-01T11:30:00.000Z',
     customer_name: 'Jan Kowalski',
     customer_phone: '+48500100100',
+    delivery_address: {
+      firstName: 'Jan',
+      email: 'jan@example.com',
+    },
     total: 42,
     items: [
       {
@@ -105,6 +117,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     ],
     created_at: '2026-03-01T10:00:00.000Z',
     status_history: [],
+    metadata: {},
   };
   const baseTicket = {
     id: 'ticket-1',
@@ -129,8 +142,11 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
   };
 
   beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-01T10:05:00.000Z'));
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
     mockKitchenRepo.findById.mockResolvedValue(baseTicket);
     mockKitchenRepo.update.mockResolvedValue({
@@ -159,6 +175,11 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
         status: 'not_requested',
       },
     });
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+    vi.useRealTimers();
   });
 
   it('transitions pending ticket to preparing and updates linked order status', async () => {
@@ -385,5 +406,152 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     expect(response.status).toBe(400);
     expect(body.error).toBe('Missing cancellation reason');
     expect(mockKitchenRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('adjusts pickup time by updating the linked order and preserving the ticket status', async () => {
+    const newPickupTime = '2026-03-01T11:50:00.000Z';
+
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockResolvedValueOnce({
+        ...baseOrder,
+        estimated_ready_at: newPickupTime,
+        metadata: {
+          pickup_time_adjustments: [
+            {
+              previous_time: '2026-03-01T11:30:00.000Z',
+              new_time: newPickupTime,
+              changed_at: '2026-03-01T10:05:00.000Z',
+              source: 'kds',
+            },
+          ],
+        },
+      });
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      estimated_ready_at: newPickupTime,
+      metadata: {
+        pickup_time_adjustments: [
+          {
+            previous_time: '2026-03-01T11:30:00.000Z',
+            new_time: newPickupTime,
+            changed_at: '2026-03-01T10:05:00.000Z',
+            source: 'kds',
+          },
+        ],
+      },
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: newPickupTime }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockKitchenRepo.update).not.toHaveBeenCalled();
+    expect(mockOrdersRepo.update).toHaveBeenCalledWith(
+      orderId,
+      expect.objectContaining({
+        estimated_ready_at: newPickupTime,
+        metadata: expect.objectContaining({
+          pickup_time_adjustments: [
+            expect.objectContaining({
+              previous_time: '2026-03-01T11:30:00.000Z',
+              new_time: newPickupTime,
+              source: 'kds',
+            }),
+          ],
+        }),
+      })
+    );
+    expect(body.ticket.status).toBe(OrderStatus.PENDING);
+    expect(body.ticket.estimated_ready_at).toBe(newPickupTime);
+    expect(mockSendPickupTimeAdjustedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: orderId,
+      }),
+      '2026-03-01T11:30:00.000Z',
+      newPickupTime
+    );
+  });
+
+  it('logs pickup time email failures without failing the adjustment', async () => {
+    const newPickupTime = '2026-03-01T11:50:00.000Z';
+
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockResolvedValueOnce({
+        ...baseOrder,
+        estimated_ready_at: newPickupTime,
+        metadata: {
+          pickup_time_adjustments: [
+            {
+              previous_time: '2026-03-01T11:30:00.000Z',
+              new_time: newPickupTime,
+              changed_at: '2026-03-01T10:05:00.000Z',
+              source: 'kds',
+            },
+          ],
+        },
+      });
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      estimated_ready_at: newPickupTime,
+      metadata: {
+        pickup_time_adjustments: [
+          {
+            previous_time: '2026-03-01T11:30:00.000Z',
+            new_time: newPickupTime,
+            changed_at: '2026-03-01T10:05:00.000Z',
+            source: 'kds',
+          },
+        ],
+      },
+    });
+    mockSendPickupTimeAdjustedEmail.mockResolvedValueOnce({
+      success: false,
+      error: 'Resend unavailable',
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: newPickupTime }),
+      makeParams('ticket-1')
+    );
+
+    expect(response.status).toBe(200);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      '[KDS pickup time email] Failed:',
+      'Resend unavailable'
+    );
+  });
+
+  it('rejects pickup time adjustments for delivery orders', async () => {
+    mockOrdersRepo.findById.mockResolvedValueOnce({
+      ...baseOrder,
+      delivery_type: 'delivery',
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: '2026-03-01T11:50:00.000Z' }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error).toBe('Pickup time can be adjusted only for pickup orders');
+    expect(mockOrdersRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects pickup time adjustments in the past', async () => {
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: '2026-03-01T09:59:00.000Z' }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toBe('Pickup time cannot be in the past');
+    expect(mockOrdersRepo.findById).not.toHaveBeenCalled();
   });
 });

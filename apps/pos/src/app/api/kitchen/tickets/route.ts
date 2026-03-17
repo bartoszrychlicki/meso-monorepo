@@ -21,7 +21,7 @@ async function loadLinkedOrders(orderIds: string[]): Promise<KitchenLinkedOrder[
   if (isSupabaseBackend) {
     const { data, error } = await createServiceClient()
       .from('orders_orders')
-      .select('id, status, channel, payment_method, payment_status, total, metadata, scheduled_time, delivery_type')
+      .select('id, status, channel, payment_method, payment_status, total, metadata, scheduled_time, estimated_ready_at, delivery_type')
       .in('id', orderIds);
 
     if (error) {
@@ -42,6 +42,7 @@ async function loadLinkedOrders(orderIds: string[]): Promise<KitchenLinkedOrder[
     total: order.total,
     metadata: order.metadata,
     scheduled_time: order.scheduled_time,
+    estimated_ready_at: order.estimated_ready_at,
     delivery_type: order.delivery_type,
   }));
 }

@@ -7,13 +7,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   UpdateDeliveryConfigSchema,
   type UpdateDeliveryConfigInput,
 } from '@/schemas/location';
 import { useLocationSettingsStore } from '@/modules/settings/store';
-import { Loader2, Save } from 'lucide-react';
+import { AlertCircle, CalendarClock, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Resolver } from 'react-hook-form';
 
@@ -22,6 +24,14 @@ interface DeliveryConfigFormProps {
 }
 
 const DEFAULT_ORDERING_REOPEN_TIME = '08:00';
+const ORDERING_REOPEN_FORMATTER = new Intl.DateTimeFormat('pl-PL', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+const MIN_ORDERING_PAUSE_OFFSET_MS = 60 * 60 * 1000;
 
 function trimTimeSeconds(time: string | undefined | null): string {
   if (!time) return '';
@@ -54,6 +64,82 @@ function resolveOrderingPauseDefaults(
       trimTimeSeconds(deliveryConfig?.ordering_paused_until_time) ||
       trimTimeSeconds(deliveryConfig?.opening_time) ||
       DEFAULT_ORDERING_REOPEN_TIME,
+  };
+}
+
+function buildLocalDateTime(
+  dateString: string | null | undefined,
+  timeString: string | null | undefined
+): Date | null {
+  if (!dateString || !timeString) return null;
+
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeString);
+
+  if (!dateMatch || !timeMatch) return null;
+
+  const [, year, month, day] = dateMatch;
+  const [, hours, minutes] = timeMatch;
+  const value = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+    0,
+    0
+  );
+
+  return Number.isNaN(value.getTime()) ? null : value;
+}
+
+function formatOrderingPauseSummary(
+  dateString: string | null | undefined,
+  timeString: string | null | undefined
+): string | null {
+  const reopenAt = buildLocalDateTime(dateString, timeString);
+
+  if (!reopenAt) {
+    if (!dateString || !timeString) return null;
+    return `${dateString} ${timeString}`;
+  }
+
+  return ORDERING_REOPEN_FORMATTER.format(reopenAt).replace(',', '');
+}
+
+function isOrderingPauseActive(
+  dateString: string | null | undefined,
+  timeString: string | null | undefined,
+  now = new Date()
+): boolean {
+  const reopenAt = buildLocalDateTime(dateString, timeString);
+  return reopenAt ? now < reopenAt : false;
+}
+
+function roundUpToQuarterHour(date: Date): Date {
+  const rounded = new Date(date);
+  rounded.setMinutes(Math.ceil(rounded.getMinutes() / 15) * 15, 0, 0);
+
+  if (rounded.getMinutes() === 60) {
+    rounded.setHours(rounded.getHours() + 1, 0, 0, 0);
+  }
+
+  return rounded;
+}
+
+function formatDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function buildMinimumOrderingPauseValues(now = new Date()) {
+  const minimumDate = roundUpToQuarterHour(new Date(now.getTime() + MIN_ORDERING_PAUSE_OFFSET_MS));
+
+  return {
+    date: formatDateInputValue(minimumDate),
+    time: minimumDate.toTimeString().slice(0, 5),
   };
 }
 
@@ -109,6 +195,15 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
   const isDeliveryActive = form.watch('is_delivery_active');
   const orderingPausedUntilDate = form.watch('ordering_paused_until_date');
   const orderingPausedUntilTime = form.watch('ordering_paused_until_time');
+  const isOrderingPauseEnabled = Boolean(orderingPausedUntilDate || orderingPausedUntilTime);
+  const orderingPauseSummary = formatOrderingPauseSummary(
+    orderingPausedUntilDate,
+    orderingPausedUntilTime
+  );
+  const orderingPauseIsActive = isOrderingPauseActive(
+    orderingPausedUntilDate,
+    orderingPausedUntilTime
+  );
 
   const handleSubmit = async (data: UpdateDeliveryConfigInput) => {
     setIsSubmitting(true);
@@ -128,6 +223,27 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     }
   };
 
+  const handleOrderingPauseToggle = (checked: boolean) => {
+    if (!checked) {
+      form.setValue('ordering_paused_until_date', null, { shouldValidate: true });
+      form.setValue('ordering_paused_until_time', null, { shouldValidate: true });
+      return;
+    }
+
+    const minimumValues = buildMinimumOrderingPauseValues();
+    const existingReopenAt = buildLocalDateTime(orderingPausedUntilDate, orderingPausedUntilTime);
+    const minimumReopenAt = buildLocalDateTime(minimumValues.date, minimumValues.time);
+
+    if (existingReopenAt && minimumReopenAt && existingReopenAt >= minimumReopenAt) {
+      form.setValue('ordering_paused_until_date', orderingPausedUntilDate, { shouldValidate: true });
+      form.setValue('ordering_paused_until_time', orderingPausedUntilTime, { shouldValidate: true });
+      return;
+    }
+
+    form.setValue('ordering_paused_until_date', minimumValues.date, { shouldValidate: true });
+    form.setValue('ordering_paused_until_time', minimumValues.time, { shouldValidate: true });
+  };
+
   return (
     <form
       onSubmit={form.handleSubmit(handleSubmit)}
@@ -136,85 +252,178 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
     >
       <Card>
         <CardHeader>
-          <CardTitle>Ustawienia zamowien online i dostawy</CardTitle>
+          <CardTitle>Godziny przyjmowania zamowien online</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2 rounded-lg border p-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="ordering_paused_until_date">Data wznowienia zamowien online</Label>
-                <Input
-                  id="ordering_paused_until_date"
-                  type="date"
-                  value={orderingPausedUntilDate ?? ''}
-                  onChange={(event) => {
-                    const nextDate = event.target.value ? event.target.value : null;
+          <p className="text-sm text-muted-foreground">
+            Te godziny dotycza wszystkich zamowien online: odbioru osobistego i dostawy.
+          </p>
 
-                    form.setValue('ordering_paused_until_date', nextDate, {
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="opening_time">Godzina otwarcia</Label>
+              <Input
+                id="opening_time"
+                type="time"
+                {...form.register('opening_time')}
+                data-field="opening_time"
+              />
+              {form.formState.errors.opening_time && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.opening_time.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="closing_time">Godzina zamkniecia</Label>
+              <Input
+                id="closing_time"
+                type="time"
+                {...form.register('closing_time')}
+                data-field="closing_time"
+              />
+              {form.formState.errors.closing_time && (
+                <p className="text-sm text-destructive">
+                  {form.formState.errors.closing_time.message}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <CardTitle>Tymczasowe zamkniecie lokalu</CardTitle>
+              {orderingPauseIsActive && <Badge variant="destructive">Aktywne</Badge>}
+            </div>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="ordering_pause_enabled">Aktywne</Label>
+              <Switch
+                id="ordering_pause_enabled"
+                checked={isOrderingPauseEnabled}
+                onCheckedChange={handleOrderingPauseToggle}
+                aria-label="Tymczasowe zamkniecie aktywne"
+                data-field="ordering_pause_enabled"
+              />
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {orderingPauseIsActive && orderingPauseSummary && (
+            <Alert className="border-amber-500/40 bg-amber-500/10 text-amber-100">
+              <AlertCircle className="text-amber-300" />
+              <AlertTitle>Tymczasowe zamkniecie lokalu jest aktywne</AlertTitle>
+              <AlertDescription className="text-amber-50/90">
+                <p>
+                  Zamowienia online beda mozna skladac dopiero od{' '}
+                  <span className="font-semibold text-amber-200">{orderingPauseSummary}</span>.
+                </p>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="ordering_paused_until_date">Data ponownego otwarcia</Label>
+              <Input
+                id="ordering_paused_until_date"
+                type="date"
+                disabled={!isOrderingPauseEnabled}
+                value={orderingPausedUntilDate ?? ''}
+                onChange={(event) => {
+                  const nextDate = event.target.value ? event.target.value : null;
+
+                  form.setValue('ordering_paused_until_date', nextDate, {
+                    shouldValidate: true,
+                  });
+
+                  if (!nextDate) {
+                    form.setValue('ordering_paused_until_time', null, {
                       shouldValidate: true,
                     });
+                    return;
+                  }
 
-                    if (!nextDate) {
-                      form.setValue('ordering_paused_until_time', null, {
-                        shouldValidate: true,
-                      });
-                      return;
-                    }
+                  if (!form.getValues('ordering_paused_until_time')) {
+                    const openingTime =
+                      trimTimeSeconds(form.getValues('opening_time')) || DEFAULT_ORDERING_REOPEN_TIME;
+                    const nextReopenAt = buildLocalDateTime(nextDate, openingTime);
+                    const minimumValues = buildMinimumOrderingPauseValues();
+                    const minimumReopenAt = buildLocalDateTime(
+                      minimumValues.date,
+                      minimumValues.time
+                    );
 
-                    if (!form.getValues('ordering_paused_until_time')) {
-                      form.setValue(
-                        'ordering_paused_until_time',
-                        trimTimeSeconds(form.getValues('opening_time')) ||
-                          DEFAULT_ORDERING_REOPEN_TIME,
-                        { shouldValidate: true }
-                      );
-                    }
-                  }}
-                  data-field="ordering_paused_until_date"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="ordering_paused_until_time">Godzina wznowienia</Label>
-                <Input
-                  id="ordering_paused_until_time"
-                  type="time"
-                  disabled={!orderingPausedUntilDate}
-                  value={orderingPausedUntilTime ?? ''}
-                  onChange={(event) =>
                     form.setValue(
                       'ordering_paused_until_time',
-                      event.target.value ? event.target.value : null,
+                      nextReopenAt && minimumReopenAt && nextReopenAt >= minimumReopenAt
+                        ? openingTime
+                        : minimumValues.time,
                       { shouldValidate: true }
-                    )
+                    );
                   }
-                  data-field="ordering_paused_until_time"
-                />
-              </div>
+                }}
+                data-field="ordering_paused_until_date"
+              />
             </div>
-            <p className="text-sm text-muted-foreground">
-              To ustawienie dotyczy wszystkich zamowien online: odbioru i dostawy. Po ustawieniu
-              daty i godziny aplikacja zablokuje zamowienia ASAP i pozwoli skladac tylko
-              zamowienia na przyszlosc od wskazanego momentu.
-            </p>
-            {form.formState.errors.ordering_paused_until_date && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.ordering_paused_until_date.message}
-              </p>
-            )}
-            {form.formState.errors.ordering_paused_until_time && (
-              <p className="text-sm text-destructive">
-                {form.formState.errors.ordering_paused_until_time.message}
-              </p>
-            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="ordering_paused_until_time">Godzina ponownego otwarcia</Label>
+              <Input
+                id="ordering_paused_until_time"
+                type="time"
+                disabled={!isOrderingPauseEnabled || !orderingPausedUntilDate}
+                value={orderingPausedUntilTime ?? ''}
+                onChange={(event) =>
+                  form.setValue(
+                    'ordering_paused_until_time',
+                    event.target.value ? event.target.value : null,
+                    { shouldValidate: true }
+                  )
+                }
+                data-field="ordering_paused_until_time"
+              />
+            </div>
           </div>
 
+          <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+            <div className="flex items-start gap-3">
+              <CalendarClock className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                To ustawienie wstrzymuje wszystkie zamowienia online: odbior i dostawe. Klienci
+                moga skladac zamowienia dopiero od wskazanej daty i godziny.
+              </p>
+            </div>
+          </div>
+
+          {form.formState.errors.ordering_paused_until_date && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.ordering_paused_until_date.message}
+            </p>
+          )}
+          {form.formState.errors.ordering_paused_until_time && (
+            <p className="text-sm text-destructive">
+              {form.formState.errors.ordering_paused_until_time.message}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Dostawa</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor="is_delivery_active">Dostawa aktywna</Label>
               {!isDeliveryActive && (
                 <p className="text-sm text-muted-foreground">
-                  Wlacz, aby skonfigurowac ustawienia dostawy
+                  Wlacz, aby skonfigurowac ustawienia dostawy.
                 </p>
               )}
             </div>
@@ -292,40 +501,6 @@ export function DeliveryConfigForm({ locationId }: DeliveryConfigFormProps) {
               {form.formState.errors.estimated_delivery_minutes && (
                 <p className="text-sm text-destructive">
                   {form.formState.errors.estimated_delivery_minutes.message}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="opening_time">Godzina otwarcia</Label>
-              <Input
-                id="opening_time"
-                type="time"
-                disabled={!isDeliveryActive}
-                {...form.register('opening_time')}
-                data-field="opening_time"
-              />
-              {form.formState.errors.opening_time && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.opening_time.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="closing_time">Godzina zamkniecia</Label>
-              <Input
-                id="closing_time"
-                type="time"
-                disabled={!isDeliveryActive}
-                {...form.register('closing_time')}
-                data-field="closing_time"
-              />
-              {form.formState.errors.closing_time && (
-                <p className="text-sm text-destructive">
-                  {form.formState.errors.closing_time.message}
                 </p>
               )}
             </div>

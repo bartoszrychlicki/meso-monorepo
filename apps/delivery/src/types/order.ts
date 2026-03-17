@@ -50,6 +50,7 @@ export interface Order {
   closure_reason_code?: OrderClosureReasonCode | null
   closure_reason?: string | null
   notes?: string
+  estimated_ready_at?: string
   paid_at?: string
   confirmed_at?: string
   preparing_at?: string

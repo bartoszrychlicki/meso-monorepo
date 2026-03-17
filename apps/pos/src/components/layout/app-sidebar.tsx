@@ -151,7 +151,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="px-2 py-2 text-xs text-muted-foreground">
-          MESOpos v0.1.0
+          MESOpos v0.2.0
         </div>
       </SidebarFooter>
     </Sidebar>

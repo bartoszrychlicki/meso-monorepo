@@ -1,6 +1,32 @@
 import { z } from 'zod';
 import { LocationType } from '@/types/enums';
 
+function buildLocalDateTime(
+  dateString: string | null | undefined,
+  timeString: string | null | undefined
+): Date | null {
+  if (!dateString || !timeString) return null;
+
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeString);
+
+  if (!dateMatch || !timeMatch) return null;
+
+  const [, year, month, day] = dateMatch;
+  const [, hours, minutes] = timeMatch;
+  const value = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hours),
+    Number(minutes),
+    0,
+    0
+  );
+
+  return Number.isNaN(value.getTime()) ? null : value;
+}
+
 // --- Address ---
 
 export const AddressSchema = z.object({
@@ -69,6 +95,24 @@ export const UpdateDeliveryConfigSchema = z.object({
         code: z.ZodIssueCode.custom,
         path: ['ordering_paused_until_time'],
         message: 'Godzina wznowienia jest wymagana razem z data',
+      });
+    }
+
+    return;
+  }
+
+  if (isPauseDateSet && isPauseTimeSet) {
+    const reopenAt = buildLocalDateTime(
+      data.ordering_paused_until_date,
+      data.ordering_paused_until_time
+    );
+    const minimumReopenAt = new Date(Date.now() + 60 * 60 * 1000);
+
+    if (!reopenAt || reopenAt < minimumReopenAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['ordering_paused_until_date'],
+        message: 'Data ponownego otwarcia musi byc ustawiona przynajmniej godzine do przodu',
       });
     }
   }

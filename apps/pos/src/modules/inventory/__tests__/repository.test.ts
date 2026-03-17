@@ -14,12 +14,14 @@ const { mockFindMany, mockFindById, mockUpdate, mockCreate, mockDelete } = vi.ho
 // Mock supabase client for queryWarehouseStockItems
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
+const mockRpc = vi.fn();
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockFrom = vi.fn((_table: any) => ({ select: mockSelect }));
 
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(args[0]),
+    rpc: (...args: unknown[]) => mockRpc(args[0], args[1]),
   },
 }));
 
@@ -60,6 +62,7 @@ describe('inventoryRepository', () => {
     // Reset supabase chain mocks
     mockSelect.mockReturnValue({ eq: mockEq });
     mockEq.mockReturnValue({ eq: mockEq, data: [], error: null });
+    mockRpc.mockResolvedValue({ error: null });
   });
 
   describe('getAllStockItems', () => {
@@ -121,6 +124,7 @@ describe('inventoryRepository', () => {
         stock_item_id: 'si-001',
         quantity: 1000,
         min_quantity: 500,
+        storage_location: null,
       };
 
       mockFindMany.mockResolvedValue([warehouseStockRow]);
@@ -142,8 +146,8 @@ describe('inventoryRepository', () => {
 
   describe('transferStock', () => {
     it('subtracts from source and adds to existing target', async () => {
-      const sourceRow = { id: 'ws-001', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 1000 };
-      const targetRow = { id: 'ws-002', warehouse_id: 'wh-2', stock_item_id: 'si-001', quantity: 200 };
+      const sourceRow = { id: 'ws-001', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 1000, storage_location: null };
+      const targetRow = { id: 'ws-002', warehouse_id: 'wh-2', stock_item_id: 'si-001', quantity: 200, storage_location: null };
 
       // First call finds source, second finds target
       mockFindMany
@@ -158,7 +162,7 @@ describe('inventoryRepository', () => {
     });
 
     it('creates target junction row when not exists', async () => {
-      const sourceRow = { id: 'ws-001', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 1000 };
+      const sourceRow = { id: 'ws-001', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 1000, storage_location: null };
 
       mockFindMany
         .mockResolvedValueOnce([sourceRow])
@@ -174,11 +178,12 @@ describe('inventoryRepository', () => {
         stock_item_id: 'si-001',
         quantity: 300,
         min_quantity: 0,
+        storage_location: null,
       });
     });
 
     it('throws when insufficient quantity', async () => {
-      const sourceRow = { id: 'ws-001', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 100 };
+      const sourceRow = { id: 'ws-001', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 100, storage_location: null };
 
       mockFindMany.mockResolvedValueOnce([sourceRow]);
 
@@ -190,7 +195,7 @@ describe('inventoryRepository', () => {
 
   describe('assignToWarehouse', () => {
     it('creates junction row', async () => {
-      const newRow = { id: 'ws-new', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 500, min_quantity: 100 };
+      const newRow = { id: 'ws-new', warehouse_id: 'wh-1', stock_item_id: 'si-001', quantity: 500, min_quantity: 100, storage_location: null };
       mockCreate.mockResolvedValue(newRow);
 
       const result = await inventoryRepository.assignToWarehouse('wh-1', 'si-001', 500, 100);
@@ -199,8 +204,163 @@ describe('inventoryRepository', () => {
         stock_item_id: 'si-001',
         quantity: 500,
         min_quantity: 100,
+        storage_location: null,
       });
       expect(result).toEqual(newRow);
+    });
+  });
+
+  describe('inventory counts', () => {
+    it('creates draft count with seeded lines from warehouse stock', async () => {
+      const count = {
+        id: 'count-1',
+        number: 'INW 1/2026',
+        scope: 'single',
+        warehouse_id: 'wh-1',
+        status: 'draft',
+        comment: null,
+        created_by: null,
+        approved_at: null,
+        created_at: '2026-03-16T10:00:00Z',
+        updated_at: '2026-03-16T10:00:00Z',
+      };
+      const warehouse = {
+        id: 'wh-1',
+        name: 'Magazyn glowny',
+        location_id: null,
+        is_active: true,
+        is_default: true,
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      };
+      const warehouseRow = {
+        id: 'ws-1',
+        warehouse_id: 'wh-1',
+        stock_item_id: 'si-001',
+        quantity: 42,
+        min_quantity: 10,
+        storage_location: 'Regal A',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      };
+      const line = {
+        id: 'line-1',
+        inventory_count_id: 'count-1',
+        warehouse_id: 'wh-1',
+        stock_item_id: 'si-001',
+        stock_item_name: 'Wolowina mielona',
+        stock_item_sku: 'RAW-BEEF-001',
+        stock_item_unit: 'g',
+        expected_quantity: 42,
+        counted_quantity: null,
+        note: null,
+        edited_inventory_category_id: null,
+        edited_storage_location: 'Regal A',
+        sort_order: 0,
+        warehouse_name: 'Magazyn glowny',
+        created_at: '2026-03-16T10:00:00Z',
+        updated_at: '2026-03-16T10:00:00Z',
+      };
+
+      mockFindMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([makeStockItem()])
+        .mockResolvedValueOnce([warehouse])
+        .mockResolvedValueOnce([warehouseRow])
+        .mockResolvedValueOnce([line])
+        .mockResolvedValueOnce([warehouse]);
+      mockCreate
+        .mockResolvedValueOnce(count)
+        .mockResolvedValueOnce(line);
+      mockFindById.mockResolvedValueOnce(count);
+
+      const result = await inventoryRepository.createInventoryCount('single', 'wh-1');
+
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+        number: 'INW 1/2026',
+        scope: 'single',
+        warehouse_id: 'wh-1',
+        status: 'draft',
+      }));
+      expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+        inventory_count_id: 'count-1',
+        warehouse_id: 'wh-1',
+        stock_item_id: 'si-001',
+        expected_quantity: 42,
+        edited_storage_location: 'Regal A',
+      }));
+      expect(result.count.number).toBe('INW 1/2026');
+      expect(result.lines).toEqual([line]);
+    });
+
+    it('approves draft count and writes final quantity plus storage location', async () => {
+      const draftCount = {
+        id: 'count-1',
+        number: 'INW 1/2026',
+        scope: 'single',
+        warehouse_id: 'wh-1',
+        status: 'draft',
+        comment: null,
+        created_by: null,
+        approved_at: null,
+        created_at: '2026-03-16T10:00:00Z',
+        updated_at: '2026-03-16T10:00:00Z',
+      };
+      const approvedCount = {
+        ...draftCount,
+        status: 'approved',
+        approved_at: '2026-03-16T11:00:00Z',
+      };
+      const line = {
+        id: 'line-1',
+        inventory_count_id: 'count-1',
+        warehouse_id: 'wh-1',
+        stock_item_id: 'si-001',
+        stock_item_name: 'Wolowina mielona',
+        stock_item_sku: 'RAW-BEEF-001',
+        stock_item_unit: 'g',
+        expected_quantity: 42,
+        counted_quantity: 39,
+        note: null,
+        edited_inventory_category_id: null,
+        edited_storage_location: 'Regal B',
+        sort_order: 0,
+        created_at: '2026-03-16T10:00:00Z',
+        updated_at: '2026-03-16T10:00:00Z',
+      };
+      const stockItem = makeStockItem({ id: 'si-001', default_min_quantity: 10 });
+      const warehouseRow = {
+        id: 'ws-1',
+        warehouse_id: 'wh-1',
+        stock_item_id: 'si-001',
+        quantity: 42,
+        min_quantity: 10,
+        storage_location: 'Regal A',
+        created_at: '2026-01-01T00:00:00Z',
+        updated_at: '2026-01-01T00:00:00Z',
+      };
+
+      mockFindById
+        .mockResolvedValueOnce(draftCount)
+        .mockResolvedValueOnce(approvedCount);
+      mockFindMany
+        .mockResolvedValueOnce([line])
+        .mockResolvedValueOnce([stockItem])
+        .mockResolvedValueOnce([warehouseRow]);
+      mockUpdate
+        .mockResolvedValueOnce({ ...warehouseRow, quantity: 39, storage_location: 'Regal B' })
+        .mockResolvedValueOnce(approvedCount);
+
+      const result = await inventoryRepository.approveInventoryCount('count-1');
+
+      expect(mockUpdate).toHaveBeenCalledWith('ws-1', {
+        quantity: 39,
+        storage_location: 'Regal B',
+      });
+      expect(mockUpdate).toHaveBeenCalledWith('count-1', expect.objectContaining({
+        status: 'approved',
+      }));
+      expect(result.status).toBe('approved');
     });
   });
 
