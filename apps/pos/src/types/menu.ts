@@ -94,6 +94,7 @@ export interface Product extends BaseEntity {
   image_url?: string; // @deprecated - use images[]
   images: ProductImage[];
   is_available: boolean; // Czy dostępny do zamówienia (tymczasowo niedostępny)
+  is_hidden_in_menu?: boolean; // Czy ukryty w Delivery mimo zachowania w systemie
   is_featured: boolean;
   allergens: Allergen[];
   nutritional_info?: NutritionalInfo;

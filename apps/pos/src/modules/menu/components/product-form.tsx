@@ -151,6 +151,7 @@ export function ProductForm({
   const [productType, setProductType] = useState<ProductType>(product?.type ?? ProductType.SINGLE);
   const [isFeatured, setIsFeatured] = useState(product?.is_featured ?? false);
   const [isAvailable, setIsAvailable] = useState(product?.is_available ?? true);
+  const [isHiddenInMenu, setIsHiddenInMenu] = useState(product?.is_hidden_in_menu ?? false);
 
   // Images
   const [images, setImages] = useState<ProductImage[]>(product?.images ?? []);
@@ -284,6 +285,7 @@ export function ProductForm({
       image_url: images.length > 0 ? images[0].url : undefined,
       images,
       is_available: isAvailable,
+      is_hidden_in_menu: isHiddenInMenu,
       is_featured: isFeatured,
       allergens: selectedAllergens,
       nutritional_info: { calories, protein, carbs, fat },
@@ -355,6 +357,45 @@ export function ProductForm({
           {/* Step 1: Basic info */}
           {step === 0 && (
             <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-lg border p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="available"
+                      checked={isAvailable}
+                      onCheckedChange={(checked) => setIsAvailable(checked === true)}
+                      data-field="product-available"
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="available" className="text-sm font-medium">
+                        Dostepny
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Klient moze dodac produkt do koszyka w Delivery.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="hidden-in-menu"
+                      checked={isHiddenInMenu}
+                      onCheckedChange={(checked) => setIsHiddenInMenu(checked === true)}
+                      data-field="product-hidden-in-menu"
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="hidden-in-menu" className="text-sm font-medium">
+                        Ukryj w menu
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Produkt nie bedzie widoczny w Delivery, nawet jesli jest dostepny.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 space-y-2">
                   <Label htmlFor="name">Nazwa produktu *</Label>
@@ -614,17 +655,6 @@ export function ProductForm({
                     Wyrozniaj w menu
                   </Label>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="available"
-                    checked={isAvailable}
-                    onCheckedChange={(checked) => setIsAvailable(checked === true)}
-                    data-field="product-available"
-                  />
-                  <Label htmlFor="available" className="text-sm">
-                    Dostepny
-                  </Label>
-                </div>
               </div>
 
               {/* Nutritional info */}
@@ -858,10 +888,29 @@ export function ProductForm({
                   />
                   <div>
                     <Label htmlFor="is-available" className="font-medium">
-                      Produkt aktywny
+                      Dostepny do zamowienia
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Wylacz, aby ukryc produkt w POS i na stronie
+                      Klient moze zamowic produkt w Delivery.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4">
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="is-hidden-in-menu"
+                    checked={isHiddenInMenu}
+                    onCheckedChange={(checked) => setIsHiddenInMenu(checked === true)}
+                    data-field="product-hidden-in-menu-final"
+                  />
+                  <div>
+                    <Label htmlFor="is-hidden-in-menu" className="font-medium">
+                      Ukryty w menu Delivery
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Produkt nie pojawi sie klientowi w menu ani w wyszukiwarce Delivery.
                     </p>
                   </div>
                 </div>
@@ -915,6 +964,16 @@ export function ProductForm({
                     <div className="flex justify-between">
                       <dt className="text-muted-foreground">Receptura:</dt>
                       <dd className="font-medium">{selectedRecipe?.name ?? 'Brak'}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Dostepnosc:</dt>
+                      <dd className="font-medium">{isAvailable ? 'Dostepny' : 'Niedostepny'}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Widocznosc w Delivery:</dt>
+                      <dd className="font-medium">
+                        {isHiddenInMenu ? 'Ukryty w menu' : 'Widoczny w menu'}
+                      </dd>
                     </div>
                     {selectedRecipe && price > 0 && (() => {
                       const costPct = (selectedRecipe.cost_per_unit / price) * 100;

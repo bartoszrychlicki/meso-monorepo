@@ -73,6 +73,8 @@ export interface ProductDetailProduct {
   prep_time_min?: number
   prep_time_max?: number
   preparation_time_minutes?: number
+  is_available?: boolean
+  is_hidden_in_menu?: boolean
   variants?: Variant[] | null
   addons?: Addon[] | null
   tags?: string[] | null
@@ -211,6 +213,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   const hasPromotion = Boolean(product.original_price && product.original_price > product.price)
   const promotionLabel = product.promo_label?.trim() || 'Promocja'
   const promoSavings = hasPromotion ? (product.original_price as number) - product.price : 0
+  const isUnavailable = product.is_available === false
 
   const nutritionItems = [
     calories !== null ? { label: 'kcal', value: formatNutritionValue(calories) } : null,
@@ -284,6 +287,11 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
   }
 
   const handleAddToCart = () => {
+    if (isUnavailable) {
+      toast.error('Produkt chwilowo niedostępny')
+      return
+    }
+
     const cartAddons: CartItemAddon[] = selectedAddons.map((addon) => ({
       id: addon.id,
       name: addon.name,
@@ -402,6 +410,12 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
               {prepTimeLabel}
             </span>
           )}
+        </div>
+      )}
+
+      {isUnavailable && (
+        <div className="mb-4 rounded-xl border border-amber-300/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          Produkt chwilowo niedostępny. Mozesz zobaczyc opis i sklad, ale nie dodasz go teraz do koszyka.
         </div>
       )}
 
@@ -553,7 +567,8 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
               <button
                 type="button"
                 onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-                className="text-foreground"
+                className="text-foreground disabled:text-muted-foreground"
+                disabled={isUnavailable}
               >
                 <Minus className="h-4 w-4" />
               </button>
@@ -563,7 +578,8 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
               <button
                 type="button"
                 onClick={() => setQuantity((prev) => prev + 1)}
-                className="text-foreground"
+                className="text-foreground disabled:text-muted-foreground"
+                disabled={isUnavailable}
               >
                 <Plus className="h-4 w-4" />
               </button>
@@ -574,9 +590,15 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
               data-testid="product-detail-add-to-cart"
               aria-label="Dodaj produkt do koszyka"
               onClick={handleAddToCart}
-              className="flex-1 rounded-xl bg-primary py-3 font-display text-sm font-semibold tracking-wider text-primary-foreground transition-all neon-glow hover:scale-[1.02]"
+              disabled={isUnavailable}
+              className={cn(
+                'flex-1 rounded-xl py-3 font-display text-sm font-semibold tracking-wider transition-all',
+                isUnavailable
+                  ? 'cursor-not-allowed bg-muted text-muted-foreground'
+                  : 'bg-primary text-primary-foreground neon-glow hover:scale-[1.02]'
+              )}
             >
-              DODAJ • {formatPrice(calculateTotal())}
+              {isUnavailable ? 'NIEDOSTĘPNE' : `DODAJ • ${formatPrice(calculateTotal())}`}
             </button>
           </div>
         </div>

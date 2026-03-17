@@ -20,6 +20,8 @@ import type { Recipe } from '@/types/recipe';
  * List products with optional filtering and pagination.
  *
  * Query params:
+ *   ?is_available=true|false - filter products by order availability
+ *   ?is_hidden_in_menu=true|false - filter products by Delivery visibility
  *   ?channel=delivery     - filter products with pricing for this channel
  *   ?updated_since=ISO    - filter products updated after this date
  *   ?include=modifiers,variants,pricing - control response fields
@@ -34,6 +36,7 @@ export async function GET(request: NextRequest) {
   const categoryId = searchParams.get('category_id');
   const search = searchParams.get('search');
   const isAvailable = searchParams.get('is_available');
+  const isHiddenInMenu = searchParams.get('is_hidden_in_menu');
   const channel = searchParams.get('channel');
   const updatedSince = searchParams.get('updated_since');
   const include = searchParams.get('include');
@@ -44,6 +47,9 @@ export async function GET(request: NextRequest) {
   if (categoryId) filters.category_id = categoryId;
   if (isAvailable !== null && isAvailable !== undefined && isAvailable !== '') {
     filters.is_available = isAvailable === 'true';
+  }
+  if (isHiddenInMenu !== null && isHiddenInMenu !== undefined && isHiddenInMenu !== '') {
+    filters.is_hidden_in_menu = isHiddenInMenu === 'true';
   }
 
   let result = await serverProductsRepo.findAll({
@@ -100,6 +106,7 @@ export async function GET(request: NextRequest) {
         promo_ends_at: p.promo_ends_at,
         images: p.images,
         is_available: p.is_available,
+        is_hidden_in_menu: p.is_hidden_in_menu,
         is_active: p.is_active,
         allergens: p.allergens,
         nutritional_info: p.nutritional_info,

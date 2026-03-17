@@ -22,7 +22,7 @@ export default async function ProductPage({ params }: PageProps) {
     `)
     .eq(isUUID ? 'id' : 'slug', id)
     .eq('is_active', true)
-    .eq('is_available', true)
+    .eq('is_hidden_in_menu', false)
     .single()
 
   if (!product) {

@@ -44,6 +44,8 @@ interface Product {
   has_spice_level?: boolean
   allergens?: string[]
   tags?: string[]
+  is_available?: boolean
+  is_hidden_in_menu?: boolean
 }
 
 interface Location {
