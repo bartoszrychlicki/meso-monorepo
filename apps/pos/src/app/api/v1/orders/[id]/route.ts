@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-import { authenticateRequest, authorizeRequest, isApiKey } from '@/lib/api/auth';
-import { hasPermission } from '@/lib/api-keys';
+import { authorizeRequest, isApiKey } from '@/lib/api/auth';
 import {
   type ApiResponseWarning,
   apiSuccess,
@@ -28,9 +27,10 @@ import {
   buildRollbackLifecycleTimestampPatch,
   buildRollbackStatusNote,
 } from '@/lib/orders/status-rollback';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { UpdateOrderSchema, type UpdateOrderInput } from '@/schemas/order';
 import { isValidPhoneNumber } from '@/lib/sms/templates';
+import { authorizeOrderRoute } from '@/modules/orders/server/route-auth';
 import type { Customer } from '@/types/crm';
 import { OrderStatus, PaymentMethod, PaymentStatus } from '@/types/enums';
 import type { KitchenTicket } from '@/types/kitchen';
@@ -128,30 +128,14 @@ function buildEditRollbackNote(itemsChanged: boolean, notesChanged: boolean): st
 async function authorizeOrderWrite(
   request: NextRequest
 ): Promise<MutationActor | ReturnType<typeof apiForbidden | typeof apiUnauthorized>> {
-  const apiKeyAuth = await authenticateRequest(request);
-  if (isApiKey(apiKeyAuth)) {
-    if (!hasPermission(apiKeyAuth, 'orders:write')) {
-      return apiForbidden('orders:write');
-    }
-
-    return {
-      authType: 'api_key',
-      actorId: apiKeyAuth.id ?? null,
-    };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return apiUnauthorized();
+  const access = await authorizeOrderRoute(request, 'orders:write');
+  if ('status' in access) {
+    return access;
   }
 
   return {
-    authType: 'session',
-    actorId: user.id,
+    authType: access.kind,
+    actorId: access.actorId,
   };
 }
 

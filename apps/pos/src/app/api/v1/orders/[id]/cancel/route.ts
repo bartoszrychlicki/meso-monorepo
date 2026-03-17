@@ -1,13 +1,8 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { authenticateRequest, isApiKey } from '@/lib/api/auth';
-import { hasPermission } from '@/lib/api-keys';
 import {
   apiError,
-  apiForbidden,
   apiNotFound,
   apiSuccess,
-  apiUnauthorized,
   apiValidationError,
 } from '@/lib/api/response';
 import { cancelOrderWithOptionalRefund } from '@/lib/orders/cancel-order';
@@ -15,6 +10,7 @@ import {
   InvalidOrderCancellationReasonError,
   OrderNotFoundError,
 } from '@/lib/orders/status-transition';
+import { authorizeOrderRoute } from '@/modules/orders/server/route-auth';
 import { CancelOrderSchema } from '@/schemas/order';
 
 interface RouteParams {
@@ -22,25 +18,12 @@ interface RouteParams {
 }
 
 async function authorizeOrderCancellation(request: NextRequest) {
-  const apiKeyAuth = await authenticateRequest(request);
-  if (isApiKey(apiKeyAuth)) {
-    if (!hasPermission(apiKeyAuth, 'orders:status')) {
-      return apiForbidden('orders:status');
-    }
-
-    return { changedBy: apiKeyAuth.id, authType: 'api_key' as const };
+  const access = await authorizeOrderRoute(request, 'orders:status');
+  if ('status' in access) {
+    return access;
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return apiUnauthorized();
-  }
-
-  return { changedBy: user.id, authType: 'session' as const };
+  return { changedBy: access.actorId, authType: access.kind };
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
