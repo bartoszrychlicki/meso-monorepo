@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Order } from '@/types/order';
 import {
   ModifierAction,
@@ -176,6 +177,12 @@ export function OrderDetail({
     setIsUpdating(true);
     try {
       await onRollbackStatus();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Nie udalo sie cofnac statusu zamowienia.'
+      );
     } finally {
       setIsUpdating(false);
     }

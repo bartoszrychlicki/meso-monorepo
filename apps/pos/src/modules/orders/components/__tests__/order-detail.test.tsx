@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/vitest';
 import { OrderDetail } from '../order-detail';
 import { Order, OrderItem, OrderItemModifier } from '@/types/order';
@@ -12,6 +12,14 @@ import {
   PaymentStatus,
   ModifierAction,
 } from '@/types/enums';
+
+const toastError = vi.fn();
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastError,
+  },
+}));
 
 // Polyfill for Radix components (Dialog, etc.)
 beforeAll(() => {
@@ -456,5 +464,33 @@ describe('OrderDetail', () => {
     fireEvent.click(rollbackButton);
 
     expect(rollbackButton).toBeDisabled();
+  });
+
+  it('shows an error toast when rollback fails', async () => {
+    const failingRollback = vi.fn().mockRejectedValue(new Error('Rollback failed'));
+
+    render(
+      <OrderDetail
+        order={{
+          ...orderWithModifiers,
+          status: OrderStatus.READY,
+          status_history: [
+            { status: OrderStatus.PENDING, timestamp: '2024-06-15T12:00:00Z' },
+            { status: OrderStatus.CONFIRMED, timestamp: '2024-06-15T12:05:00Z' },
+            { status: OrderStatus.PREPARING, timestamp: '2024-06-15T12:10:00Z' },
+            { status: OrderStatus.READY, timestamp: '2024-06-15T12:20:00Z' },
+          ],
+        }}
+        onStatusChange={noopStatusChange}
+        onRollbackStatus={failingRollback}
+        onCancel={noopCancel}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cofnij do: W przygotowaniu' }));
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith('Rollback failed');
+    });
   });
 });
