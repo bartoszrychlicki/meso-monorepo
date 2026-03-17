@@ -5,6 +5,7 @@ import '@testing-library/jest-dom/vitest';
 import { KdsCard } from '../kds-card';
 import { KitchenTicket } from '@/types/kitchen';
 import { OrderStatus } from '@/types/enums';
+import { formatKitchenEstimatedReadyTime } from '../../formatting';
 
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual<typeof import('../../hooks')>('../../hooks');
@@ -76,7 +77,14 @@ describe('KdsCard', () => {
       />
     );
 
-    expect(screen.getByText('Odbior ok.: 11:10')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        `Odbior ok.: ${formatKitchenEstimatedReadyTime(
+          ticketWithVariantAndModifiers.created_at,
+          ticketWithVariantAndModifiers.estimated_minutes
+        )}`
+      )
+    ).toBeInTheDocument();
   });
 
   it('does not render modifiers row when modifiers list is empty', () => {
