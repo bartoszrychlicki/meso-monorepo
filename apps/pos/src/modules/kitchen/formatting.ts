@@ -2,6 +2,7 @@ import { addDays, addMinutes, format, isSameDay } from 'date-fns';
 import { pl } from 'date-fns/locale';
 import { ModifierAction } from '@/types/enums';
 import type { OrderItemModifier } from '@/types/order';
+import type { KitchenTicket } from '@/types/kitchen';
 
 export function formatKitchenModifierLabel(
   modifier: Pick<OrderItemModifier, 'name' | 'quantity' | 'modifier_action'>
@@ -78,4 +79,28 @@ export function formatKitchenEstimatedReadyTime(
     addMinutes(createdAtDate, estimatedMinutes).toISOString(),
     referenceDate
   );
+}
+export function resolveKitchenTicketCurrentPickupTime(ticket: KitchenTicket): string | null {
+  if (ticket.estimated_ready_at) {
+    return ticket.estimated_ready_at;
+  }
+
+  if (ticket.scheduled_time) {
+    return ticket.scheduled_time;
+  }
+
+  if (ticket.delivery_type !== 'pickup') {
+    return null;
+  }
+
+  if (!Number.isFinite(ticket.estimated_minutes) || ticket.estimated_minutes <= 0) {
+    return null;
+  }
+
+  const createdAt = new Date(ticket.created_at);
+  if (Number.isNaN(createdAt.getTime())) {
+    return null;
+  }
+
+  return addMinutes(createdAt, ticket.estimated_minutes).toISOString();
 }

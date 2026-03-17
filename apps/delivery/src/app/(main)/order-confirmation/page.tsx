@@ -15,6 +15,7 @@ import { PAYMENT_TIMEOUT_MS, getPickupStepIndex, isPaymentPending } from '@/lib/
 import { mapConfirmationItems } from '@/lib/order-confirmation-mapper'
 import { resolveCheckoutConfig } from '@/lib/location-config'
 import { readOrderDeliveryFee, readOrderDiscount, readOrderPaymentFee } from '@/lib/order-financials'
+import { formatCustomerPickupTime, getPickupTimeDetails } from '@/lib/pickup-time'
 
 // Step definitions for pickup orders
 const pickupSteps = [
@@ -29,6 +30,15 @@ function buildConfirmation(order: Record<string, any>, waitMinutes = 20): OrderC
     const deliveryAddress = order.delivery_address as Record<string, string | undefined>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const location = order.location as Record<string, any>
+    const pickupTimeDetails = getPickupTimeDetails({
+        delivery_type: order.delivery_type,
+        scheduled_time: typeof order.scheduled_time === 'string' ? order.scheduled_time : null,
+        estimated_ready_at: typeof order.estimated_ready_at === 'string' ? order.estimated_ready_at : null,
+        metadata: order.metadata as Record<string, unknown> | null | undefined,
+    })
+    const pickupTimeLabel = pickupTimeDetails.currentTime
+        ? formatCustomerPickupTime(pickupTimeDetails.currentTime)
+        : null
 
     // POS stores location address as JSONB; extract city/street
     const locAddr = location && typeof location.address === 'object' && location.address
@@ -62,7 +72,11 @@ function buildConfirmation(order: Record<string, any>, waitMinutes = 20): OrderC
         paymentMethod: order.payment_method,
         paymentStatus: order.payment_status,
         orderStatus: order.status,
-        estimatedTime: `~${waitMinutes} min`,
+        estimatedTime: pickupTimeLabel ?? `~${waitMinutes} min`,
+        scheduledTime: typeof order.scheduled_time === 'string' ? order.scheduled_time : null,
+        estimatedReadyAt: typeof order.estimated_ready_at === 'string' ? order.estimated_ready_at : null,
+        previousPickupTime: pickupTimeDetails.previousTime,
+        pickupTimeAdjusted: pickupTimeDetails.isAdjusted,
         createdAt: order.created_at,
         loyaltyPointsEarned: order.loyalty_points_earned || 0,
     }
@@ -157,15 +171,39 @@ function OrderConfirmationContent() {
                     filter: `id=eq.${orderId}`,
                 },
                 (payload: { new: Record<string, string | undefined> }) => {
-                    const updated = payload.new as Record<string, string | undefined>
+                    const updated = payload.new as Record<string, unknown>
                     console.log('[Realtime] Order updated:', updated.status, updated.payment_status)
 
                     setConfirmation((prev) => {
                         if (!prev) return prev
+                        const pickupTimeDetails = getPickupTimeDetails({
+                            delivery_type: prev.deliveryType,
+                            scheduled_time: typeof updated.scheduled_time === 'string'
+                                ? updated.scheduled_time
+                                : (prev.scheduledTime ?? null),
+                            estimated_ready_at: typeof updated.estimated_ready_at === 'string'
+                                ? updated.estimated_ready_at
+                                : (prev.estimatedReadyAt ?? null),
+                            metadata: (updated.metadata as Record<string, unknown> | null | undefined) ?? null,
+                        })
+
                         return {
                             ...prev,
-                            orderStatus: updated.status ?? prev.orderStatus,
-                            paymentStatus: updated.payment_status ?? prev.paymentStatus,
+                            orderStatus: typeof updated.status === 'string' ? updated.status : prev.orderStatus,
+                            paymentStatus: typeof updated.payment_status === 'string'
+                                ? updated.payment_status
+                                : prev.paymentStatus,
+                            scheduledTime: typeof updated.scheduled_time === 'string'
+                                ? updated.scheduled_time
+                                : (prev.scheduledTime ?? null),
+                            estimatedReadyAt: typeof updated.estimated_ready_at === 'string'
+                                ? updated.estimated_ready_at
+                                : (prev.estimatedReadyAt ?? null),
+                            previousPickupTime: pickupTimeDetails.previousTime,
+                            pickupTimeAdjusted: pickupTimeDetails.isAdjusted,
+                            estimatedTime: pickupTimeDetails.currentTime
+                                ? (formatCustomerPickupTime(pickupTimeDetails.currentTime) ?? prev.estimatedTime)
+                                : prev.estimatedTime,
                         }
                     })
 
@@ -178,6 +216,12 @@ function OrderConfirmationContent() {
                     }
                     if (updated.status === 'ready') {
                         toast.success('Zamówienie gotowe do odbioru!')
+                    }
+                    if (
+                        typeof updated.estimated_ready_at === 'string' &&
+                        updated.estimated_ready_at !== confirmation?.estimatedReadyAt
+                    ) {
+                        toast.info('Zmieniliśmy godzinę odbioru')
                     }
                     if (updated.payment_status === 'failed') {
                         toast.error('Płatność nie powiodła się')
@@ -192,19 +236,42 @@ function OrderConfirmationContent() {
         const pollId = setInterval(async () => {
             const { data } = await supabase
                 .from(Tables.orders)
-                .select('status, payment_status')
+                .select('status, payment_status, scheduled_time, estimated_ready_at, metadata')
                 .eq('id', orderId)
                 .single()
             if (data) {
                 setConfirmation((prev) => {
                     if (!prev) return prev
-                    if (prev.orderStatus === data.status && prev.paymentStatus === data.payment_status) {
+                    const pickupTimeDetails = getPickupTimeDetails({
+                        delivery_type: prev.deliveryType,
+                        scheduled_time: data.scheduled_time,
+                        estimated_ready_at: data.estimated_ready_at,
+                        metadata: (data.metadata as Record<string, unknown> | null | undefined) ?? null,
+                    })
+                    const nextEstimatedTime = pickupTimeDetails.currentTime
+                        ? (formatCustomerPickupTime(pickupTimeDetails.currentTime) ?? prev.estimatedTime)
+                        : prev.estimatedTime
+
+                    if (
+                        prev.orderStatus === data.status &&
+                        prev.paymentStatus === data.payment_status &&
+                        prev.scheduledTime === (data.scheduled_time ?? null) &&
+                        prev.estimatedReadyAt === (data.estimated_ready_at ?? null) &&
+                        prev.previousPickupTime === pickupTimeDetails.previousTime &&
+                        prev.pickupTimeAdjusted === pickupTimeDetails.isAdjusted &&
+                        prev.estimatedTime === nextEstimatedTime
+                    ) {
                         return prev // no change
                     }
                     return {
                         ...prev,
                         orderStatus: data.status,
                         paymentStatus: data.payment_status,
+                        scheduledTime: data.scheduled_time ?? null,
+                        estimatedReadyAt: data.estimated_ready_at ?? null,
+                        previousPickupTime: pickupTimeDetails.previousTime,
+                        pickupTimeAdjusted: pickupTimeDetails.isAdjusted,
+                        estimatedTime: nextEstimatedTime,
                     }
                 })
                 if (terminalStatuses.includes(data.status)) {
@@ -217,7 +284,7 @@ function OrderConfirmationContent() {
             supabase.removeChannel(channel)
             clearInterval(pollId)
         }
-    }, [orderId, setConfirmation])
+    }, [confirmation?.estimatedReadyAt, orderId, setConfirmation])
 
     const [paymentTimedOut, setPaymentTimedOut] = useState(false)
     const [isRetryingPayment, setIsRetryingPayment] = useState(false)
@@ -345,6 +412,7 @@ function OrderConfirmationContent() {
 
     const steps = pickupSteps
     const loyaltyPointsAlreadyCredited = confirmation.orderStatus === 'delivered'
+    const pickupTimeTitle = confirmation.pickupTimeAdjusted ? 'Nowy czas odbioru' : 'Czas odbioru'
 
     return (
         <div className="mx-auto max-w-2xl px-4 py-8 pb-32">
@@ -497,11 +565,20 @@ function OrderConfirmationContent() {
             {/* ETA */}
             <div className="mb-6 rounded-xl border border-border bg-card p-6 text-center">
                 <p className="text-sm text-muted-foreground mb-1">
-                    {isPendingPayment ? 'Szacowany czas po oplaceniu' : 'Szacowany czas przygotowania'}
+                    {confirmation.deliveryType === 'pickup' && (confirmation.estimatedReadyAt || confirmation.scheduledTime)
+                        ? pickupTimeTitle
+                        : isPendingPayment
+                            ? 'Szacowany czas po oplaceniu'
+                            : 'Szacowany czas przygotowania'}
                 </p>
                 <p className="font-display text-3xl font-bold text-primary neon-text">
                     {confirmation.estimatedTime}
                 </p>
+                {confirmation.deliveryType === 'pickup' && confirmation.pickupTimeAdjusted && confirmation.previousPickupTime && (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                        Było: {formatCustomerPickupTime(confirmation.previousPickupTime) ?? confirmation.previousPickupTime}
+                    </p>
+                )}
             </div>
 
             {/* Pickup location with map links */}

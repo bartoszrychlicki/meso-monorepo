@@ -12,12 +12,14 @@ type TransitionAction =
   | 'mark_served'
   | 'cancel_order'
   | 'toggle_item'
-  | 'set_priority';
+  | 'set_priority'
+  | 'adjust_pickup_time';
 
 interface TransitionPayload {
   itemId?: string;
   isDone?: boolean;
   priority?: number;
+  pickupTime?: string;
   reasonCode?: OrderClosureReasonCode | null;
   reasonText?: string;
   requestRefund?: boolean;
@@ -231,6 +233,14 @@ async function setPriority(id: string, priority: number): Promise<KitchenTicket>
   return baseRepo.update(id, { priority } as Partial<KitchenTicket>);
 }
 
+async function adjustPickupTime(id: string, pickupTime: string): Promise<KitchenTicket> {
+  if (isSupabaseBackend) {
+    return callTransition(id, 'adjust_pickup_time', { pickupTime });
+  }
+
+  return baseRepo.update(id, { estimated_ready_at: pickupTime } as Partial<KitchenTicket>);
+}
+
 export const kitchenRepository = {
   ...baseRepo,
   getByStatus,
@@ -243,4 +253,5 @@ export const kitchenRepository = {
   getCompletedToday,
   updateItem,
   setPriority,
+  adjustPickupTime,
 };

@@ -26,6 +26,7 @@ interface KitchenStore {
   markServed: (ticketId: string) => Promise<void>;
   bumpOrder: (ticketId: string) => Promise<void>;
   setPriority: (ticketId: string, priority: number) => Promise<void>;
+  adjustPickupTime: (ticketId: string, pickupTime: string) => Promise<void>;
 }
 
 export const useKitchenStore = create<KitchenStore>((set, get) => ({
@@ -150,6 +151,19 @@ export const useKitchenStore = create<KitchenStore>((set, get) => ({
     } catch (error) {
       console.error('Failed to update ticket priority:', error);
       toast.error('Nie udało się zmienić priorytetu.');
+    }
+  },
+
+  adjustPickupTime: async (ticketId: string, pickupTime: string) => {
+    try {
+      const updated = await kitchenRepository.adjustPickupTime(ticketId, pickupTime);
+      set({
+        tickets: get().tickets.map((t) => (t.id === ticketId ? updated : t)),
+      });
+    } catch (error) {
+      console.error('Failed to adjust pickup time:', error);
+      toast.error('Nie udało się zaktualizować czasu odbioru.');
+      throw error;
     }
   },
 }));

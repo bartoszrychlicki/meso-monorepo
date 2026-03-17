@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OrderChannel, OrderStatus, PaymentStatus } from '@/types/enums';
+import { OrderChannel, OrderSource, OrderStatus, PaymentStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
 import type { PosbistroOrderIntegration } from '../types';
 import {
@@ -17,7 +17,7 @@ function createOrder(overrides: Partial<Order> = {}): Order {
     order_number: 'WEB-20260310-001',
     status: OrderStatus.CONFIRMED,
     channel: OrderChannel.DELIVERY_APP,
-    source: 'delivery',
+    source: OrderSource.DELIVERY,
     location_id: 'location-1',
     customer_name: 'Jan Kowalski',
     customer_phone: '+48123456789',
@@ -76,6 +76,13 @@ function createIntegration(
     updated_at: '2026-03-10T10:00:00.000Z',
     ...overrides,
   };
+}
+
+function requireIntegration(
+  integration: PosbistroOrderIntegration | null
+): PosbistroOrderIntegration {
+  expect(integration).not.toBeNull();
+  return integration as PosbistroOrderIntegration;
 }
 
 describe('submitPosbistroOrder', () => {
@@ -140,14 +147,14 @@ describe('submitPosbistroOrder', () => {
       },
     });
 
-    const result = await submitPosbistroOrder(createOrder(), {
+    const result = requireIntegration(await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
       mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
       randomUUID: () => 'token-1',
-    });
+    }));
 
     expect(integrationRepo.create).toHaveBeenCalledTimes(1);
     expect(client.submitOrder).toHaveBeenCalledTimes(1);
@@ -160,14 +167,14 @@ describe('submitPosbistroOrder', () => {
       createIntegration({ status: 'submitted', posbistro_order_id: 'pb-100' }),
     ]);
 
-    const result = await submitPosbistroOrder(createOrder(), {
+    const result = requireIntegration(await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
       mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
       randomUUID: () => 'token-1',
-    });
+    }));
 
     expect(client.submitOrder).not.toHaveBeenCalled();
     expect(result.status).toBe('submitted');
@@ -188,14 +195,14 @@ describe('submitPosbistroOrder', () => {
       );
     client.submitOrder.mockRejectedValue(new Error('timeout'));
 
-    const result = await submitPosbistroOrder(createOrder(), {
+    const result = requireIntegration(await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
       mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
       randomUUID: () => 'token-1',
-    });
+    }));
 
     expect(result.status).toBe('failed');
     expect(result.next_retry_at).toBe('2026-03-10T10:00:30.000Z');
@@ -229,14 +236,14 @@ describe('submitPosbistroOrder', () => {
       })
     );
 
-    const result = await submitPosbistroOrder(createOrder(), {
+    const result = requireIntegration(await submitPosbistroOrder(createOrder(), {
       integrationRepo: integrationRepo as never,
       mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
       randomUUID: () => 'token-1',
-    });
+    }));
 
     expect(result.status).toBe('failed');
     expect(result.response_payload).toEqual(
@@ -269,14 +276,14 @@ describe('submitPosbistroOrder', () => {
       total_pages: 0,
     });
 
-    const result = await submitPosbistroOrder(createOrder({ items: [{ ...createOrder().items[0], variant_id: undefined }] }), {
+    const result = requireIntegration(await submitPosbistroOrder(createOrder({ items: [{ ...createOrder().items[0], variant_id: undefined }] }), {
       integrationRepo: integrationRepo as never,
       mappingRepo: mappingRepo as never,
       client: client as never,
       confirmBaseUrl: 'https://pos.mesofood.pl/api/integrations/posbistro/confirm',
       now: () => new Date('2026-03-10T10:00:00.000Z'),
       randomUUID: () => 'token-1',
-    });
+    }));
 
     expect(client.submitOrder).not.toHaveBeenCalled();
     expect(result.status).toBe('failed');
@@ -416,10 +423,11 @@ describe('customer upsert helpers', () => {
     const result = await ensureCustomerForOrderDraft(
       {
         channel: OrderChannel.DELIVERY_APP,
-        source: 'delivery',
+        source: OrderSource.DELIVERY,
         location_id: 'location-1',
         customer_phone: '+48123456789',
         customer_name: 'Jan Kowalski',
+        discount: 0,
         items: [
           {
             product_id: 'product-1',
