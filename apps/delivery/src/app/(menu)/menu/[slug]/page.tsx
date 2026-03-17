@@ -18,7 +18,7 @@ async function getProduct(slug: string) {
     `)
     .eq('slug', slug)
     .eq('is_active', true)
-    .eq('is_available', true)
+    .eq('is_hidden_in_menu', false)
     .single()
 
   if (productError || !product) {

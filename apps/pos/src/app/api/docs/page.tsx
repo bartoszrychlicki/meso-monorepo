@@ -380,6 +380,9 @@ export default function ApiDocsPage() {
                 { name: 'category_id', type: 'string', desc: 'Filtruj po kategorii (UUID)' },
                 { name: 'search', type: 'string', desc: 'Szukaj po nazwie produktu' },
                 { name: 'is_available', type: 'boolean', desc: 'Filtruj po dostępności (true/false)' },
+                { name: 'is_hidden_in_menu', type: 'boolean', desc: 'Filtruj po ukryciu w Delivery (true/false)' },
+                { name: 'channel', type: 'string', desc: 'Filtruj produkty z ceną dla kanału: delivery | pickup | dine_in' },
+                { name: 'updated_since', type: 'string', desc: 'Zwróć produkty zmienione po wskazanej dacie ISO' },
                 { name: 'include', type: 'string', desc: 'Lista pól po przecinku: modifiers,variants,pricing' },
               ]}
               response={`{
@@ -395,6 +398,7 @@ export default function ApiDocsPage() {
       "price": 29.90,
       "tax_rate": 8,
       "is_available": true,
+      "is_hidden_in_menu": false,
       "allergens": ["gluten", "eggs", "milk"],
       "variants": [...],
       "modifier_groups": [...], // wynik pochodzi z relacyjnego read modelu
@@ -423,6 +427,7 @@ export default function ApiDocsPage() {
   "price": 29.90,
   "tax_rate": 8,
   "is_available": true,
+  "is_hidden_in_menu": false,
   "is_featured": false,
   "allergens": ["gluten", "eggs"],
   "pricing": [
@@ -472,6 +477,7 @@ export default function ApiDocsPage() {
   "name": "Burger Classic v2",
   "price": 31.90,
   "is_available": false,
+  "is_hidden_in_menu": true,
   "modifier_group_ids": ["uuid-grupy-dodatki"]
 }`}
             />

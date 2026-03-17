@@ -32,6 +32,7 @@ export function ProductCard({
   const promotionPricing = getProductPromotionPricing(product);
   const basePrice = promotionPricing.currentPrice;
   const baseOriginalPrice = promotionPricing.originalPrice;
+  const isHiddenInMenu = product.is_hidden_in_menu === true;
 
   const mainImage = product.images?.length > 0 ? product.images[0] : null;
   const hasRealImage = mainImage && !imgError;
@@ -57,7 +58,8 @@ export function ProductCard({
     <div
       className={cn(
         'group relative flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-all hover:shadow-md hover:-translate-y-0.5',
-        !product.is_available && 'opacity-60'
+        !product.is_available && 'opacity-60',
+        isHiddenInMenu && 'ring-1 ring-amber-300'
       )}
       data-component="product-card"
       data-id={product.id}
@@ -112,6 +114,11 @@ export function ProductCard({
               {promotionPricing.promoLabel || 'Promocja'}
             </Badge>
           )}
+          {isHiddenInMenu && (
+            <Badge className="bg-amber-500/90 text-white shadow-sm hover:bg-amber-500/90">
+              Ukryty
+            </Badge>
+          )}
         </div>
 
         {/* Image count badge */}
@@ -153,6 +160,12 @@ export function ProductCard({
         {product.description && (
           <p className="mb-2 line-clamp-2 text-xs text-muted-foreground leading-relaxed">
             {product.description}
+          </p>
+        )}
+
+        {isHiddenInMenu && (
+          <p className="mb-2 text-xs font-medium text-amber-700">
+            Ukryty w menu Delivery
           </p>
         )}
 

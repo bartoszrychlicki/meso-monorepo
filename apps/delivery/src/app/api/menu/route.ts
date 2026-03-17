@@ -29,6 +29,8 @@ export async function GET() {
       promo_label,
       image_url,
       images,
+      is_available,
+      is_hidden_in_menu,
       is_vegetarian,
       is_vegan,
       is_bestseller,
@@ -42,7 +44,7 @@ export async function GET() {
       modifier_groups
     `)
     .eq('is_active', true)
-    .eq('is_available', true)
+    .eq('is_hidden_in_menu', false)
     .order('sort_order')
 
   if (prodError) {

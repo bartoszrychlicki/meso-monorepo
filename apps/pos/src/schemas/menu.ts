@@ -29,7 +29,7 @@ export const MenuModifierSchema = z.object({
 
 export type CreateMenuModifierInput = z.infer<typeof MenuModifierSchema>;
 
-const ModifierGroupSchema = z.object({
+const _ModifierGroupSchema = z.object({
   name: z.string().min(1, 'Nazwa grupy jest wymagana'),
   type: z.nativeEnum(ModifierType),
   required: z.boolean().default(false),
@@ -99,6 +99,7 @@ const ProductBaseSchema = z.object({
   image_url: z.string().optional(), // @deprecated - use images[]
   images: z.array(ProductImageSchema).max(3, 'Maksymalnie 3 zdjęcia').default([]),
   is_available: z.boolean().default(true),
+  is_hidden_in_menu: z.boolean().default(false),
   is_featured: z.boolean().default(false),
   allergens: z.array(z.nativeEnum(Allergen)).default([]),
   nutritional_info: NutritionalInfoSchema.optional(),
