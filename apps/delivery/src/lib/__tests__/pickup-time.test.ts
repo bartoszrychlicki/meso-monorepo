@@ -42,9 +42,9 @@ describe('pickup-time helpers', () => {
   it('formats same-day pickup time as hour and minute', () => {
     expect(
       formatCustomerPickupTime(
-        '2026-03-17T12:45:00.000Z',
-        new Date('2026-03-17T09:00:00.000Z')
+        '2026-03-17T12:45:00.000',
+        new Date('2026-03-17T09:00:00.000')
       )
-    ).toBe('13:45');
+    ).toBe('12:45');
   });
 });
