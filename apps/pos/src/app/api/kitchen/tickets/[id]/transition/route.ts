@@ -134,6 +134,18 @@ async function enrichKitchenTicket(ticket: KitchenTicket): Promise<KitchenTicket
   }
 }
 
+function buildAdjustedPickupResponseTicket(
+  ticket: KitchenTicket,
+  order: Pick<Order, 'scheduled_time' | 'estimated_ready_at' | 'delivery_type'>
+): KitchenTicket {
+  return {
+    ...ticket,
+    scheduled_time: order.scheduled_time ?? ticket.scheduled_time,
+    estimated_ready_at: order.estimated_ready_at ?? ticket.estimated_ready_at,
+    delivery_type: order.delivery_type ?? ticket.delivery_type,
+  };
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const body = (await request.json()) as TransitionBody;
@@ -249,7 +261,23 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         }
       }
 
-      return NextResponse.json({ ticket: await enrichKitchenTicket(currentTicket) });
+      let latestTicket: KitchenTicket | null = null;
+
+      try {
+        latestTicket = await kitchenRepo.findById(id);
+      } catch (error) {
+        console.warn(
+          `[KDS transition] Pickup time adjusted for ticket ${id}, but ticket reload was skipped:`,
+          error
+        );
+      }
+
+      const responseTicket = buildAdjustedPickupResponseTicket(
+        latestTicket ?? currentTicket,
+        updatedOrder
+      );
+
+      return NextResponse.json({ ticket: await enrichKitchenTicket(responseTicket) });
     }
 
     const normalizedCancellation = body.action === 'cancel_order'

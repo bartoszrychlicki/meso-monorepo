@@ -87,6 +87,7 @@ function makeParams(id = 'ticket-1') {
 describe('POST /api/kitchen/tickets/:id/transition', () => {
   const orderId = '11111111-1111-4111-8111-111111111111';
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
   const baseOrder = {
     id: orderId,
     order_number: 'WEB-20260301-001',
@@ -147,6 +148,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
     mockKitchenRepo.findById.mockResolvedValue(baseTicket);
     mockKitchenRepo.update.mockResolvedValue({
@@ -179,6 +181,7 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
     vi.useRealTimers();
   });
 
@@ -473,6 +476,146 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
       }),
       '2026-03-01T11:30:00.000Z',
       newPickupTime
+    );
+  });
+
+  it('returns the latest ticket state after adjusting pickup time', async () => {
+    const newPickupTime = '2026-03-01T11:50:00.000Z';
+
+    mockKitchenRepo.findById
+      .mockResolvedValueOnce(baseTicket)
+      .mockResolvedValueOnce({
+        ...baseTicket,
+        status: OrderStatus.PREPARING,
+        started_at: '2026-03-01T10:04:00.000Z',
+      });
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockResolvedValueOnce({
+        ...baseOrder,
+        estimated_ready_at: newPickupTime,
+        metadata: {
+          pickup_time_adjustments: [
+            {
+              previous_time: '2026-03-01T11:30:00.000Z',
+              new_time: newPickupTime,
+              changed_at: '2026-03-01T10:05:00.000Z',
+              source: 'kds',
+            },
+          ],
+        },
+      });
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      estimated_ready_at: newPickupTime,
+      metadata: {
+        pickup_time_adjustments: [
+          {
+            previous_time: '2026-03-01T11:30:00.000Z',
+            new_time: newPickupTime,
+            changed_at: '2026-03-01T10:05:00.000Z',
+            source: 'kds',
+          },
+        ],
+      },
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: newPickupTime }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.status).toBe(OrderStatus.PREPARING);
+    expect(body.ticket.started_at).toBe('2026-03-01T10:04:00.000Z');
+    expect(body.ticket.estimated_ready_at).toBe(newPickupTime);
+  });
+
+  it('returns the adjusted pickup time even when linked order enrichment fails', async () => {
+    const newPickupTime = '2026-03-01T11:50:00.000Z';
+
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockRejectedValueOnce(new Error('temporary orders lookup failure'));
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      estimated_ready_at: newPickupTime,
+      metadata: {
+        pickup_time_adjustments: [
+          {
+            previous_time: '2026-03-01T11:30:00.000Z',
+            new_time: newPickupTime,
+            changed_at: '2026-03-01T10:05:00.000Z',
+            source: 'kds',
+          },
+        ],
+      },
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: newPickupTime }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.estimated_ready_at).toBe(newPickupTime);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[KDS transition] Ticket ticket-1 updated, but linked order enrichment was skipped:',
+      expect.any(Error)
+    );
+  });
+
+  it('falls back to the current ticket when ticket reload fails after pickup adjustment', async () => {
+    const newPickupTime = '2026-03-01T11:50:00.000Z';
+
+    mockKitchenRepo.findById
+      .mockResolvedValueOnce(baseTicket)
+      .mockRejectedValueOnce(new Error('temporary ticket lookup failure'));
+    mockOrdersRepo.findById
+      .mockResolvedValueOnce(baseOrder)
+      .mockResolvedValueOnce({
+        ...baseOrder,
+        estimated_ready_at: newPickupTime,
+        metadata: {
+          pickup_time_adjustments: [
+            {
+              previous_time: '2026-03-01T11:30:00.000Z',
+              new_time: newPickupTime,
+              changed_at: '2026-03-01T10:05:00.000Z',
+              source: 'kds',
+            },
+          ],
+        },
+      });
+    mockOrdersRepo.update.mockResolvedValueOnce({
+      ...baseOrder,
+      estimated_ready_at: newPickupTime,
+      metadata: {
+        pickup_time_adjustments: [
+          {
+            previous_time: '2026-03-01T11:30:00.000Z',
+            new_time: newPickupTime,
+            changed_at: '2026-03-01T10:05:00.000Z',
+            source: 'kds',
+          },
+        ],
+      },
+    });
+
+    const response = await POST(
+      makeRequest({ action: 'adjust_pickup_time', pickupTime: newPickupTime }),
+      makeParams('ticket-1')
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.ticket.status).toBe(OrderStatus.PENDING);
+    expect(body.ticket.estimated_ready_at).toBe(newPickupTime);
+    expect(consoleWarnSpy).toHaveBeenCalledWith(
+      '[KDS transition] Pickup time adjusted for ticket ticket-1, but ticket reload was skipped:',
+      expect.any(Error)
     );
   });
 
