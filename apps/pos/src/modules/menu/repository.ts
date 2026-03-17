@@ -141,6 +141,14 @@ export async function toggleAvailability(productId: string): Promise<Product> {
   return productsRepository.update(productId, { is_available: !product.is_available });
 }
 
+export async function toggleMenuVisibility(productId: string): Promise<Product> {
+  const product = await productsRepository.findById(productId);
+  if (!product) throw new Error(`Product ${productId} not found`);
+  return productsRepository.update(productId, {
+    is_hidden_in_menu: !(product.is_hidden_in_menu === true),
+  });
+}
+
 /** Get modifier IDs for a product (ordered by per-product sort_order) */
 export async function getProductModifierIds(productId: string): Promise<string[]> {
   const modifiers = await getProductModifiers(productId);

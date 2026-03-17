@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Product } from '@/types/menu';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
-import { Clock, Star, Eye, EyeOff, ImageIcon } from 'lucide-react';
+import { Clock, Star, Eye, EyeOff, ImageIcon, ShoppingCart } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AllergenBadges } from './allergen-badges';
@@ -17,6 +17,7 @@ interface ProductCardProps {
   categoryName?: string;
   foodCost?: { totalCost: number; costPercentage: number } | null;
   onToggleAvailability: (id: string) => void;
+  onToggleMenuVisibility: (id: string) => void;
   onClick: (id: string) => void;
 }
 
@@ -25,6 +26,7 @@ export function ProductCard({
   categoryName,
   foodCost,
   onToggleAvailability,
+  onToggleMenuVisibility,
   onClick,
 }: ProductCardProps) {
   const hasVariants = product.variants.length > 0;
@@ -208,22 +210,42 @@ export function ProductCard({
             )}
           </div>
 
-          <div
-            className="flex items-center gap-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {product.is_available ? (
-              <Eye className="h-3.5 w-3.5 text-green-500" />
-            ) : (
-              <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
-            )}
-            <Switch
-              checked={product.is_available}
-              onCheckedChange={() => onToggleAvailability(product.id)}
-              size="sm"
-              data-action="toggle-availability"
-              data-id={product.id}
-            />
+          <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <ShoppingCart
+                  className={cn(
+                    'h-3.5 w-3.5',
+                    product.is_available ? 'text-green-500' : 'text-muted-foreground'
+                  )}
+                />
+                <span>Dostepny</span>
+              </div>
+              <Switch
+                checked={product.is_available}
+                onCheckedChange={() => onToggleAvailability(product.id)}
+                size="sm"
+                data-action="toggle-availability"
+                data-id={product.id}
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                {isHiddenInMenu ? (
+                  <EyeOff className="h-3.5 w-3.5 text-amber-600" />
+                ) : (
+                  <Eye className="h-3.5 w-3.5 text-green-500" />
+                )}
+                <span>W menu</span>
+              </div>
+              <Switch
+                checked={!isHiddenInMenu}
+                onCheckedChange={() => onToggleMenuVisibility(product.id)}
+                size="sm"
+                data-action="toggle-menu-visibility"
+                data-id={product.id}
+              />
+            </div>
           </div>
         </div>
       </div>

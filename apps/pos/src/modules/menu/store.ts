@@ -15,6 +15,7 @@ import {
   modifierGroupsRepository,
   modifiersRepository,
   toggleAvailability,
+  toggleMenuVisibility,
   createProductWithFoodCost,
   updateProductWithFoodCost,
   listModifierGroups,
@@ -37,6 +38,7 @@ interface MenuStore {
   updateProduct: (id: string, data: Partial<ProductWriteInput>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   toggleProductAvailability: (id: string) => Promise<void>;
+  toggleProductMenuVisibility: (id: string) => Promise<void>;
   createCategory: (data: Omit<Category, 'id' | 'created_at' | 'updated_at'>) => Promise<Category>;
   updateCategory: (id: string, data: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
@@ -110,6 +112,13 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
 
   toggleProductAvailability: async (id) => {
     const updated = await toggleAvailability(id);
+    set((state) => ({
+      products: state.products.map((p) => (p.id === id ? updated : p)),
+    }));
+  },
+
+  toggleProductMenuVisibility: async (id) => {
+    const updated = await toggleMenuVisibility(id);
     set((state) => ({
       products: state.products.map((p) => (p.id === id ? updated : p)),
     }));

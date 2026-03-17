@@ -32,6 +32,7 @@ export default function MenuPage() {
     setSelectedCategory,
     setSearchQuery,
     toggleProductAvailability,
+    toggleProductMenuVisibility,
     createCategory,
     updateCategory,
     deleteCategory,
@@ -177,6 +178,7 @@ export default function MenuPage() {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onToggleAvailability={toggleProductAvailability}
+            onToggleMenuVisibility={toggleProductMenuVisibility}
             onProductClick={(id) => router.push(`/menu/${id}`)}
             isLoading={isLoading}
           />

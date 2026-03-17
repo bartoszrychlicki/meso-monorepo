@@ -20,6 +20,7 @@ interface MenuGridProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onToggleAvailability: (id: string) => void;
+  onToggleMenuVisibility: (id: string) => void;
   onProductClick: (id: string) => void;
   isLoading: boolean;
 }
@@ -32,6 +33,7 @@ export function MenuGrid({
   searchQuery,
   onSearchChange,
   onToggleAvailability,
+  onToggleMenuVisibility,
   onProductClick,
   isLoading,
 }: MenuGridProps) {
@@ -120,6 +122,7 @@ export function MenuGrid({
               categoryName={categoryMap.get(product.category_id)}
               foodCost={foodCostMap.get(product.id) ?? null}
               onToggleAvailability={onToggleAvailability}
+              onToggleMenuVisibility={onToggleMenuVisibility}
               onClick={onProductClick}
             />
           ))}
