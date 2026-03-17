@@ -177,20 +177,20 @@ export function ProductCard({
         </div>
 
         {/* Bottom section */}
-        <div className="mt-auto flex items-center justify-between pt-2 border-t">
-          <div>
+        <div className="mt-auto space-y-2 border-t pt-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-sm font-bold text-foreground" data-field="price">
               {priceDisplay}
             </span>
             {!hasVariants && baseOriginalPrice != null && (
-              <span className="ml-2 text-xs text-muted-foreground line-through">
+              <span className="text-xs text-muted-foreground line-through">
                 {formatCurrency(baseOriginalPrice)}
               </span>
             )}
             {foodCost && foodCost.totalCost > 0 && (
               <span
                 className={cn(
-                  'ml-2 text-sm font-semibold',
+                  'text-sm font-semibold',
                   foodCost.costPercentage < 25
                     ? 'text-green-600'
                     : foodCost.costPercentage < 35
@@ -203,15 +203,18 @@ export function ProductCard({
               </span>
             )}
             {product.preparation_time_minutes != null && product.preparation_time_minutes > 0 && (
-              <span className="ml-2 inline-flex items-center gap-0.5 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 {product.preparation_time_minutes} min
               </span>
             )}
           </div>
 
-          <div className="space-y-1.5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-end gap-2">
+          <div
+            className="flex items-center justify-end gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 <ShoppingCart
                   className={cn(
@@ -229,7 +232,7 @@ export function ProductCard({
                 data-id={product.id}
               />
             </div>
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center gap-2">
               <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                 {isHiddenInMenu ? (
                   <EyeOff className="h-3.5 w-3.5 text-amber-600" />
