@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { PickupTimeAdjustDialog } from '../pickup-time-adjust-dialog';
@@ -63,5 +63,38 @@ describe('PickupTimeAdjustDialog', () => {
 
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('submits pickup time adjustment only once while the request is pending', async () => {
+    const user = userEvent.setup();
+    let resolveConfirm: (() => void) | null = null;
+    const onConfirm = vi.fn().mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveConfirm = resolve;
+        })
+    );
+
+    render(
+      <PickupTimeAdjustDialog
+        open
+        onOpenChange={vi.fn()}
+        currentPickupTime="2026-03-17T12:30:00.000Z"
+        onConfirm={onConfirm}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: '+10 min' }));
+    const confirmButton = screen.getByRole('button', { name: 'Zapisz' });
+
+    await user.click(confirmButton);
+    await user.click(confirmButton);
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(confirmButton).toBeDisabled();
+
+    await act(async () => {
+      resolveConfirm?.();
+    });
   });
 });
