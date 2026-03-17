@@ -29,6 +29,10 @@ export interface OrderConfirmation {
   paymentStatus: string
   orderStatus: string
   estimatedTime: string
+  scheduledTime?: string | null
+  estimatedReadyAt?: string | null
+  previousPickupTime?: string | null
+  pickupTimeAdjusted?: boolean
   createdAt: string
   loyaltyPointsEarned?: number
 }

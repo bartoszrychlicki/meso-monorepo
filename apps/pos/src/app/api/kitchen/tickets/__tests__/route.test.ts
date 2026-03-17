@@ -80,6 +80,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'cash',
         payment_status: 'pending',
         scheduled_time: '2026-03-12T12:30:00.000Z',
+        estimated_ready_at: '2026-03-12T12:40:00.000Z',
         delivery_type: 'pickup',
       },
       {
@@ -89,6 +90,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'online',
         payment_status: 'pending',
         scheduled_time: null,
+        estimated_ready_at: null,
         delivery_type: 'delivery',
       },
       {
@@ -98,6 +100,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'blik',
         payment_status: 'pending',
         scheduled_time: null,
+        estimated_ready_at: null,
         delivery_type: 'delivery',
       },
       {
@@ -107,6 +110,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'blik',
         payment_status: 'pending',
         scheduled_time: null,
+        estimated_ready_at: null,
         delivery_type: 'pickup',
       },
       {
@@ -116,6 +120,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'pay_on_pickup',
         payment_status: 'pay_on_pickup',
         scheduled_time: '2026-03-12T13:00:00.000Z',
+        estimated_ready_at: null,
         delivery_type: 'pickup',
       },
       {
@@ -125,6 +130,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'online',
         payment_status: 'paid',
         scheduled_time: null,
+        estimated_ready_at: null,
         delivery_type: 'delivery',
       },
     ]);
@@ -144,6 +150,7 @@ describe('GET /api/kitchen/tickets', () => {
     expect(body.tickets[0]).toMatchObject({
       id: 'ticket-active',
       scheduled_time: '2026-03-12T12:30:00.000Z',
+      estimated_ready_at: '2026-03-12T12:40:00.000Z',
       delivery_type: 'pickup',
     });
   });
@@ -183,6 +190,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'cash',
         payment_status: 'pending',
         scheduled_time: null,
+        estimated_ready_at: null,
         delivery_type: 'pickup',
       },
       {
@@ -192,6 +200,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'online',
         payment_status: 'paid',
         scheduled_time: null,
+        estimated_ready_at: null,
         delivery_type: 'delivery',
       },
       {
@@ -201,6 +210,7 @@ describe('GET /api/kitchen/tickets', () => {
         payment_method: 'online',
         payment_status: 'failed',
         scheduled_time: null,
+        estimated_ready_at: null,
         delivery_type: 'delivery',
       },
     ]);

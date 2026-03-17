@@ -87,6 +87,22 @@ describe('KdsCard', () => {
     ).toBeInTheDocument();
   });
 
+  it('prefers adjusted pickup time over the original scheduled time', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-03T12:00:00'));
+
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          estimated_ready_at: '2026-03-04T19:05:00.000Z',
+        }}
+      />
+    );
+
+    expect(screen.getByText('Odbior: jutro, 20:05')).toBeInTheDocument();
+    expect(screen.queryByText('Odbior: jutro, 18:45')).not.toBeInTheDocument();
+  });
   it('does not render modifiers row when modifiers list is empty', () => {
     const ticketWithoutModifiers: KitchenTicket = {
       ...ticketWithVariantAndModifiers,
@@ -165,6 +181,12 @@ describe('KdsCard', () => {
     expect(screen.getByText('Anuluj')).toBeInTheDocument();
   });
 
+  it('shows pickup time adjustment action for pending pickup tickets', () => {
+    render(<KdsCard ticket={ticketWithVariantAndModifiers} />);
+
+    expect(screen.getByText('Skoryguj odbiór')).toBeInTheDocument();
+  });
+
   it('hides cancel action after preparation starts', () => {
     render(
       <KdsCard
@@ -177,6 +199,20 @@ describe('KdsCard', () => {
     );
 
     expect(screen.queryByText('Anuluj')).not.toBeInTheDocument();
+  });
+
+  it('hides pickup time adjustment action for ready tickets', () => {
+    render(
+      <KdsCard
+        ticket={{
+          ...ticketWithVariantAndModifiers,
+          id: 'ticket-ready',
+          status: OrderStatus.READY,
+        }}
+      />
+    );
+
+    expect(screen.queryByText('Skoryguj odbiór')).not.toBeInTheDocument();
   });
 
   it('shows refund prompt in cancel dialog for paid online orders', async () => {
@@ -206,7 +242,7 @@ describe('KdsCard', () => {
                 ],
               },
             },
-          },
+          } as never,
         }}
       />
     );

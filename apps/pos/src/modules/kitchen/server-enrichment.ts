@@ -4,7 +4,16 @@ import type { Order } from '@/types/order';
 
 export type KitchenLinkedOrder = Pick<
   Order,
-  'id' | 'status' | 'channel' | 'payment_method' | 'payment_status' | 'total' | 'metadata' | 'scheduled_time' | 'delivery_type'
+  | 'id'
+  | 'status'
+  | 'channel'
+  | 'payment_method'
+  | 'payment_status'
+  | 'total'
+  | 'metadata'
+  | 'scheduled_time'
+  | 'estimated_ready_at'
+  | 'delivery_type'
 >;
 
 export function mergeKitchenTicketWithLinkedOrder(
@@ -18,6 +27,7 @@ export function mergeKitchenTicketWithLinkedOrder(
   return {
     ...ticket,
     scheduled_time: linkedOrder.scheduled_time,
+    estimated_ready_at: linkedOrder.estimated_ready_at,
     delivery_type: linkedOrder.delivery_type,
   };
 }
@@ -57,6 +67,7 @@ export async function loadKitchenLinkedOrder(
     total: order.total,
     metadata: order.metadata,
     scheduled_time: order.scheduled_time,
+    estimated_ready_at: order.estimated_ready_at,
     delivery_type: order.delivery_type,
   };
 }
