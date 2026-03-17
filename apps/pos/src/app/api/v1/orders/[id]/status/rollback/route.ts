@@ -52,12 +52,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
+    const changedBy: string | undefined = auth.authType === 'api_key'
+      ? (validation.data.changed_by ?? auth.changedBy ?? undefined)
+      : auth.changedBy ?? undefined;
+
     const updated = await rollbackOrderStatus({
       orderId: id,
       note: validation.data.note,
-      changed_by: auth.authType === 'api_key'
-        ? (validation.data.changed_by || auth.changedBy)
-        : auth.changedBy,
+      changed_by: changedBy,
     });
 
     return apiSuccess(updated);

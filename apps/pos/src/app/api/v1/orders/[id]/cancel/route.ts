@@ -50,15 +50,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
+    const changedBy: string | undefined = auth.authType === 'api_key'
+      ? (validation.data.changed_by ?? auth.changedBy ?? undefined)
+      : auth.changedBy ?? undefined;
+
     const result = await cancelOrderWithOptionalRefund({
       orderId: id,
       closure_reason_code: validation.data.closure_reason_code,
       closure_reason: validation.data.closure_reason,
       request_refund: validation.data.request_refund,
       requested_from: validation.data.requested_from,
-      changed_by: auth.authType === 'api_key'
-        ? (validation.data.changed_by || auth.changedBy)
-        : auth.changedBy,
+      changed_by: changedBy,
       requestOrigin: request.nextUrl.origin,
     });
 

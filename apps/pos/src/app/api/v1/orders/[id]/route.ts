@@ -6,8 +6,6 @@ import {
   apiNotFound,
   apiValidationError,
   apiError,
-  apiForbidden,
-  apiUnauthorized,
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
 import {
@@ -127,14 +125,21 @@ function buildEditRollbackNote(itemsChanged: boolean, notesChanged: boolean): st
 
 async function authorizeOrderWrite(
   request: NextRequest
-): Promise<MutationActor | ReturnType<typeof apiForbidden | typeof apiUnauthorized>> {
+): Promise<MutationActor | Response> {
   const access = await authorizeOrderRoute(request, 'orders:write');
   if ('status' in access) {
     return access;
   }
 
+  if (access.kind === 'api_key') {
+    return {
+      authType: 'api_key',
+      actorId: access.actorId,
+    };
+  }
+
   return {
-    authType: access.kind,
+    authType: 'session',
     actorId: access.actorId,
   };
 }
