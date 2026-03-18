@@ -10,8 +10,10 @@ import {
   toggleAvailability,
   createProductWithFoodCost,
   updateProductWithFoodCost,
+  reorderProductsInCategory,
 } from './repository';
 import { deleteAllProductImages } from '@/lib/supabase/storage';
+import { applyCategoryReorder, sortProductsForMenu } from './utils/sort-order';
 
 interface MenuStore {
   products: Product[];
@@ -28,6 +30,7 @@ interface MenuStore {
   updateProduct: (id: string, data: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   toggleProductAvailability: (id: string) => Promise<void>;
+  reorderProducts: (categoryId: string, productIds: string[]) => Promise<void>;
   createCategory: (data: Omit<Category, 'id' | 'created_at' | 'updated_at'>) => Promise<Category>;
   updateCategory: (id: string, data: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
@@ -62,9 +65,12 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
         modifierGroupsRepository.findAll({ per_page: 100 }),
         modifiersRepository.findAll({ per_page: 200 }),
       ]);
+      const sortedCategories = [...categoriesResult.data].sort(
+        (left, right) => left.sort_order - right.sort_order
+      );
       set({
-        products: productsResult.data,
-        categories: categoriesResult.data,
+        products: sortProductsForMenu(productsResult.data, sortedCategories),
+        categories: sortedCategories,
         modifierGroups: modifierGroupsResult.data,
         modifiers: modifiersResult.data,
         isLoading: false,
@@ -77,14 +83,19 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
 
   createProduct: async (data) => {
     const product = await createProductWithFoodCost(data);
-    set((state) => ({ products: [...state.products, product] }));
+    set((state) => ({
+      products: sortProductsForMenu([...state.products, product], state.categories),
+    }));
     return product;
   },
 
   updateProduct: async (id, data) => {
     const updated = await updateProductWithFoodCost(id, data);
     set((state) => ({
-      products: state.products.map((p) => (p.id === id ? updated : p)),
+      products: sortProductsForMenu(
+        state.products.map((p) => (p.id === id ? updated : p)),
+        state.categories
+      ),
     }));
   },
 
@@ -99,21 +110,56 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
   toggleProductAvailability: async (id) => {
     const updated = await toggleAvailability(id);
     set((state) => ({
-      products: state.products.map((p) => (p.id === id ? updated : p)),
+      products: sortProductsForMenu(
+        state.products.map((p) => (p.id === id ? updated : p)),
+        state.categories
+      ),
     }));
+  },
+
+  reorderProducts: async (categoryId, productIds) => {
+    const previousProducts = get().products;
+    const optimisticProducts = sortProductsForMenu(
+      applyCategoryReorder(previousProducts, categoryId, productIds),
+      get().categories
+    );
+
+    set({ products: optimisticProducts });
+
+    try {
+      await reorderProductsInCategory(categoryId, productIds);
+    } catch (error) {
+      set({ products: previousProducts });
+      throw error;
+    }
   },
 
   createCategory: async (data) => {
     const category = await categoriesRepository.create(data);
-    set((state) => ({ categories: [...state.categories, category] }));
+    set((state) => {
+      const categories = [...state.categories, category].sort(
+        (left, right) => left.sort_order - right.sort_order
+      );
+      return {
+        categories,
+        products: sortProductsForMenu(state.products, categories),
+      };
+    });
     return category;
   },
 
   updateCategory: async (id, data) => {
     const updated = await categoriesRepository.update(id, data);
-    set((state) => ({
-      categories: state.categories.map((c) => (c.id === id ? updated : c)),
-    }));
+    set((state) => {
+      const categories = state.categories
+        .map((c) => (c.id === id ? updated : c))
+        .sort((left, right) => left.sort_order - right.sort_order);
+
+      return {
+        categories,
+        products: sortProductsForMenu(state.products, categories),
+      };
+    });
   },
 
   deleteCategory: async (id) => {

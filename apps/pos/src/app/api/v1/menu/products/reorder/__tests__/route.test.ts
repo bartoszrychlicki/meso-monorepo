@@ -1,0 +1,105 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+
+vi.mock('@/lib/api/auth', () => ({
+  authorizeRequest: vi.fn(),
+  isApiKey: vi.fn(),
+}));
+
+const mockRpc = vi.fn();
+const mockEq = vi.fn();
+const mockSelect = vi.fn();
+const mockFrom = vi.fn(() => ({
+  select: mockSelect,
+}));
+
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: () => ({
+    from: mockFrom,
+    rpc: mockRpc,
+  }),
+}));
+
+import { authorizeRequest, isApiKey } from '@/lib/api/auth';
+import { POST } from '../route';
+
+const mockAuthorizeRequest = authorizeRequest as ReturnType<typeof vi.fn>;
+const mockIsApiKey = isApiKey as unknown as ReturnType<typeof vi.fn>;
+
+const categoryId = '11111111-1111-4111-8111-111111111111';
+const productIds = [
+  '22222222-2222-4222-8222-222222222222',
+  '33333333-3333-4333-8333-333333333333',
+];
+
+function makeRequest(body: unknown) {
+  return new NextRequest('http://localhost:3000/api/v1/menu/products/reorder', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+}
+
+describe('POST /api/v1/menu/products/reorder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuthorizeRequest.mockResolvedValue({ id: 'key-1', permissions: ['menu:write'] });
+    mockIsApiKey.mockReturnValue(true);
+    mockSelect.mockReturnValue({ eq: mockEq });
+    mockEq.mockResolvedValue({
+      data: productIds.map((id) => ({ id, category_id: categoryId })),
+      error: null,
+    });
+    mockRpc.mockResolvedValue({ error: null });
+  });
+
+  it('reorders a full category payload', async () => {
+    const response = await POST(makeRequest({
+      category_id: categoryId,
+      product_ids: [...productIds].reverse(),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(mockRpc).toHaveBeenCalledWith('reorder_menu_products', {
+      p_category_id: categoryId,
+      p_product_ids: [...productIds].reverse(),
+    });
+  });
+
+  it('rejects duplicate product ids', async () => {
+    const response = await POST(makeRequest({
+      category_id: categoryId,
+      product_ids: [productIds[0], productIds[0]],
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rejects incomplete category payloads', async () => {
+    const response = await POST(makeRequest({
+      category_id: categoryId,
+      product_ids: [productIds[0]],
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+
+  it('rejects products outside the category', async () => {
+    const response = await POST(makeRequest({
+      category_id: categoryId,
+      product_ids: [...productIds, '44444444-4444-4444-8444-444444444444'],
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
+});

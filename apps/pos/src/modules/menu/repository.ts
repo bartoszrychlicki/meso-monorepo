@@ -19,6 +19,31 @@ function roundFoodCostPercentage(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
+async function getNextSortOrderForCategory(
+  categoryId: string,
+  excludeProductId?: string
+): Promise<number> {
+  let query = supabase
+    .from('menu_products')
+    .select('sort_order')
+    .eq('category_id', categoryId);
+
+  if (excludeProductId) {
+    query = query.neq('id', excludeProductId);
+  }
+
+  const { data, error } = await query
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`getNextSortOrderForCategory failed: ${error.message}`);
+  }
+
+  const maxSortOrder = data?.sort_order ?? -1;
+  return maxSortOrder + 1;
+}
+
 export async function calculateProductFoodCostPercentage(
   recipeId: string | null | undefined,
   productPrice: number
@@ -42,6 +67,7 @@ export async function calculateProductFoodCostPercentage(
 export async function createProductWithFoodCost(
   data: Omit<Product, 'created_at' | 'updated_at'>
 ): Promise<Product> {
+  const nextSortOrder = await getNextSortOrderForCategory(data.category_id);
   const foodCostPercentage = await calculateProductFoodCostPercentage(
     data.recipe_id,
     data.price
@@ -49,6 +75,7 @@ export async function createProductWithFoodCost(
 
   return productsRepository.create({
     ...data,
+    sort_order: nextSortOrder,
     food_cost_percentage: foodCostPercentage,
   });
 }
@@ -65,14 +92,21 @@ export async function updateProductWithFoodCost(
   const nextPrice = data.price ?? existingProduct.price;
   const nextRecipeId =
     data.recipe_id === undefined ? existingProduct.recipe_id : data.recipe_id;
+  const nextCategoryId = data.category_id ?? existingProduct.category_id;
+  const shouldMoveToCategoryEnd = nextCategoryId !== existingProduct.category_id;
 
   const foodCostPercentage = await calculateProductFoodCostPercentage(
     nextRecipeId,
     nextPrice
   );
 
+  const nextSortOrder = shouldMoveToCategoryEnd
+    ? await getNextSortOrderForCategory(nextCategoryId, id)
+    : data.sort_order;
+
   return productsRepository.update(id, {
     ...data,
+    ...(nextSortOrder === undefined ? {} : { sort_order: nextSortOrder }),
     food_cost_percentage: foodCostPercentage,
   });
 }
@@ -98,6 +132,20 @@ export async function toggleAvailability(productId: string): Promise<Product> {
   const product = await productsRepository.findById(productId);
   if (!product) throw new Error(`Product ${productId} not found`);
   return productsRepository.update(productId, { is_available: !product.is_available });
+}
+
+export async function reorderProductsInCategory(
+  categoryId: string,
+  productIds: string[]
+): Promise<void> {
+  const { error } = await supabase.rpc('reorder_menu_products', {
+    p_category_id: categoryId,
+    p_product_ids: productIds,
+  });
+
+  if (error) {
+    throw new Error(`reorderProductsInCategory failed: ${error.message}`);
+  }
 }
 
 /** Get modifier IDs for a product (ordered by per-product sort_order) */

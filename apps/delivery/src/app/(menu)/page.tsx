@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Tables } from '@/lib/table-mapping'
 import { MenuClient } from './MenuClient'
 
-export const revalidate = 60
+export const dynamic = 'force-dynamic'
 
 async function getMenuData() {
   const supabase = await createClient()
