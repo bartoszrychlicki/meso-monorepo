@@ -14,9 +14,21 @@ interface PickupTimeAdjustedEmailData {
 const PICKUP_TIME_EMAIL_TIME_ZONE = 'Europe/Warsaw';
 
 function resolveTrackingUrl(orderId: string): string | undefined {
-  const appUrl = process.env.DELIVERY_APP_URL?.trim() || 'https://order.mesofood.pl';
+  const explicitUrl = process.env.DELIVERY_APP_URL?.trim();
+  if (explicitUrl) {
+    return `${explicitUrl.replace(/\/$/, '')}/order-confirmation?orderId=${orderId}`;
+  }
 
-  return appUrl ? `${appUrl}/order-confirmation?orderId=${orderId}` : undefined;
+  const vercelHost =
+    process.env.VERCEL_BRANCH_URL?.trim() || process.env.VERCEL_URL?.trim();
+  if (vercelHost) {
+    const normalizedHost = vercelHost
+      .replace(/^https?:\/\//, '')
+      .replace(/\/$/, '');
+    return `https://${normalizedHost}/order-confirmation?orderId=${orderId}`;
+  }
+
+  return `https://order.mesofood.pl/order-confirmation?orderId=${orderId}`;
 }
 
 function formatPickupDateTime(dateString: string): string {

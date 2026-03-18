@@ -81,4 +81,32 @@ describe('pickup-time-adjustment-email', () => {
     expect(result.error).toContain('email');
     expect(mockSend).not.toHaveBeenCalled();
   });
+
+  it('falls back to the active Vercel deployment when DELIVERY_APP_URL is unset', async () => {
+    vi.stubEnv('DELIVERY_APP_URL', '');
+    vi.stubEnv('VERCEL_URL', 'meso-pos-preview.vercel.app');
+    mockSend.mockResolvedValueOnce({ data: { id: 'msg_2' }, error: null });
+
+    const result = await sendPickupTimeAdjustedEmail(
+      {
+        id: 'order-2',
+        order_number: 'WEB-002',
+        delivery_address: {
+          firstName: 'Jan',
+          email: 'jan@example.com',
+        },
+      },
+      '2026-03-17T12:30:00.000Z',
+      '2026-03-17T12:45:00.000Z'
+    );
+
+    expect(result.success).toBe(true);
+    expect(mockSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining(
+          'https://meso-pos-preview.vercel.app/order-confirmation?orderId=order-2'
+        ),
+      })
+    );
+  });
 });

@@ -11,6 +11,8 @@ export type MenuRouteActor =
 const SESSION_ROLE_PERMISSIONS: Record<string, ApiKeyPermission[]> = {
   admin: ['menu:read', 'menu:write'],
   manager: ['menu:read', 'menu:write'],
+  cashier: ['menu:read', 'menu:write'],
+  chef: ['menu:read', 'menu:write'],
 };
 
 async function resolveSessionRole(
