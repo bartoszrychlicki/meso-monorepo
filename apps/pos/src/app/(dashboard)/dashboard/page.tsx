@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { WarehouseStockItem } from '@/types/inventory';
 import { useOrders } from '@/modules/orders/hooks';
-import { getOrderStatsForLocalDay } from '@/modules/orders/stats';
+import { filterOutCancelledOrders, getOrderStatsForLocalDay } from '@/modules/orders/stats';
 import { inventoryRepository } from '@/modules/inventory/repository';
 
 export default function DashboardPage() {
@@ -61,14 +61,16 @@ export default function DashboardPage() {
 
   // Compute KPI stats
   const stats = useMemo(() => {
+    const nonCancelledOrders = filterOutCancelledOrders(orders);
     const orderStats = getOrderStatsForLocalDay(orders);
 
     // Average prep time from all orders (simulated)
-    const avgPrepTime = orders.length > 0 ? 12 : 0;
+    const avgPrepTime = nonCancelledOrders.length > 0 ? 12 : 0;
 
     return {
       revenueToday: orderStats.revenueToday,
       orderCountToday: orderStats.orderCountToday,
+      cancelledOrderCountToday: orderStats.cancelledOrderCountToday,
       avgOrderValue: orderStats.avgOrderValue,
       avgPrepTime,
       activeOrderCount: orderStats.activeOrderCount,
@@ -85,7 +87,7 @@ export default function DashboardPage() {
   // Top products by frequency in orders
   const topProducts = useMemo(() => {
     const productCounts: Record<string, { name: string; count: number }> = {};
-    for (const order of orders) {
+    for (const order of filterOutCancelledOrders(orders)) {
       for (const item of order.items) {
         if (!productCounts[item.product_id]) {
           productCounts[item.product_id] = { name: item.product_name, count: 0 };
@@ -106,8 +108,8 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6" data-page="dashboard">
         <PageHeader title="Dashboard" description="Przeglad najwazniejszych wskaznikow" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))}
         </div>
@@ -127,7 +129,7 @@ export default function DashboardPage() {
       />
 
       {/* KPI Row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           icon={<DollarSign className="h-5 w-5" />}
           label="Przychod dzisiaj"
@@ -159,6 +161,12 @@ export default function DashboardPage() {
           label="Aktywne zamowienia"
           value={stats.activeOrderCount}
           className="bg-gradient-to-br from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20"
+        />
+        <KpiCard
+          icon={<AlertTriangle className="h-5 w-5" />}
+          label="Anulowane dzisiaj"
+          value={stats.cancelledOrderCountToday}
+          className="bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20"
         />
       </div>
 
