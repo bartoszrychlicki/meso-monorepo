@@ -1,9 +1,13 @@
+import { appendPickupTimeAdjustment } from '@meso/core';
 import { KitchenTicket } from '@/types/kitchen';
 import type { OrderCancellationResult } from '@/types/order-cancel';
 import { OrderClosureReasonCode, OrderStatus } from '@/types/enums';
 import { createRepository } from '@/lib/data/repository-factory';
+import { resolveKitchenTicketCurrentPickupTime } from './formatting';
+import type { Order } from '@/types/order';
 
 const baseRepo = createRepository<KitchenTicket>('kitchen_tickets');
+const ordersRepo = createRepository<Order>('orders');
 const isSupabaseBackend = process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
 
 type TransitionAction =
@@ -236,6 +240,42 @@ async function setPriority(id: string, priority: number): Promise<KitchenTicket>
 async function adjustPickupTime(id: string, pickupTime: string): Promise<KitchenTicket> {
   if (isSupabaseBackend) {
     return callTransition(id, 'adjust_pickup_time', { pickupTime });
+  }
+
+  const nextPickupDate = new Date(pickupTime);
+  if (Number.isNaN(nextPickupDate.getTime())) {
+    throw new Error('Invalid pickupTime format');
+  }
+  if (nextPickupDate.getTime() <= Date.now()) {
+    throw new Error('Pickup time cannot be in the past');
+  }
+
+  const ticket = await baseRepo.findById(id);
+  if (!ticket) {
+    throw new Error(`Kitchen ticket with id ${id} not found`);
+  }
+
+  const linkedOrderId = ticket.order_id?.trim();
+  const linkedOrder = linkedOrderId ? await ordersRepo.findById(linkedOrderId) : null;
+  const previousPickupTime =
+    linkedOrder?.estimated_ready_at ||
+    linkedOrder?.scheduled_time ||
+    resolveKitchenTicketCurrentPickupTime(ticket);
+
+  if (linkedOrder) {
+    const nextMetadata = previousPickupTime && previousPickupTime !== pickupTime
+      ? appendPickupTimeAdjustment(linkedOrder.metadata, {
+          previous_time: previousPickupTime,
+          new_time: pickupTime,
+          changed_at: new Date().toISOString(),
+          source: 'kds',
+        })
+      : linkedOrder.metadata;
+
+    await ordersRepo.update(linkedOrder.id, {
+      estimated_ready_at: pickupTime,
+      metadata: nextMetadata,
+    } as Partial<Order>);
   }
 
   return baseRepo.update(id, { estimated_ready_at: pickupTime } as Partial<KitchenTicket>);

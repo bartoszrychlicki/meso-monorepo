@@ -14,6 +14,7 @@ vi.mock('@/lib/supabase/client', () => ({
 const mockProductsCreate = vi.fn();
 const mockProductsUpdate = vi.fn();
 const mockProductsFindById = vi.fn();
+const mockProductsFindMany = vi.fn();
 const mockRecipesFindById = vi.fn();
 
 function createBaseRepositoryMock() {
@@ -35,6 +36,7 @@ vi.mock('@/lib/data/repository-factory', () => ({
       return {
         ...createBaseRepositoryMock(),
         findById: (...args: unknown[]) => mockProductsFindById(...args),
+        findMany: (...args: unknown[]) => mockProductsFindMany(...args),
         create: (...args: unknown[]) => mockProductsCreate(...args),
         update: (...args: unknown[]) => mockProductsUpdate(...args),
       };
@@ -105,15 +107,15 @@ function makePersistedProduct(
 }
 
 describe('food cost persistence in menu products', () => {
-  let chain: ReturnType<typeof createMockChain>;
-
   beforeEach(() => {
     vi.clearAllMocks();
-    chain = createMockChain();
+    vi.unstubAllEnvs();
   });
 
   it('calculates and persists food cost on product create', async () => {
-    mockCategorySortOrder(chain, 4);
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'product-existing', sort_order: 4 }),
+    ]);
     mockRecipesFindById.mockResolvedValueOnce({ cost_per_unit: 8 });
     mockProductsCreate.mockResolvedValueOnce({
       ...makePersistedProduct({ recipe_id: 'recipe-1', food_cost_percentage: 40 }),
@@ -138,7 +140,6 @@ describe('food cost persistence in menu products', () => {
     mockProductsFindById.mockResolvedValueOnce(
       makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 20, food_cost_percentage: 40 })
     );
-    mockCategorySortOrder(chain, 4);
     mockRecipesFindById.mockResolvedValueOnce({ cost_per_unit: 8 });
     mockProductsUpdate.mockResolvedValueOnce(
       makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 40, food_cost_percentage: 20 })
@@ -161,7 +162,6 @@ describe('food cost persistence in menu products', () => {
     mockProductsFindById.mockResolvedValueOnce(
       makePersistedProduct({ id: 'product-1', recipe_id: undefined, price: 20, food_cost_percentage: null })
     );
-    mockCategorySortOrder(chain, 4);
     mockProductsUpdate.mockResolvedValueOnce(
       makePersistedProduct({ id: 'product-1', recipe_id: undefined, price: 25, food_cost_percentage: null })
     );
@@ -182,7 +182,6 @@ describe('food cost persistence in menu products', () => {
     mockProductsFindById.mockResolvedValueOnce(
       makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 38, food_cost_percentage: null })
     );
-    mockCategorySortOrder(chain, 4);
     mockRecipesFindById.mockResolvedValueOnce({ cost_per_unit: 6061.14 });
     mockProductsUpdate.mockResolvedValueOnce(
       makePersistedProduct({ id: 'product-1', recipe_id: 'recipe-1', price: 38, food_cost_percentage: null })
@@ -208,7 +207,9 @@ describe('food cost persistence in menu products', () => {
         food_cost_percentage: null,
       })
     );
-    mockCategorySortOrder(chain, 6);
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'product-2', category_id: 'cat-2', sort_order: 6 }),
+    ]);
     mockProductsUpdate.mockResolvedValueOnce(
       makePersistedProduct({
         id: 'product-1',
@@ -226,16 +227,18 @@ describe('food cost persistence in menu products', () => {
         sort_order: 7,
       })
     );
-    expect(chain.neq).toHaveBeenCalledWith('id', 'product-1');
+    expect(mockProductsFindMany).toHaveBeenCalled();
   });
 });
 
 describe('reorderProductsInCategory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
-  it('calls the reorder RPC with category and ordered ids', async () => {
+  it('calls the reorder RPC with category and ordered ids on supabase backend', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
     mockRpc.mockResolvedValueOnce({ error: null });
 
     await reorderProductsInCategory('cat-1', ['prod-3', 'prod-1', 'prod-2']);
@@ -247,11 +250,37 @@ describe('reorderProductsInCategory', () => {
   });
 
   it('throws when the reorder RPC fails', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
     mockRpc.mockResolvedValueOnce({ error: { message: 'rpc failed' } });
 
     await expect(
       reorderProductsInCategory('cat-1', ['prod-1'])
     ).rejects.toThrow('reorderProductsInCategory failed: rpc failed');
+  });
+
+  it('updates local repository sort order when using localStorage backend', async () => {
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0 }),
+      makePersistedProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1 }),
+    ]);
+    mockProductsUpdate.mockResolvedValue(makePersistedProduct());
+
+    await reorderProductsInCategory('cat-1', ['prod-2', 'prod-1']);
+
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockProductsUpdate).toHaveBeenNthCalledWith(1, 'prod-2', { sort_order: 0 });
+    expect(mockProductsUpdate).toHaveBeenNthCalledWith(2, 'prod-1', { sort_order: 1 });
+  });
+
+  it('rejects incomplete local reorder payloads', async () => {
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0 }),
+      makePersistedProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1 }),
+    ]);
+
+    await expect(
+      reorderProductsInCategory('cat-1', ['prod-1'])
+    ).rejects.toThrow('reorderProductsInCategory failed: incomplete category product list');
   });
 });
 
@@ -272,17 +301,6 @@ function createMockChain() {
   chain.maybeSingle = vi.fn().mockReturnValue(chain);
 
   return chain;
-}
-
-function mockCategorySortOrder(
-  chain: ReturnType<typeof createMockChain>,
-  maxSortOrder: number | null
-) {
-  mockFrom.mockReturnValue(chain);
-  chain.maybeSingle.mockResolvedValueOnce({
-    data: maxSortOrder == null ? null : { sort_order: maxSortOrder },
-    error: null,
-  });
 }
 
 describe('getProductModifierIds', () => {

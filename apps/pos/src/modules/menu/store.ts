@@ -14,6 +14,23 @@ import {
 } from './repository';
 import { deleteAllProductImages } from '@/lib/supabase/storage';
 import { applyCategoryReorder, sortProductsForMenu } from './utils/sort-order';
+import type { PaginatedResult } from '@/types/common';
+
+async function loadAllPages<T>(
+  loadPage: (page: number, perPage: number) => Promise<PaginatedResult<T>>,
+  perPage: number
+): Promise<T[]> {
+  const firstPage = await loadPage(1, perPage);
+  const allItems = [...firstPage.data];
+  const totalPages = firstPage.total_pages ?? 1;
+
+  for (let page = 2; page <= totalPages; page += 1) {
+    const nextPage = await loadPage(page, perPage);
+    allItems.push(...nextPage.data);
+  }
+
+  return allItems;
+}
 
 interface MenuStore {
   products: Product[];
@@ -59,20 +76,44 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
   loadAll: async () => {
     set({ isLoading: true });
     try {
-      const [productsResult, categoriesResult, modifierGroupsResult, modifiersResult] = await Promise.all([
-        productsRepository.findAll({ sort_by: 'sort_order', sort_order: 'asc', per_page: 200 }),
-        categoriesRepository.findAll({ sort_by: 'sort_order', sort_order: 'asc', per_page: 100 }),
-        modifierGroupsRepository.findAll({ per_page: 100 }),
-        modifiersRepository.findAll({ per_page: 200 }),
+      const [products, categories, modifierGroups, modifiers] = await Promise.all([
+        loadAllPages(
+          (page, perPage) =>
+            productsRepository.findAll({
+              page,
+              per_page: perPage,
+              sort_by: 'sort_order',
+              sort_order: 'asc',
+            }),
+          200
+        ),
+        loadAllPages(
+          (page, perPage) =>
+            categoriesRepository.findAll({
+              page,
+              per_page: perPage,
+              sort_by: 'sort_order',
+              sort_order: 'asc',
+            }),
+          100
+        ),
+        loadAllPages(
+          (page, perPage) => modifierGroupsRepository.findAll({ page, per_page: perPage }),
+          100
+        ),
+        loadAllPages(
+          (page, perPage) => modifiersRepository.findAll({ page, per_page: perPage }),
+          200
+        ),
       ]);
-      const sortedCategories = [...categoriesResult.data].sort(
+      const sortedCategories = [...categories].sort(
         (left, right) => left.sort_order - right.sort_order
       );
       set({
-        products: sortProductsForMenu(productsResult.data, sortedCategories),
+        products: sortProductsForMenu(products, sortedCategories),
         categories: sortedCategories,
-        modifierGroups: modifierGroupsResult.data,
-        modifiers: modifiersResult.data,
+        modifierGroups,
+        modifiers,
         isLoading: false,
       });
     } catch (error) {

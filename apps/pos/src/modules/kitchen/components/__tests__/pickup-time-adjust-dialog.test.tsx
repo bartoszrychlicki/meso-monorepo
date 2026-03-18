@@ -24,6 +24,7 @@ describe('PickupTimeAdjustDialog', () => {
         onOpenChange={vi.fn()}
         currentPickupTime={currentPickupTime}
         onConfirm={onConfirm}
+        openedAtTimestamp={currentPickupDate.getTime()}
       />
     );
 
@@ -55,6 +56,7 @@ describe('PickupTimeAdjustDialog', () => {
         onOpenChange={onOpenChange}
         currentPickupTime="2026-03-17T12:30:00.000Z"
         onConfirm={onConfirm}
+        openedAtTimestamp={new Date('2026-03-17T12:30:00.000Z').getTime()}
       />
     );
 
@@ -63,5 +65,23 @@ describe('PickupTimeAdjustDialog', () => {
 
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('adds larger positive adjustments when the current pickup time is already overdue', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-17T12:00:00.000Z'));
+
+    render(
+      <PickupTimeAdjustDialog
+        open
+        onOpenChange={vi.fn()}
+        currentPickupTime="2026-03-17T11:30:00.000Z"
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        openedAtTimestamp={new Date('2026-03-17T12:00:00.000Z').getTime()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: '+35 min' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+45 min' })).toBeInTheDocument();
   });
 });

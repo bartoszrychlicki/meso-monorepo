@@ -229,15 +229,45 @@ describe('useMenuStore — Modifiers', () => {
   describe('loadAll includes modifiers', () => {
     it('loads modifiers alongside products, categories, and modifier groups', async () => {
       const modifiers = [makeModifier({ id: 'mod-all-1' })];
-      mockProductsFindAll.mockResolvedValue({ data: [] });
-      mockCategoriesFindAll.mockResolvedValue({ data: [] });
-      mockModifierGroupsFindAll.mockResolvedValue({ data: [] });
-      mockModifiersFindAll.mockResolvedValue({ data: modifiers });
+      mockProductsFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+      mockCategoriesFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+      mockModifierGroupsFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+      mockModifiersFindAll.mockResolvedValue({ data: modifiers, total_pages: 1 });
 
       await useMenuStore.getState().loadAll();
 
       expect(mockModifiersFindAll).toHaveBeenCalled();
       expect(useMenuStore.getState().modifiers).toEqual(modifiers);
+    });
+
+    it('loads all product pages before enabling reorder state', async () => {
+      mockProductsFindAll
+        .mockResolvedValueOnce({
+          data: [makeProduct({ id: 'prod-1' })],
+          total_pages: 2,
+        })
+        .mockResolvedValueOnce({
+          data: [makeProduct({ id: 'prod-2', sort_order: 1 })],
+          total_pages: 2,
+        });
+      mockCategoriesFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+      mockModifierGroupsFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+      mockModifiersFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+
+      await useMenuStore.getState().loadAll();
+
+      expect(mockProductsFindAll).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ page: 1, per_page: 200 })
+      );
+      expect(mockProductsFindAll).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ page: 2, per_page: 200 })
+      );
+      expect(useMenuStore.getState().products.map((product) => product.id)).toEqual([
+        'prod-1',
+        'prod-2',
+      ]);
     });
   });
 

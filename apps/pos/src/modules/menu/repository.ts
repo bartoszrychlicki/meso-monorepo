@@ -11,6 +11,10 @@ export const recipesRepository = createRepository<Recipe>('recipes');
 
 const MAX_FOOD_COST_PERCENTAGE = 999.99;
 
+function isSupabaseBackend(): boolean {
+  return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+}
+
 function normalizeModifierIds(ids: string[]): string[] {
   return [...new Set(ids.filter(Boolean))];
 }
@@ -23,24 +27,13 @@ async function getNextSortOrderForCategory(
   categoryId: string,
   excludeProductId?: string
 ): Promise<number> {
-  let query = supabase
-    .from('menu_products')
-    .select('sort_order')
-    .eq('category_id', categoryId);
-
-  if (excludeProductId) {
-    query = query.neq('id', excludeProductId);
-  }
-
-  const { data, error } = await query
-    .order('sort_order', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) {
-    throw new Error(`getNextSortOrderForCategory failed: ${error.message}`);
-  }
-
-  const maxSortOrder = data?.sort_order ?? -1;
+  const categoryProducts = await productsRepository.findMany(
+    (product) => product.category_id === categoryId && product.id !== excludeProductId
+  );
+  const maxSortOrder = categoryProducts.reduce(
+    (maxValue, product) => Math.max(maxValue, product.sort_order ?? -1),
+    -1
+  );
   return maxSortOrder + 1;
 }
 
@@ -138,14 +131,42 @@ export async function reorderProductsInCategory(
   categoryId: string,
   productIds: string[]
 ): Promise<void> {
-  const { error } = await supabase.rpc('reorder_menu_products', {
-    p_category_id: categoryId,
-    p_product_ids: productIds,
-  });
+  if (isSupabaseBackend()) {
+    const { error } = await supabase.rpc('reorder_menu_products', {
+      p_category_id: categoryId,
+      p_product_ids: productIds,
+    });
 
-  if (error) {
-    throw new Error(`reorderProductsInCategory failed: ${error.message}`);
+    if (error) {
+      throw new Error(`reorderProductsInCategory failed: ${error.message}`);
+    }
+
+    return;
   }
+
+  const categoryProducts = await productsRepository.findMany(
+    (product) => product.category_id === categoryId
+  );
+  const categoryProductIds = new Set(categoryProducts.map((product) => product.id));
+  const uniqueIds = new Set(productIds);
+
+  if (uniqueIds.size !== productIds.length) {
+    throw new Error('reorderProductsInCategory failed: duplicate product IDs');
+  }
+
+  if (categoryProducts.length !== productIds.length) {
+    throw new Error('reorderProductsInCategory failed: incomplete category product list');
+  }
+
+  if (productIds.some((productId) => !categoryProductIds.has(productId))) {
+    throw new Error('reorderProductsInCategory failed: product outside category');
+  }
+
+  await Promise.all(
+    productIds.map((productId, index) =>
+      productsRepository.update(productId, { sort_order: index })
+    )
+  );
 }
 
 /** Get modifier IDs for a product (ordered by per-product sort_order) */
