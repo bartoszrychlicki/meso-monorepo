@@ -14,7 +14,9 @@ import {
 } from '@/components/ui/dialog';
 import { formatKitchenScheduledTime } from '../formatting';
 
-const ADJUSTMENT_OPTIONS = [-10, -5, 5, 10, 15, 20] as const;
+const ADJUSTMENT_OPTIONS = [-10, -5, 5, 10, 15, 20];
+const MIN_FUTURE_BUFFER_MINUTES = 5;
+const MINUTE_STEP = 5;
 
 interface PickupTimeAdjustDialogProps {
   open: boolean;
@@ -22,6 +24,7 @@ interface PickupTimeAdjustDialogProps {
   currentPickupTime: string;
   onConfirm: (pickupTime: string) => Promise<void>;
   isSubmitting?: boolean;
+  openedAtTimestamp?: number | null;
 }
 
 export function PickupTimeAdjustDialog({
@@ -30,6 +33,7 @@ export function PickupTimeAdjustDialog({
   currentPickupTime,
   onConfirm,
   isSubmitting = false,
+  openedAtTimestamp = null,
 }: PickupTimeAdjustDialogProps) {
   const [draftPickupTime, setDraftPickupTime] = useState(currentPickupTime);
   const [isConfirming, setIsConfirming] = useState(false);
@@ -52,6 +56,34 @@ export function PickupTimeAdjustDialog({
     () => formatKitchenScheduledTime(draftPickupTime) ?? '--:--',
     [draftPickupTime]
   );
+  const adjustmentOptions = useMemo(() => {
+    const draftDate = new Date(draftPickupTime);
+    const options = [...ADJUSTMENT_OPTIONS];
+
+    if (Number.isNaN(draftDate.getTime())) {
+      return options;
+    }
+    if (!openedAtTimestamp) {
+      return options;
+    }
+
+    const minimumFutureAdjustment = Math.ceil(
+      (openedAtTimestamp + MIN_FUTURE_BUFFER_MINUTES * 60_000 - draftDate.getTime())
+        / (MINUTE_STEP * 60_000)
+    ) * MINUTE_STEP;
+
+    const filteredOptions = options.filter((value) => value >= minimumFutureAdjustment);
+
+    if (filteredOptions.length === 0) {
+      filteredOptions.push(
+        minimumFutureAdjustment,
+        minimumFutureAdjustment + 10,
+        minimumFutureAdjustment + 20
+      );
+    }
+
+    return [...new Set(filteredOptions)].sort((left, right) => left - right);
+  }, [draftPickupTime, openedAtTimestamp]);
   const isBusy = isSubmitting || isConfirming;
   const canConfirm = draftPickupTime !== currentPickupTime;
 
@@ -110,7 +142,7 @@ export function PickupTimeAdjustDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {ADJUSTMENT_OPTIONS.map((minutes) => (
+            {adjustmentOptions.map((minutes) => (
               <Button
                 key={minutes}
                 type="button"

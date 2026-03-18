@@ -10,7 +10,6 @@ import { KdsTimer } from './kds-timer';
 import { cn } from '@/lib/utils';
 import { Check, ChefHat, ArrowRight, AlertTriangle, Clock3 } from 'lucide-react';
 import {
-  formatKitchenEstimatedReadyTime,
   formatKitchenScheduledTime,
   normalizeKitchenModifierLabels,
   resolveKitchenTicketCurrentPickupTime,
@@ -42,6 +41,8 @@ export function KdsCard({ ticket }: KdsCardProps) {
   const { color } = useTicketTimer(ticket);
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [pickupAdjustDialogOpen, setPickupAdjustDialogOpen] = useState(false);
+  const [isPickupAdjustSubmitting, setIsPickupAdjustSubmitting] = useState(false);
+  const [pickupAdjustOpenedAt, setPickupAdjustOpenedAt] = useState<number | null>(null);
   const currentPickupTime = resolveKitchenTicketCurrentPickupTime(ticket);
   const isEstimatedPickupTime = !ticket.estimated_ready_at && !ticket.scheduled_time && ticket.delivery_type === 'pickup';
   const scheduledTimeLabel = currentPickupTime
@@ -87,10 +88,25 @@ export function KdsCard({ ticket }: KdsCardProps) {
   };
 
   const handlePickupTimeAdjust = async (pickupTime: string) => {
-    await adjustPickupTime(ticket.id, pickupTime);
-    setPickupAdjustDialogOpen(false);
-    const pickupTimeLabel = formatKitchenScheduledTime(pickupTime) ?? pickupTime;
-    toast.success(`Nowy czas odbioru: ${pickupTimeLabel}`);
+    if (isPickupAdjustSubmitting) {
+      return;
+    }
+
+    setIsPickupAdjustSubmitting(true);
+
+    try {
+      await adjustPickupTime(ticket.id, pickupTime);
+      setPickupAdjustDialogOpen(false);
+      const pickupTimeLabel = formatKitchenScheduledTime(pickupTime) ?? pickupTime;
+      toast.success(`Nowy czas odbioru: ${pickupTimeLabel}`);
+    } finally {
+      setIsPickupAdjustSubmitting(false);
+    }
+  };
+
+  const openPickupAdjustDialog = () => {
+    setPickupAdjustOpenedAt(Date.now());
+    setPickupAdjustDialogOpen(true);
   };
 
   return (
@@ -227,7 +243,7 @@ export function KdsCard({ ticket }: KdsCardProps) {
             {canAdjustPickupTime && (
               <button
                 type="button"
-                onClick={() => setPickupAdjustDialogOpen(true)}
+                onClick={openPickupAdjustDialog}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-6 py-3 text-base font-bold text-sky-700 transition-colors hover:bg-sky-100"
                 data-action="adjust-pickup-time"
               >
@@ -252,7 +268,7 @@ export function KdsCard({ ticket }: KdsCardProps) {
             {canAdjustPickupTime && (
               <button
                 type="button"
-                onClick={() => setPickupAdjustDialogOpen(true)}
+                onClick={openPickupAdjustDialog}
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-sky-300 bg-sky-50 px-6 py-3 text-base font-bold text-sky-700 transition-colors hover:bg-sky-100"
                 data-action="adjust-pickup-time"
               >
@@ -302,10 +318,13 @@ export function KdsCard({ ticket }: KdsCardProps) {
       />
       {currentPickupTime && (
         <PickupTimeAdjustDialog
+          key={pickupAdjustOpenedAt ?? currentPickupTime}
           open={pickupAdjustDialogOpen}
           onOpenChange={setPickupAdjustDialogOpen}
           currentPickupTime={currentPickupTime}
           onConfirm={handlePickupTimeAdjust}
+          isSubmitting={isPickupAdjustSubmitting}
+          openedAtTimestamp={pickupAdjustOpenedAt}
         />
       )}
     </div>

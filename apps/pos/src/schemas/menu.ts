@@ -215,3 +215,19 @@ export type CreateCategoryInput = z.infer<typeof CreateCategorySchema>;
 export type UpdateCategoryInput = z.infer<typeof UpdateCategorySchema>;
 export type CreatePromotionInput = z.infer<typeof CreatePromotionSchema>;
 export type UpdatePromotionInput = z.infer<typeof UpdatePromotionSchema>;
+
+export const ReorderMenuProductsSchema = z.object({
+  category_id: z.string().uuid('Kategoria musi byc poprawnym UUID'),
+  product_ids: z.array(z.string().uuid('Produkt musi byc poprawnym UUID')).min(1, 'Lista produktow nie moze byc pusta'),
+}).superRefine((data, ctx) => {
+  const uniqueIds = new Set(data.product_ids);
+  if (uniqueIds.size !== data.product_ids.length) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['product_ids'],
+      message: 'Lista produktow nie moze zawierac duplikatow',
+    });
+  }
+});
+
+export type ReorderMenuProductsInput = z.infer<typeof ReorderMenuProductsSchema>;

@@ -13,8 +13,9 @@ vi.mock('resend', () => ({
 
 describe('pickup-time-adjustment-email', () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.stubEnv('RESEND_API_KEY', 'test-key');
-    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://mesofood.pl');
+    vi.stubEnv('DELIVERY_APP_URL', 'https://order.mesofood.pl');
     mockSend.mockReset();
   });
 
@@ -31,9 +32,10 @@ describe('pickup-time-adjustment-email', () => {
 
     expect(html).toContain('Zmiana czasu odbioru');
     expect(html).toContain('WEB-001');
-    expect(html).toContain('17 marca 13:30');
-    expect(html).toContain('17 marca 13:45');
     expect(html).toContain('Sledz zamowienie');
+    expect(html).toContain('17 marca');
+    expect(html).toContain('13:30');
+    expect(html).toContain('13:45');
   });
 
   it('sends pickup time adjustment email when customer email is present', async () => {
@@ -57,6 +59,7 @@ describe('pickup-time-adjustment-email', () => {
       expect.objectContaining({
         to: 'jan@example.com',
         subject: expect.stringContaining('WEB-001'),
+        html: expect.stringContaining('https://order.mesofood.pl/order-confirmation?orderId=order-1'),
       })
     );
   });

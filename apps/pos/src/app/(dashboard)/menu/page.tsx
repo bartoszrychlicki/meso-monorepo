@@ -31,6 +31,7 @@ export default function MenuPage() {
     isLoading,
     setSelectedCategory,
     setSearchQuery,
+    reorderProducts,
     toggleProductAvailability,
     toggleProductMenuVisibility,
     createCategory,
@@ -175,9 +176,11 @@ export default function MenuPage() {
             categories={categories}
             stockItems={stockItems}
             recipes={recipes}
+            selectedCategoryId={selectedCategoryId}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onToggleAvailability={toggleProductAvailability}
+            onReorderProducts={reorderProducts}
             onToggleMenuVisibility={toggleProductMenuVisibility}
             onProductClick={(id) => router.push(`/menu/${id}`)}
             isLoading={isLoading}

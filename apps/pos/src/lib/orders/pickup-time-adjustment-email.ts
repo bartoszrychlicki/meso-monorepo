@@ -14,9 +14,7 @@ interface PickupTimeAdjustedEmailData {
 const PICKUP_TIME_EMAIL_TIME_ZONE = 'Europe/Warsaw';
 
 function resolveTrackingUrl(orderId: string): string | undefined {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim()
-    || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : null)
-    || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null);
+  const appUrl = process.env.DELIVERY_APP_URL?.trim() || 'https://order.mesofood.pl';
 
   return appUrl ? `${appUrl}/order-confirmation?orderId=${orderId}` : undefined;
 }

@@ -3,15 +3,19 @@ import type { Product } from '@/types/menu';
 
 // Mock the supabase client before importing the repository
 const mockFrom = vi.fn();
+const mockRpc = vi.fn();
+const mockFetch = vi.fn();
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
+    rpc: (...args: unknown[]) => mockRpc(...args),
   },
 }));
 
 const mockProductsCreate = vi.fn();
 const mockProductsUpdate = vi.fn();
 const mockProductsFindById = vi.fn();
+const mockProductsFindMany = vi.fn();
 const mockRecipesFindById = vi.fn();
 const mockGetProductModifiersWithClient = vi.fn();
 const mockCountProductsUsingModifierWithClient = vi.fn();
@@ -35,6 +39,7 @@ vi.mock('@/lib/data/repository-factory', () => ({
       return {
         ...createBaseRepositoryMock(),
         findById: (...args: unknown[]) => mockProductsFindById(...args),
+        findMany: (...args: unknown[]) => mockProductsFindMany(...args),
         create: (...args: unknown[]) => mockProductsCreate(...args),
         update: (...args: unknown[]) => mockProductsUpdate(...args),
       };
@@ -68,6 +73,7 @@ import {
   setProductModifiers,
   getProductModifiers,
   countProductsUsingModifier,
+  reorderProductsInCategory,
 } from '../repository';
 
 type ProductInput = Omit<Product, 'created_at' | 'updated_at'>;
@@ -116,9 +122,13 @@ function makePersistedProduct(
 describe('food cost persistence in menu products', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it('calculates and persists food cost on product create', async () => {
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'product-existing', sort_order: 4 }),
+    ]);
     mockRecipesFindById.mockResolvedValueOnce({ cost_per_unit: 8 });
     mockProductsCreate.mockResolvedValueOnce({
       ...makePersistedProduct({ recipe_id: 'recipe-1', food_cost_percentage: 40 }),
@@ -133,6 +143,7 @@ describe('food cost persistence in menu products', () => {
       expect.objectContaining({
         recipe_id: 'recipe-1',
         price: 20,
+        sort_order: 5,
         food_cost_percentage: 40,
       })
     );
@@ -198,6 +209,109 @@ describe('food cost persistence in menu products', () => {
       })
     );
   });
+
+  it('moves product to the end when category changes', async () => {
+    mockProductsFindById.mockResolvedValueOnce(
+      makePersistedProduct({
+        id: 'product-1',
+        category_id: 'cat-1',
+        sort_order: 2,
+        recipe_id: undefined,
+        food_cost_percentage: null,
+      })
+    );
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'product-2', category_id: 'cat-2', sort_order: 6 }),
+    ]);
+    mockProductsUpdate.mockResolvedValueOnce(
+      makePersistedProduct({
+        id: 'product-1',
+        category_id: 'cat-2',
+        sort_order: 7,
+      })
+    );
+
+    await updateProductWithFoodCost('product-1', { category_id: 'cat-2' });
+
+    expect(mockProductsUpdate).toHaveBeenCalledWith(
+      'product-1',
+      expect.objectContaining({
+        category_id: 'cat-2',
+        sort_order: 7,
+      })
+    );
+    expect(mockProductsFindMany).toHaveBeenCalled();
+  });
+});
+
+describe('reorderProductsInCategory', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  it('calls the protected reorder API with category and ordered ids on supabase backend', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+    });
+
+    await reorderProductsInCategory('cat-1', ['prod-3', 'prod-1', 'prod-2']);
+
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/menu/products/reorder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category_id: 'cat-1',
+        product_ids: ['prod-3', 'prod-1', 'prod-2'],
+      }),
+    });
+  });
+
+  it('throws when the reorder API fails', async () => {
+    vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: vi.fn().mockResolvedValue({
+        error: {
+          message: 'Brak wymaganego uprawnienia: menu:write',
+        },
+      }),
+    });
+
+    await expect(
+      reorderProductsInCategory('cat-1', ['prod-1'])
+    ).rejects.toThrow('reorderProductsInCategory failed: Brak wymaganego uprawnienia: menu:write');
+  });
+
+  it('updates local repository sort order when using localStorage backend', async () => {
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0 }),
+      makePersistedProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1 }),
+    ]);
+    mockProductsUpdate.mockResolvedValue(makePersistedProduct());
+
+    await reorderProductsInCategory('cat-1', ['prod-2', 'prod-1']);
+
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockProductsUpdate).toHaveBeenNthCalledWith(1, 'prod-2', { sort_order: 0 });
+    expect(mockProductsUpdate).toHaveBeenNthCalledWith(2, 'prod-1', { sort_order: 1 });
+  });
+
+  it('rejects incomplete local reorder payloads', async () => {
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0 }),
+      makePersistedProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1 }),
+    ]);
+
+    await expect(
+      reorderProductsInCategory('cat-1', ['prod-1'])
+    ).rejects.toThrow('reorderProductsInCategory failed: incomplete category product list');
+  });
 });
 
 function createMockChain() {
@@ -211,6 +325,7 @@ function createMockChain() {
   chain.neq = vi.fn().mockReturnValue(chain);
   chain.in = vi.fn().mockReturnValue(chain);
   chain.order = vi.fn().mockReturnValue(chain);
+  chain.limit = vi.fn().mockReturnValue(chain);
   chain.range = vi.fn().mockReturnValue(chain);
   chain.single = vi.fn().mockReturnValue(chain);
   chain.maybeSingle = vi.fn().mockReturnValue(chain);

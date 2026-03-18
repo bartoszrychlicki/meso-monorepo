@@ -26,6 +26,7 @@ export function useMenu() {
     updateProduct: store.updateProduct,
     deleteProduct: store.deleteProduct,
     toggleProductAvailability: store.toggleProductAvailability,
+    reorderProducts: store.reorderProducts,
     toggleProductMenuVisibility: store.toggleProductMenuVisibility,
     createCategory: store.createCategory,
     updateCategory: store.updateCategory,

@@ -668,7 +668,6 @@ describe('POST /api/kitchen/tickets/:id/transition', () => {
       'Resend unavailable'
     );
   });
-
   it('rejects pickup time adjustments for delivery orders', async () => {
     mockOrdersRepo.findById.mockResolvedValueOnce({
       ...baseOrder,

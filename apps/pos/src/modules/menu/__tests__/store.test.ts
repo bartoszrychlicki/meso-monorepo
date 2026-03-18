@@ -15,6 +15,7 @@ const mockSetModifierGroupModifiers = vi.fn();
 const mockCreateProductWithFoodCost = vi.fn();
 const mockUpdateProductWithFoodCost = vi.fn();
 const mockToggleAvailability = vi.fn();
+const mockReorderProductsInCategory = vi.fn();
 const mockToggleMenuVisibility = vi.fn();
 
 // Mock the repository module
@@ -45,6 +46,7 @@ vi.mock('../repository', () => ({
   createProductWithFoodCost: (...args: unknown[]) => mockCreateProductWithFoodCost(...args),
   updateProductWithFoodCost: (...args: unknown[]) => mockUpdateProductWithFoodCost(...args),
   toggleAvailability: (...args: unknown[]) => mockToggleAvailability(...args),
+  reorderProductsInCategory: (...args: unknown[]) => mockReorderProductsInCategory(...args),
   toggleMenuVisibility: (...args: unknown[]) => mockToggleMenuVisibility(...args),
 }));
 
@@ -63,6 +65,31 @@ const makeModifier = (overrides: Partial<MenuModifier> = {}): MenuModifier => ({
   modifier_action: ModifierAction.ADD,
   is_available: true,
   sort_order: 0,
+  created_at: '2024-01-01T00:00:00.000Z',
+  updated_at: '2024-01-01T00:00:00.000Z',
+  ...overrides,
+});
+
+const makeProduct = (overrides: Record<string, unknown> = {}) => ({
+  id: 'prod-1',
+  name: 'Ramen',
+  slug: 'ramen',
+  category_id: 'cat-1',
+  type: 'single',
+  price: 39,
+  images: [],
+  is_available: true,
+  is_featured: false,
+  allergens: [],
+  variants: [],
+  modifier_groups: [],
+  ingredients: [],
+  sort_order: 0,
+  sku: 'RAM-1',
+  tax_rate: 8,
+  is_active: true,
+  point_ids: [],
+  pricing: [],
   created_at: '2024-01-01T00:00:00.000Z',
   updated_at: '2024-01-01T00:00:00.000Z',
   ...overrides,
@@ -209,15 +236,110 @@ describe('useMenuStore — Modifiers', () => {
   describe('loadAll includes modifiers', () => {
     it('loads modifiers alongside products, categories, and modifier groups', async () => {
       const modifiers = [makeModifier({ id: 'mod-all-1' })];
-      mockProductsFindAll.mockResolvedValue({ data: [] });
-      mockCategoriesFindAll.mockResolvedValue({ data: [] });
+      mockProductsFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+      mockCategoriesFindAll.mockResolvedValue({ data: [], total_pages: 1 });
       mockListModifierGroups.mockResolvedValue([]);
-      mockModifiersFindAll.mockResolvedValue({ data: modifiers });
+      mockModifiersFindAll.mockResolvedValue({ data: modifiers, total_pages: 1 });
 
       await useMenuStore.getState().loadAll();
 
       expect(mockModifiersFindAll).toHaveBeenCalled();
       expect(useMenuStore.getState().modifiers).toEqual(modifiers);
+    });
+
+    it('loads all product pages before enabling reorder state', async () => {
+      mockProductsFindAll
+        .mockResolvedValueOnce({
+          data: [makeProduct({ id: 'prod-1' })],
+          total_pages: 2,
+        })
+        .mockResolvedValueOnce({
+          data: [makeProduct({ id: 'prod-2', sort_order: 1 })],
+          total_pages: 2,
+        });
+      mockCategoriesFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+      mockListModifierGroups.mockResolvedValue([]);
+      mockModifiersFindAll.mockResolvedValue({ data: [], total_pages: 1 });
+
+      await useMenuStore.getState().loadAll();
+
+      expect(mockProductsFindAll).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ page: 1, per_page: 200 })
+      );
+      expect(mockProductsFindAll).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ page: 2, per_page: 200 })
+      );
+      expect(useMenuStore.getState().products.map((product) => product.id)).toEqual([
+        'prod-1',
+        'prod-2',
+      ]);
+    });
+  });
+
+  describe('product actions', () => {
+    it('toggleProductAvailability replaces product in state', async () => {
+      useMenuStore.setState({
+        categories: [{ id: 'cat-1', name: 'Ramen', slug: 'ramen', sort_order: 0, is_active: true, created_at: '', updated_at: '' } as never],
+        products: [makeProduct() as never],
+      });
+
+      mockToggleAvailability.mockResolvedValue({
+        ...useMenuStore.getState().products[0],
+        is_available: false,
+      });
+
+      await useMenuStore.getState().toggleProductAvailability('prod-1');
+
+      expect(mockToggleAvailability).toHaveBeenCalledWith('prod-1');
+      expect(useMenuStore.getState().products[0].is_available).toBe(false);
+    });
+
+    it('optimistically reorders category products and persists the change', async () => {
+      useMenuStore.setState({
+        categories: [
+          { id: 'cat-1', name: 'Ramen', slug: 'ramen', sort_order: 0, is_active: true, created_at: '', updated_at: '' } as never,
+          { id: 'cat-2', name: 'Bao', slug: 'bao', sort_order: 1, is_active: true, created_at: '', updated_at: '' } as never,
+        ],
+        products: [
+          makeProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0, name: 'A' }) as never,
+          makeProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1, name: 'B' }) as never,
+          makeProduct({ id: 'prod-3', category_id: 'cat-2', sort_order: 0, name: 'C' }) as never,
+        ],
+      });
+      mockReorderProductsInCategory.mockResolvedValue(undefined);
+
+      await useMenuStore.getState().reorderProducts('cat-1', ['prod-2', 'prod-1']);
+
+      expect(mockReorderProductsInCategory).toHaveBeenCalledWith('cat-1', ['prod-2', 'prod-1']);
+      expect(useMenuStore.getState().products.map((product) => product.id)).toEqual([
+        'prod-2',
+        'prod-1',
+        'prod-3',
+      ]);
+    });
+
+    it('rolls back optimistic reorder when persistence fails', async () => {
+      useMenuStore.setState({
+        categories: [
+          { id: 'cat-1', name: 'Ramen', slug: 'ramen', sort_order: 0, is_active: true, created_at: '', updated_at: '' } as never,
+        ],
+        products: [
+          makeProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0, name: 'A' }) as never,
+          makeProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1, name: 'B' }) as never,
+        ],
+      });
+      mockReorderProductsInCategory.mockRejectedValue(new Error('save failed'));
+
+      await expect(
+        useMenuStore.getState().reorderProducts('cat-1', ['prod-2', 'prod-1'])
+      ).rejects.toThrow('save failed');
+
+      expect(useMenuStore.getState().products.map((product) => product.id)).toEqual([
+        'prod-1',
+        'prod-2',
+      ]);
     });
   });
 

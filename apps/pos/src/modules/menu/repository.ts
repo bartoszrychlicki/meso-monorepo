@@ -30,6 +30,10 @@ const MAX_FOOD_COST_PERCENTAGE = 999.99;
 type ProductRepo = BaseRepository<Product>;
 type RecipeRepo = BaseRepository<Recipe>;
 
+function isSupabaseBackend(): boolean {
+  return process.env.NEXT_PUBLIC_DATA_BACKEND === 'supabase';
+}
+
 function normalizeModifierIds(ids: string[]): string[] {
   return [...new Set(ids.filter(Boolean))];
 }
@@ -41,6 +45,21 @@ function roundFoodCostPercentage(value: number): number {
 function stripProductWriteRelations<T extends ProductWriteInput | Partial<ProductWriteInput>>(data: T) {
   const { modifier_group_ids: _modifierGroupIds, ...persistedProduct } = data;
   return persistedProduct;
+}
+
+async function getNextSortOrderForCategory(
+  categoryId: string,
+  excludeProductId?: string,
+  productsRepo: ProductRepo = productsRepository
+): Promise<number> {
+  const categoryProducts = await productsRepo.findMany(
+    (product) => product.category_id === categoryId && product.id !== excludeProductId
+  );
+  const maxSortOrder = categoryProducts.reduce(
+    (maxValue, product) => Math.max(maxValue, product.sort_order ?? -1),
+    -1
+  );
+  return maxSortOrder + 1;
 }
 
 export async function calculateProductFoodCostPercentage(
@@ -73,6 +92,7 @@ export async function createProductWithFoodCost(
 ): Promise<Product> {
   const productsRepo = repositories.productsRepo ?? productsRepository;
   const recipesRepo = repositories.recipesRepo ?? recipesRepository;
+  const nextSortOrder = await getNextSortOrderForCategory(data.category_id, undefined, productsRepo);
   const foodCostPercentage = await calculateProductFoodCostPercentage(
     data.recipe_id,
     data.price,
@@ -82,6 +102,7 @@ export async function createProductWithFoodCost(
   return productsRepo.create(
     {
       ...stripProductWriteRelations(data),
+      sort_order: nextSortOrder,
       food_cost_percentage: foodCostPercentage,
     } as unknown as Omit<Product, 'id' | 'created_at' | 'updated_at'>
   );
@@ -105,6 +126,8 @@ export async function updateProductWithFoodCost(
   const nextPrice = data.price ?? existingProduct.price;
   const nextRecipeId =
     data.recipe_id === undefined ? existingProduct.recipe_id : data.recipe_id;
+  const nextCategoryId = data.category_id ?? existingProduct.category_id;
+  const shouldMoveToCategoryEnd = nextCategoryId !== existingProduct.category_id;
 
   const foodCostPercentage = await calculateProductFoodCostPercentage(
     nextRecipeId,
@@ -112,8 +135,13 @@ export async function updateProductWithFoodCost(
     recipesRepo
   );
 
+  const nextSortOrder = shouldMoveToCategoryEnd
+    ? await getNextSortOrderForCategory(nextCategoryId, id, productsRepo)
+    : data.sort_order;
+
   return productsRepo.update(id, {
     ...stripProductWriteRelations(data),
+    ...(nextSortOrder === undefined ? {} : { sort_order: nextSortOrder }),
     food_cost_percentage: foodCostPercentage,
   });
 }
@@ -149,13 +177,72 @@ export async function toggleMenuVisibility(productId: string): Promise<Product> 
   });
 }
 
-/** Get modifier IDs for a product (ordered by per-product sort_order) */
+export async function reorderProductsInCategory(
+  categoryId: string,
+  productIds: string[]
+): Promise<void> {
+  if (isSupabaseBackend()) {
+    const response = await fetch('/api/v1/menu/products/reorder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category_id: categoryId,
+        product_ids: productIds,
+      }),
+    });
+
+    if (!response.ok) {
+      let errorMessage = `request failed with status ${response.status}`;
+
+      try {
+        const payload = await response.json() as {
+          error?: {
+            message?: string;
+          };
+        };
+        errorMessage = payload.error?.message || errorMessage;
+      } catch {
+        // Keep the fallback message when the response has no JSON error payload.
+      }
+
+      throw new Error(`reorderProductsInCategory failed: ${errorMessage}`);
+    }
+
+    return;
+  }
+
+  const categoryProducts = await productsRepository.findMany(
+    (product) => product.category_id === categoryId
+  );
+  const categoryProductIds = new Set(categoryProducts.map((product) => product.id));
+  const uniqueIds = new Set(productIds);
+
+  if (uniqueIds.size !== productIds.length) {
+    throw new Error('reorderProductsInCategory failed: duplicate product IDs');
+  }
+
+  if (categoryProducts.length !== productIds.length) {
+    throw new Error('reorderProductsInCategory failed: incomplete category product list');
+  }
+
+  if (productIds.some((productId) => !categoryProductIds.has(productId))) {
+    throw new Error('reorderProductsInCategory failed: product outside category');
+  }
+
+  await Promise.all(
+    productIds.map((productId, index) =>
+      productsRepository.update(productId, { sort_order: index })
+    )
+  );
+}
+
 export async function getProductModifierIds(productId: string): Promise<string[]> {
   const modifiers = await getProductModifiers(productId);
   return modifiers.map((modifier) => modifier.id);
 }
 
-/** Set modifiers for a product (replace all) */
 export async function setProductModifiers(productId: string, modifierIds: string[]): Promise<void> {
   const normalizedModifierIds = normalizeModifierIds(modifierIds);
   const { error: delError } = await supabase
@@ -177,12 +264,10 @@ export async function setProductModifiers(productId: string, modifierIds: string
   }
 }
 
-/** Get modifiers for a product (full objects, ordered by per-product sort_order) */
 export async function getProductModifiers(productId: string): Promise<MenuModifier[]> {
   return getProductModifiersWithClient(supabase, productId);
 }
 
-/** Count products using a modifier */
 export async function countProductsUsingModifier(modifierId: string): Promise<number> {
   return countProductsUsingModifierWithClient(supabase, modifierId);
 }

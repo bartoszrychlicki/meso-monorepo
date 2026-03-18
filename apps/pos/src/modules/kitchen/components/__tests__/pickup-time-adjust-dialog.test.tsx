@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { PickupTimeAdjustDialog } from '../pickup-time-adjust-dialog';
@@ -24,6 +24,7 @@ describe('PickupTimeAdjustDialog', () => {
         onOpenChange={vi.fn()}
         currentPickupTime={currentPickupTime}
         onConfirm={onConfirm}
+        openedAtTimestamp={currentPickupDate.getTime()}
       />
     );
 
@@ -55,6 +56,7 @@ describe('PickupTimeAdjustDialog', () => {
         onOpenChange={onOpenChange}
         currentPickupTime="2026-03-17T12:30:00.000Z"
         onConfirm={onConfirm}
+        openedAtTimestamp={new Date('2026-03-17T12:30:00.000Z').getTime()}
       />
     );
 
@@ -63,6 +65,66 @@ describe('PickupTimeAdjustDialog', () => {
 
     expect(onConfirm).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('adds larger positive adjustments when the current pickup time is already overdue', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-17T12:00:00.000Z'));
+
+    render(
+      <PickupTimeAdjustDialog
+        open
+        onOpenChange={vi.fn()}
+        currentPickupTime="2026-03-17T11:30:00.000Z"
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        openedAtTimestamp={new Date('2026-03-17T12:00:00.000Z').getTime()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: '+35 min' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+45 min' })).toBeInTheDocument();
+  });
+
+  it('hides adjustments that would still keep the pickup time in the past', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-17T12:00:00.000Z'));
+
+    render(
+      <PickupTimeAdjustDialog
+        open
+        onOpenChange={vi.fn()}
+        currentPickupTime="2026-03-17T11:52:00.000Z"
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        openedAtTimestamp={new Date('2026-03-17T12:00:00.000Z').getTime()}
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: '-10 min' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '-5 min' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+5 min' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+10 min' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '+15 min' })).toBeInTheDocument();
+  });
+
+  it('does not re-enable negative adjustments after reaching the first safe future time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-03-17T12:00:00.000Z'));
+
+    render(
+      <PickupTimeAdjustDialog
+        open
+        onOpenChange={vi.fn()}
+        currentPickupTime="2026-03-17T11:52:00.000Z"
+        onConfirm={vi.fn().mockResolvedValue(undefined)}
+        openedAtTimestamp={new Date('2026-03-17T12:00:00.000Z').getTime()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+15 min' }));
+
+    expect(screen.queryByRole('button', { name: '-10 min' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '-5 min' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '+5 min' })).toBeInTheDocument();
   });
 
   it('submits pickup time adjustment only once while the request is pending', async () => {
@@ -81,6 +143,7 @@ describe('PickupTimeAdjustDialog', () => {
         onOpenChange={vi.fn()}
         currentPickupTime="2026-03-17T12:30:00.000Z"
         onConfirm={onConfirm}
+        openedAtTimestamp={new Date('2026-03-17T12:30:00.000Z').getTime()}
       />
     );
 

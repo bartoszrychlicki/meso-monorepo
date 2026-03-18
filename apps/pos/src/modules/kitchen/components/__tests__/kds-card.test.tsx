@@ -1,11 +1,18 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom/vitest';
 import { KdsCard } from '../kds-card';
 import { KitchenTicket } from '@/types/kitchen';
 import { OrderStatus } from '@/types/enums';
 import { formatKitchenEstimatedReadyTime } from '../../formatting';
+
+const mockStartPreparing = vi.fn();
+const mockCancelOrder = vi.fn();
+const mockMarkItemDone = vi.fn();
+const mockMarkReady = vi.fn();
+const mockMarkServed = vi.fn();
+const mockAdjustPickupTime = vi.fn();
 
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual<typeof import('../../hooks')>('../../hooks');
@@ -19,6 +26,18 @@ vi.mock('../../hooks', async () => {
     }),
   };
 });
+
+vi.mock('../../store', () => ({
+  useKitchenStore: (selector: (state: Record<string, unknown>) => unknown) =>
+    selector({
+      startPreparing: mockStartPreparing,
+      cancelOrder: mockCancelOrder,
+      markItemDone: mockMarkItemDone,
+      markReady: mockMarkReady,
+      markServed: mockMarkServed,
+      adjustPickupTime: mockAdjustPickupTime,
+    }),
+}));
 
 const ticketWithVariantAndModifiers: KitchenTicket = {
   id: 'ticket-1',
@@ -48,6 +67,7 @@ const ticketWithVariantAndModifiers: KitchenTicket = {
 describe('KdsCard', () => {
   afterEach(() => {
     vi.useRealTimers();
+    vi.clearAllMocks();
   });
 
   it('renders item variant, modifiers and scheduled pickup time', () => {
@@ -249,5 +269,35 @@ describe('KdsCard', () => {
 
     await user.click(screen.getByText('Anuluj'));
     expect(screen.getByText(/Czy od razu zlecić zwrot płatności/)).toBeInTheDocument();
+  });
+
+  it('prevents duplicate pickup-time saves while the request is in flight', async () => {
+    const user = userEvent.setup();
+    let resolveRequest!: () => void;
+    mockAdjustPickupTime.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveRequest = resolve;
+      })
+    );
+
+    render(<KdsCard ticket={ticketWithVariantAndModifiers} />);
+
+    await user.click(screen.getByText('Skoryguj odbiór'));
+    const firstPositiveAdjustmentButton = screen
+      .getAllByRole('button')
+      .find((button) => button.textContent?.trim().startsWith('+'));
+
+    expect(firstPositiveAdjustmentButton).toBeDefined();
+    await user.click(firstPositiveAdjustmentButton!);
+
+    const saveButton = screen.getByRole('button', { name: 'Zapisz' });
+    await user.click(saveButton);
+    await user.click(saveButton);
+
+    expect(mockAdjustPickupTime).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRequest();
+    });
   });
 });
