@@ -280,6 +280,31 @@ describe('useInventoryStore', () => {
     });
   });
 
+  describe('loadStockItems', () => {
+    it('loads stock items and clears previous loadError', async () => {
+      const items = [makeStockItem({ id: 'stock-1' })];
+      useInventoryStore.setState({ loadError: 'old error' });
+      mockGetAllStockItems.mockResolvedValue(items);
+
+      await useInventoryStore.getState().loadStockItems();
+
+      expect(useInventoryStore.getState().stockItems).toEqual(items);
+      expect(useInventoryStore.getState().loadError).toBeNull();
+      expect(useInventoryStore.getState().isLoading).toBe(false);
+    });
+
+    it('captures network failure without throwing unhandled rejection', async () => {
+      mockGetAllStockItems.mockRejectedValue(new Error('TypeError: Load failed (example.supabase.co)'));
+
+      await expect(useInventoryStore.getState().loadStockItems()).resolves.toBeUndefined();
+
+      expect(useInventoryStore.getState().loadError).toBe(
+        'Nie udalo sie zaladowac pozycji magazynowych. Sprobuj ponownie.'
+      );
+      expect(useInventoryStore.getState().isLoading).toBe(false);
+    });
+  });
+
   describe('setSelectedWarehouse', () => {
     it('sets selected warehouse ID', () => {
       useInventoryStore.getState().setSelectedWarehouse('wh-001');
