@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { formatKitchenScheduledTime } from '../formatting';
 
-const ADJUSTMENT_OPTIONS = [-10, -5, 5, 10, 15, 20] as const;
+const ADJUSTMENT_OPTIONS = [-10, -5, 5, 10, 15, 20];
 const MIN_FUTURE_BUFFER_MINUTES = 5;
 const MINUTE_STEP = 5;
 
