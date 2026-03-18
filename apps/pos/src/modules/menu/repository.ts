@@ -234,13 +234,11 @@ export async function reorderProductsInCategory(
     throw new Error('reorderProductsInCategory failed: duplicate product IDs');
   }
 
-  if (productIds.some((productId) => !categoryProductIds.has(productId))) {
-    throw new Error('reorderProductsInCategory failed: product outside category');
-  }
+  const requestedExistingIds = productIds.filter((productId) => categoryProductIds.has(productId));
 
   const normalizedProductIds = expandCategoryReorder(
     sortedCategoryProducts.map((product) => product.id),
-    productIds
+    requestedExistingIds
   );
 
   await Promise.all(

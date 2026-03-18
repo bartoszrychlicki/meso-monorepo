@@ -158,15 +158,18 @@ describe('POST /api/v1/menu/products/reorder', () => {
     });
   });
 
-  it('rejects products outside the category', async () => {
+  it('ignores stale products outside the category when rebuilding the current order', async () => {
     const response = await POST(makeRequest({
       category_id: categoryId,
       product_ids: [...productIds, '44444444-4444-4444-8444-444444444444'],
     }));
     const body = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(body.error.code).toBe('VALIDATION_ERROR');
-    expect(mockRpc).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(body.data.product_ids).toEqual(productIds);
+    expect(mockRpc).toHaveBeenCalledWith('reorder_menu_products', {
+      p_category_id: categoryId,
+      p_product_ids: productIds,
+    });
   });
 });

@@ -25,6 +25,7 @@ import {
 import { deleteAllProductImages } from '@/lib/supabase/storage';
 import { applyCategoryReorder, sortProductsForMenu } from './utils/sort-order';
 import type { PaginatedResult } from '@/types/common';
+import { expandCategoryReorder } from './utils/reorder';
 
 async function loadAllPages<T>(
   loadPage: (page: number, perPage: number) => Promise<PaginatedResult<T>>,
@@ -174,15 +175,21 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
 
   reorderProducts: async (categoryId, productIds) => {
     const previousProducts = get().products;
+    const normalizedProductIds = expandCategoryReorder(
+      previousProducts
+        .filter((product) => product.category_id === categoryId)
+        .map((product) => product.id),
+      productIds
+    );
     const optimisticProducts = sortProductsForMenu(
-      applyCategoryReorder(previousProducts, categoryId, productIds),
+      applyCategoryReorder(previousProducts, categoryId, normalizedProductIds),
       get().categories
     );
 
     set({ products: optimisticProducts });
 
     try {
-      await reorderProductsInCategory(categoryId, productIds);
+      await reorderProductsInCategory(categoryId, normalizedProductIds);
     } catch (error) {
       set({ products: previousProducts });
       throw error;

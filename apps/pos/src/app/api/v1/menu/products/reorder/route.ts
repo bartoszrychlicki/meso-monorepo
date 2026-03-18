@@ -47,18 +47,9 @@ export async function POST(request: NextRequest) {
   }
 
   const existingIds = (categoryProducts ?? []).map((product) => product.id);
-  const foreignIds = product_ids.filter((id) => !existingIds.includes(id));
-
-  if (foreignIds.length > 0) {
-    return apiValidationError([
-      {
-        field: 'product_ids',
-        message: 'Lista produktow moze zawierac tylko produkty z wybranej kategorii',
-      },
-    ]);
-  }
-
-  const normalizedProductIds = expandCategoryReorder(existingIds, product_ids);
+  const currentCategoryIds = new Set(existingIds);
+  const requestedExistingIds = product_ids.filter((id) => currentCategoryIds.has(id));
+  const normalizedProductIds = expandCategoryReorder(existingIds, requestedExistingIds);
 
   const { error } = await serviceClient.rpc('reorder_menu_products', {
     p_category_id: category_id,

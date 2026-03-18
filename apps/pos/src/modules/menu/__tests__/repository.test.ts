@@ -316,6 +316,21 @@ describe('reorderProductsInCategory', () => {
     expect(mockProductsUpdate).toHaveBeenNthCalledWith(2, 'prod-2', { sort_order: 1 });
     expect(mockProductsUpdate).toHaveBeenNthCalledWith(3, 'prod-1', { sort_order: 2 });
   });
+
+  it('ignores stale local reorder ids that are no longer in the category', async () => {
+    mockProductsFindMany.mockResolvedValueOnce([
+      makePersistedProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0 }),
+      makePersistedProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1 }),
+      makePersistedProduct({ id: 'prod-3', category_id: 'cat-1', sort_order: 2 }),
+    ]);
+    mockProductsUpdate.mockResolvedValue(makePersistedProduct());
+
+    await reorderProductsInCategory('cat-1', ['prod-3', 'prod-legacy', 'prod-1']);
+
+    expect(mockProductsUpdate).toHaveBeenNthCalledWith(1, 'prod-3', { sort_order: 0 });
+    expect(mockProductsUpdate).toHaveBeenNthCalledWith(2, 'prod-2', { sort_order: 1 });
+    expect(mockProductsUpdate).toHaveBeenNthCalledWith(3, 'prod-1', { sort_order: 2 });
+  });
 });
 
 function createMockChain() {
