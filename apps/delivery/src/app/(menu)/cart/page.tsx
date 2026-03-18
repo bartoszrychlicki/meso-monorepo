@@ -54,7 +54,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-4">
+    <div className="mx-auto max-w-2xl px-4 py-4 pb-[calc(14rem+env(safe-area-inset-bottom))] lg:pb-4">
       <button
         onClick={() => router.back()}
         className="mb-4 flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -134,7 +134,7 @@ export default function CartPage() {
       </p>
 
       {/* Fixed CTA Button */}
-      <div className="fixed bottom-[85px] left-0 right-0 z-50 mx-4 lg:relative lg:bottom-auto lg:mx-0 lg:mt-6">
+      <div className="fixed bottom-[calc(85px+env(safe-area-inset-bottom))] left-0 right-0 z-50 mx-4 lg:relative lg:bottom-auto lg:mx-0 lg:mt-6">
         <div className="bg-background border border-border p-4 rounded-2xl shadow-xl lg:p-0 lg:border-0 lg:shadow-none lg:bg-transparent">
           <Link
             data-testid="cart-checkout-link"
