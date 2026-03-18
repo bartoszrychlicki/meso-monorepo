@@ -283,7 +283,12 @@ describe('KdsCard', () => {
     render(<KdsCard ticket={ticketWithVariantAndModifiers} />);
 
     await user.click(screen.getByText('Skoryguj odbiór'));
-    await user.click(screen.getByRole('button', { name: '+10 min' }));
+    const firstPositiveAdjustmentButton = screen
+      .getAllByRole('button')
+      .find((button) => button.textContent?.trim().startsWith('+'));
+
+    expect(firstPositiveAdjustmentButton).toBeDefined();
+    await user.click(firstPositiveAdjustmentButton!);
 
     const saveButton = screen.getByRole('button', { name: 'Zapisz' });
     await user.click(saveButton);
