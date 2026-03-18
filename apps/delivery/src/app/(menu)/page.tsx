@@ -14,7 +14,7 @@ async function getMenuData() {
       .eq('is_active', true)
       .order('sort_order'),
     supabase
-      .from(Tables.products)
+      .from(Tables.productsCatalog)
       .select(`
         id,
         category_id,
@@ -27,6 +27,8 @@ async function getMenuData() {
         promo_label,
         image_url,
         images,
+        is_available,
+        is_hidden_in_menu,
         is_vegetarian,
         is_vegan,
         is_bestseller,
@@ -40,7 +42,7 @@ async function getMenuData() {
         modifier_groups
       `)
       .eq('is_active', true)
-      .eq('is_available', true)
+      .eq('is_hidden_in_menu', false)
       .order('sort_order'),
     supabase
       .from(Tables.locations)

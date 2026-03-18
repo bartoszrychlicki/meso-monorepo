@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { addMinutes } from 'date-fns';
 import { Clock3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,17 @@ export function PickupTimeAdjustDialog({
   openedAtTimestamp = null,
 }: PickupTimeAdjustDialogProps) {
   const [draftPickupTime, setDraftPickupTime] = useState(currentPickupTime);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const confirmInFlightRef = useRef(false);
+
+  useEffect(() => {
+    confirmInFlightRef.current = false;
+    setIsConfirming(false);
+
+    if (open) {
+      setDraftPickupTime(currentPickupTime);
+    }
+  }, [currentPickupTime, open]);
 
   const currentLabel = useMemo(
     () => formatKitchenScheduledTime(currentPickupTime) ?? '--:--',
@@ -71,6 +82,7 @@ export function PickupTimeAdjustDialog({
 
     return [...new Set(options)].sort((left, right) => left - right);
   }, [draftPickupTime, openedAtTimestamp]);
+  const isBusy = isSubmitting || isConfirming;
   const canConfirm = draftPickupTime !== currentPickupTime;
 
   const handleAdjust = (minutes: number) => {
@@ -83,11 +95,19 @@ export function PickupTimeAdjustDialog({
   };
 
   const handleConfirm = async () => {
-    if (!canConfirm || isSubmitting) {
+    if (!canConfirm || isBusy || confirmInFlightRef.current) {
       return;
     }
 
-    await onConfirm(draftPickupTime);
+    confirmInFlightRef.current = true;
+    setIsConfirming(true);
+
+    try {
+      await onConfirm(draftPickupTime);
+    } finally {
+      confirmInFlightRef.current = false;
+      setIsConfirming(false);
+    }
   };
 
   return (
@@ -127,6 +147,7 @@ export function PickupTimeAdjustDialog({
                 variant={minutes > 0 ? 'default' : 'outline'}
                 className="h-16 text-xl font-bold"
                 onClick={() => handleAdjust(minutes)}
+                disabled={isBusy}
                 data-action={`pickup-adjust-${minutes > 0 ? 'plus' : 'minus'}-${Math.abs(minutes)}`}
               >
                 {minutes > 0 ? '+' : ''}{minutes} min
@@ -141,7 +162,7 @@ export function PickupTimeAdjustDialog({
             variant="outline"
             className="h-12 px-6 text-base font-semibold"
             onClick={() => onOpenChange(false)}
-            disabled={isSubmitting}
+            disabled={isBusy}
             data-action="cancel-pickup-adjust"
           >
             Anuluj
@@ -150,7 +171,7 @@ export function PickupTimeAdjustDialog({
             type="button"
             className="h-12 px-8 text-base font-semibold"
             onClick={() => void handleConfirm()}
-            disabled={!canConfirm || isSubmitting}
+            disabled={!canConfirm || isBusy}
             data-action="confirm-pickup-adjust"
           >
             Zapisz

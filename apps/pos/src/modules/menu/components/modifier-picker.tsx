@@ -17,9 +17,10 @@ interface ModifierPickerProps {
   selectedModifierIds: string[];
   onChange: (ids: string[]) => void;
   recipes: Recipe[];
-  onCreateModifier: (
+  onCreateModifier?: (
     data: Omit<MenuModifier, 'id' | 'created_at' | 'updated_at'>
   ) => Promise<MenuModifier>;
+  allowCreate?: boolean;
 }
 
 function normalizeModifierIds(ids: string[]): string[] {
@@ -32,6 +33,7 @@ export function ModifierPicker({
   onChange,
   recipes,
   onCreateModifier,
+  allowCreate = true,
 }: ModifierPickerProps) {
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -68,6 +70,7 @@ export function ModifierPicker({
   const handleCreateModifier = async (
     data: Omit<MenuModifier, 'id' | 'created_at' | 'updated_at'>
   ) => {
+    if (!onCreateModifier) return;
     const newModifier = await onCreateModifier(data);
     // Auto-select the newly created modifier
     onChange(normalizeModifierIds([...selectedModifierIds, newModifier.id]));
@@ -159,23 +162,27 @@ export function ModifierPicker({
       </div>
 
       {/* Create new modifier button */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setDialogOpen(true)}
-        data-action="create-modifier"
-      >
-        <Plus className="mr-1 h-4 w-4" />
-        Stworz nowy modyfikator
-      </Button>
+      {allowCreate && onCreateModifier && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setDialogOpen(true)}
+          data-action="create-modifier"
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          Stworz nowy modyfikator
+        </Button>
+      )}
 
       {/* Modifier creation dialog */}
-      <ModifierFormDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        recipes={recipes}
-        onSave={handleCreateModifier}
-      />
+      {allowCreate && onCreateModifier && (
+        <ModifierFormDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          recipes={recipes}
+          onSave={handleCreateModifier}
+        />
+      )}
     </div>
   );
 }

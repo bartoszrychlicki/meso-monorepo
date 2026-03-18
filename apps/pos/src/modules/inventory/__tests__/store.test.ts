@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { StockItem, Warehouse, WarehouseStockItem, StockItemComponentWithDetails } from '@/types/inventory';
+import {
+  InventoryCount,
+  InventoryCountLine,
+  StockItem,
+  Warehouse,
+  WarehouseStockItem,
+  StockItemComponentWithDetails,
+} from '@/types/inventory';
 import { ProductCategory, VatRate, ConsumptionType } from '@/types/enums';
 
 // Mock inventory repository
@@ -7,6 +14,7 @@ const mockGetAllStockItems = vi.fn();
 const mockGetAllInventoryCategories = vi.fn();
 const mockGetAllWarehouses = vi.fn();
 const mockGetAllWarehouseStockItems = vi.fn();
+const mockGetInventoryCounts = vi.fn();
 const mockStockItemsCreate = vi.fn();
 const mockStockItemsUpdate = vi.fn();
 const mockDeleteStockItem = vi.fn();
@@ -21,11 +29,19 @@ const mockCreateInventoryCategory = vi.fn();
 const mockUpdateInventoryCategory = vi.fn();
 const mockDeleteInventoryCategory = vi.fn();
 const mockGetStockItemById = vi.fn();
+const mockGetWarehouseAssignmentsForStockItem = vi.fn();
 const mockGetComponentsForItem = vi.fn();
 const mockGetStockItemUsage = vi.fn();
 const mockAddComponent = vi.fn();
 const mockUpdateComponent = vi.fn();
 const mockRemoveComponent = vi.fn();
+const mockCreateInventoryCount = vi.fn();
+const mockGetInventoryCountById = vi.fn();
+const mockUpdateInventoryCount = vi.fn();
+const mockUpdateInventoryCountLine = vi.fn();
+const mockAddStockItemToInventoryCount = vi.fn();
+const mockApproveInventoryCount = vi.fn();
+const mockCancelInventoryCount = vi.fn();
 
 vi.mock('../repository', () => ({
   inventoryRepository: {
@@ -33,6 +49,7 @@ vi.mock('../repository', () => ({
     getAllInventoryCategories: (...args: unknown[]) => mockGetAllInventoryCategories(...args),
     getAllWarehouses: (...args: unknown[]) => mockGetAllWarehouses(...args),
     getAllWarehouseStockItems: (...args: unknown[]) => mockGetAllWarehouseStockItems(...args),
+    getInventoryCounts: (...args: unknown[]) => mockGetInventoryCounts(...args),
     deleteStockItem: (...args: unknown[]) => mockDeleteStockItem(...args),
     adjustStock: (...args: unknown[]) => mockAdjustStock(...args),
     transferStock: (...args: unknown[]) => mockTransferStock(...args),
@@ -44,7 +61,16 @@ vi.mock('../repository', () => ({
     createInventoryCategory: (...args: unknown[]) => mockCreateInventoryCategory(...args),
     updateInventoryCategory: (...args: unknown[]) => mockUpdateInventoryCategory(...args),
     deleteInventoryCategory: (...args: unknown[]) => mockDeleteInventoryCategory(...args),
+    createInventoryCount: (...args: unknown[]) => mockCreateInventoryCount(...args),
+    getInventoryCountById: (...args: unknown[]) => mockGetInventoryCountById(...args),
+    updateInventoryCount: (...args: unknown[]) => mockUpdateInventoryCount(...args),
+    updateInventoryCountLine: (...args: unknown[]) => mockUpdateInventoryCountLine(...args),
+    addStockItemToInventoryCount: (...args: unknown[]) => mockAddStockItemToInventoryCount(...args),
+    approveInventoryCount: (...args: unknown[]) => mockApproveInventoryCount(...args),
+    cancelInventoryCount: (...args: unknown[]) => mockCancelInventoryCount(...args),
     getStockItemById: (...args: unknown[]) => mockGetStockItemById(...args),
+    getWarehouseAssignmentsForStockItem: (...args: unknown[]) =>
+      mockGetWarehouseAssignmentsForStockItem(...args),
     getComponentsForItem: (...args: unknown[]) => mockGetComponentsForItem(...args),
     getStockItemUsage: (...args: unknown[]) => mockGetStockItemUsage(...args),
     addComponent: (...args: unknown[]) => mockAddComponent(...args),
@@ -113,6 +139,44 @@ const makeWarehouseStockItem = (overrides: Partial<WarehouseStockItem> = {}): Wa
   ...overrides,
 });
 
+const makeInventoryCount = (overrides: Partial<InventoryCount> = {}): InventoryCount => ({
+  id: 'count-001',
+  number: 'INW 1/2026',
+  scope: 'single',
+  warehouse_id: 'wh-001',
+  status: 'draft',
+  comment: null,
+  created_by: null,
+  approved_at: null,
+  created_at: '2026-03-16T10:00:00Z',
+  updated_at: '2026-03-16T10:00:00Z',
+  warehouse_name: 'Test Warehouse',
+  total_lines: 1,
+  counted_lines: 0,
+  difference_lines: 0,
+  ...overrides,
+});
+
+const makeInventoryCountLine = (overrides: Partial<InventoryCountLine> = {}): InventoryCountLine => ({
+  id: 'line-001',
+  inventory_count_id: 'count-001',
+  warehouse_id: 'wh-001',
+  stock_item_id: 'si-001',
+  stock_item_name: 'Test Item',
+  stock_item_sku: 'TEST-001',
+  stock_item_unit: 'g',
+  expected_quantity: 1000,
+  counted_quantity: null,
+  note: null,
+  edited_inventory_category_id: null,
+  edited_storage_location: null,
+  sort_order: 0,
+  created_at: '2026-03-16T10:00:00Z',
+  updated_at: '2026-03-16T10:00:00Z',
+  warehouse_name: 'Test Warehouse',
+  ...overrides,
+});
+
 describe('useInventoryStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,14 +185,20 @@ describe('useInventoryStore', () => {
       inventoryCategories: [],
       warehouses: [],
       warehouseStockItems: [],
+      inventoryCounts: [],
       selectedWarehouseId: null,
       isLoading: false,
       loadError: null,
       currentStockItem: null,
+      currentWarehouseAssignments: [],
       currentComponents: [],
       currentUsage: null,
       isDetailLoading: false,
       detailLoadError: null,
+      currentInventoryCount: null,
+      currentInventoryCountLines: [],
+      isInventoryCountLoading: false,
+      inventoryCountLoadError: null,
     });
   });
 
@@ -143,6 +213,7 @@ describe('useInventoryStore', () => {
       mockGetAllInventoryCategories.mockResolvedValue(categories);
       mockGetAllWarehouses.mockResolvedValue(warehouses);
       mockGetAllWarehouseStockItems.mockResolvedValue(whItems);
+      mockGetInventoryCounts.mockResolvedValue([]);
 
       await useInventoryStore.getState().loadAll();
 
@@ -162,6 +233,7 @@ describe('useInventoryStore', () => {
       mockGetAllInventoryCategories.mockResolvedValue([]);
       mockGetAllWarehouses.mockResolvedValue([]);
       mockGetAllWarehouseStockItems.mockResolvedValue([]);
+      mockGetInventoryCounts.mockResolvedValue([]);
 
       const loadPromise = useInventoryStore.getState().loadAll();
       expect(useInventoryStore.getState().isLoading).toBe(true);
@@ -181,6 +253,7 @@ describe('useInventoryStore', () => {
       mockGetAllInventoryCategories.mockResolvedValue(categories);
       mockGetAllWarehouses.mockResolvedValue(warehouses);
       mockGetAllWarehouseStockItems.mockRejectedValue(new Error('Network error'));
+      mockGetInventoryCounts.mockResolvedValue([]);
 
       await useInventoryStore.getState().loadAll();
 
@@ -199,10 +272,41 @@ describe('useInventoryStore', () => {
       mockGetAllInventoryCategories.mockResolvedValue([]);
       mockGetAllWarehouses.mockResolvedValue([]);
       mockGetAllWarehouseStockItems.mockResolvedValue([]);
+      mockGetInventoryCounts.mockResolvedValue([]);
 
       await useInventoryStore.getState().loadAll();
 
       expect(useInventoryStore.getState().loadError).toBeNull();
+    });
+  });
+
+  describe('loadStockItems', () => {
+    it('loads stock items without mutating shared loadError', async () => {
+      const items = [makeStockItem({ id: 'stock-1' })];
+      useInventoryStore.setState({ loadError: 'old error' });
+      mockGetAllStockItems.mockResolvedValue(items);
+
+      await useInventoryStore.getState().loadStockItems();
+
+      expect(useInventoryStore.getState().stockItems).toEqual(items);
+      expect(useInventoryStore.getState().loadError).toBe('old error');
+      expect(useInventoryStore.getState().isLoading).toBe(false);
+    });
+
+    it('captures network failure without throwing unhandled rejection', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      useInventoryStore.setState({ loadError: 'existing inventory warning' });
+      mockGetAllStockItems.mockRejectedValue(new Error('TypeError: Load failed (example.supabase.co)'));
+
+      await expect(useInventoryStore.getState().loadStockItems()).resolves.toBeUndefined();
+
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[InventoryStore] loadStockItems failed:',
+        expect.any(Error)
+      );
+      expect(useInventoryStore.getState().loadError).toBe('existing inventory warning');
+      expect(useInventoryStore.getState().isLoading).toBe(false);
+      consoleErrorSpy.mockRestore();
     });
   });
 
@@ -351,6 +455,60 @@ describe('useInventoryStore', () => {
     });
   });
 
+  describe('inventory counts', () => {
+    it('stores created inventory count detail in state', async () => {
+      const count = makeInventoryCount();
+      const line = makeInventoryCountLine();
+
+      mockCreateInventoryCount.mockResolvedValue({
+        count,
+        lines: [line],
+      });
+
+      const created = await useInventoryStore.getState().createInventoryCount('single', 'wh-001');
+
+      expect(mockCreateInventoryCount).toHaveBeenCalledWith('single', 'wh-001');
+      expect(created).toEqual(count);
+      expect(useInventoryStore.getState().inventoryCounts).toEqual([count]);
+      expect(useInventoryStore.getState().currentInventoryCount).toEqual(count);
+      expect(useInventoryStore.getState().currentInventoryCountLines).toEqual([line]);
+    });
+
+    it('approves count and refreshes stock plus summary data', async () => {
+      const draftCount = makeInventoryCount();
+      const approvedCount = makeInventoryCount({
+        status: 'approved',
+        counted_lines: 1,
+        difference_lines: 1,
+      });
+      const approvedLine = makeInventoryCountLine({ counted_quantity: 900 });
+      const refreshedStock = [
+        makeWarehouseStockItem({ id: 'si-001', warehouse_id: 'wh-001', quantity: 900 }),
+      ];
+
+      useInventoryStore.setState({
+        currentInventoryCount: draftCount,
+        currentInventoryCountLines: [makeInventoryCountLine()],
+      });
+
+      mockApproveInventoryCount.mockResolvedValue(approvedCount);
+      mockGetAllWarehouseStockItems.mockResolvedValue(refreshedStock);
+      mockGetInventoryCounts.mockResolvedValue([approvedCount]);
+      mockGetInventoryCountById.mockResolvedValue({
+        count: approvedCount,
+        lines: [approvedLine],
+      });
+
+      await useInventoryStore.getState().approveInventoryCount(draftCount.id);
+
+      expect(mockApproveInventoryCount).toHaveBeenCalledWith(draftCount.id);
+      expect(useInventoryStore.getState().warehouseStockItems).toEqual(refreshedStock);
+      expect(useInventoryStore.getState().inventoryCounts).toEqual([approvedCount]);
+      expect(useInventoryStore.getState().currentInventoryCount?.status).toBe('approved');
+      expect(useInventoryStore.getState().currentInventoryCountLines).toEqual([approvedLine]);
+    });
+  });
+
   describe('loadInventoryCategories', () => {
     it('exposes category load failures for detail views', async () => {
       mockGetAllInventoryCategories.mockRejectedValue(new Error('network error'));
@@ -372,6 +530,9 @@ describe('useInventoryStore', () => {
       useInventoryStore.setState({ warehouseStockItems: [item] });
 
       mockAdjustStock.mockResolvedValue({ quantity: 1500 });
+      mockGetAllWarehouseStockItems.mockResolvedValue([
+        makeWarehouseStockItem({ id: 'si-001', warehouse_id: 'wh-001', quantity: 1500 }),
+      ]);
 
       await useInventoryStore.getState().adjustStock('wh-001', 'si-001', 500, 'Delivery');
 
@@ -474,6 +635,30 @@ describe('useInventoryStore', () => {
       await promise;
 
       expect(useInventoryStore.getState().isDetailLoading).toBe(false);
+    });
+  });
+
+  describe('loadWarehouseAssignments', () => {
+    it('loads warehouse assignments for stock item detail', async () => {
+      const assignments = [
+        {
+          id: 'ws-001',
+          warehouse_id: 'wh-001',
+          warehouse_name: 'Test Warehouse',
+          quantity: 1000,
+          min_quantity: 500,
+          storage_location: 'Regal A',
+          created_at: '2026-01-01T00:00:00Z',
+          updated_at: '2026-01-01T00:00:00Z',
+        },
+      ];
+
+      mockGetWarehouseAssignmentsForStockItem.mockResolvedValue(assignments);
+
+      await useInventoryStore.getState().loadWarehouseAssignments('si-001');
+
+      expect(mockGetWarehouseAssignmentsForStockItem).toHaveBeenCalledWith('si-001');
+      expect(useInventoryStore.getState().currentWarehouseAssignments).toEqual(assignments);
     });
   });
 

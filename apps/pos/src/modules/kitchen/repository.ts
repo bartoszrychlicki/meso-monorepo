@@ -277,7 +277,6 @@ async function adjustPickupTime(id: string, pickupTime: string): Promise<Kitchen
       metadata: nextMetadata,
     } as Partial<Order>);
   }
-
   return baseRepo.update(id, { estimated_ready_at: pickupTime } as Partial<KitchenTicket>);
 }
 

@@ -40,6 +40,8 @@ export interface Product {
   has_spice_level: boolean
   tags: string[]
   sort_order: number
+  is_available?: boolean
+  is_hidden_in_menu?: boolean
   created_at: string
   updated_at?: string
   // Relations

@@ -8,14 +8,20 @@ import {
 } from '@/lib/api/response';
 import { createServerRepository } from '@/lib/data/server-repository-factory';
 import { CreateProductSchema } from '@/schemas/menu';
-import type { Product } from '@/types/menu';
+import { createServiceClient } from '@/lib/supabase/server';
+import type { Product, ProductWriteInput } from '@/types/menu';
 import { SalesChannel } from '@/types/enums';
+import { createProductWithFoodCost } from '@/modules/menu/repository';
+import { setProductModifierGroupsWithClient } from '@/modules/menu/relations';
+import type { Recipe } from '@/types/recipe';
 
 /**
  * GET /api/v1/menu/products
  * List products with optional filtering and pagination.
  *
  * Query params:
+ *   ?is_available=true|false - filter products by order availability
+ *   ?is_hidden_in_menu=true|false - filter products by Delivery visibility
  *   ?channel=delivery     - filter products with pricing for this channel
  *   ?updated_since=ISO    - filter products updated after this date
  *   ?include=modifiers,variants,pricing - control response fields
@@ -30,16 +36,20 @@ export async function GET(request: NextRequest) {
   const categoryId = searchParams.get('category_id');
   const search = searchParams.get('search');
   const isAvailable = searchParams.get('is_available');
+  const isHiddenInMenu = searchParams.get('is_hidden_in_menu');
   const channel = searchParams.get('channel');
   const updatedSince = searchParams.get('updated_since');
   const include = searchParams.get('include');
 
-  const serverProductsRepo = createServerRepository<Product>('products');
+  const serverProductsRepo = createServerRepository<Product>('products_catalog');
 
   const filters: Record<string, unknown> = {};
   if (categoryId) filters.category_id = categoryId;
   if (isAvailable !== null && isAvailable !== undefined && isAvailable !== '') {
     filters.is_available = isAvailable === 'true';
+  }
+  if (isHiddenInMenu !== null && isHiddenInMenu !== undefined && isHiddenInMenu !== '') {
+    filters.is_hidden_in_menu = isHiddenInMenu === 'true';
   }
 
   let result = await serverProductsRepo.findAll({
@@ -96,6 +106,7 @@ export async function GET(request: NextRequest) {
         promo_ends_at: p.promo_ends_at,
         images: p.images,
         is_available: p.is_available,
+        is_hidden_in_menu: p.is_hidden_in_menu,
         is_active: p.is_active,
         allergens: p.allergens,
         nutritional_info: p.nutritional_info,
@@ -145,7 +156,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const serviceClient = createServiceClient();
   const serverProductsRepo = createServerRepository<Product>('products');
-  const product = await serverProductsRepo.create(validation.data as Omit<Product, 'id' | 'created_at' | 'updated_at'>);
-  return apiCreated(product);
+  const serverRecipesRepo = createServerRepository<Recipe>('recipes');
+  const catalogProductsRepo = createServerRepository<Product>('products_catalog');
+  const payload = validation.data as ProductWriteInput;
+
+  const product = await createProductWithFoodCost(payload, {
+    productsRepo: serverProductsRepo,
+    recipesRepo: serverRecipesRepo,
+  });
+
+  await setProductModifierGroupsWithClient(
+    serviceClient,
+    product.id,
+    payload.modifier_group_ids ?? []
+  );
+
+  const createdProduct = await catalogProductsRepo.findById(product.id);
+  return apiCreated(createdProduct ?? product);
 }

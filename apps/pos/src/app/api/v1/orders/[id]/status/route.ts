@@ -1,12 +1,7 @@
 import { NextRequest } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { authenticateRequest, isApiKey } from '@/lib/api/auth';
-import { hasPermission } from '@/lib/api-keys';
 import {
   apiSuccess,
-  apiForbidden,
   apiNotFound,
-  apiUnauthorized,
   apiValidationError,
   apiError,
 } from '@/lib/api/response';
@@ -16,6 +11,7 @@ import {
   OrderNotFoundError,
   transitionOrderStatus,
 } from '@/lib/orders/status-transition';
+import { authorizeOrderRoute } from '@/modules/orders/server/route-auth';
 import { UpdateOrderStatusSchema } from '@/schemas/order';
 
 interface RouteParams {
@@ -23,25 +19,12 @@ interface RouteParams {
 }
 
 async function authorizeOrderStatusMutation(request: NextRequest) {
-  const apiKeyAuth = await authenticateRequest(request);
-  if (isApiKey(apiKeyAuth)) {
-    if (!hasPermission(apiKeyAuth, 'orders:status')) {
-      return apiForbidden('orders:status');
-    }
-
-    return { changedBy: apiKeyAuth.id, authType: 'api_key' as const };
+  const access = await authorizeOrderRoute(request, 'orders:status');
+  if ('status' in access) {
+    return access;
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return apiUnauthorized();
-  }
-
-  return { changedBy: user.id, authType: 'session' as const };
+  return { changedBy: access.actorId, authType: access.kind };
 }
 
 /**
@@ -72,15 +55,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 
   try {
+    const changedBy: string | undefined = auth.authType === 'api_key'
+      ? (validation.data.changed_by ?? auth.changedBy ?? undefined)
+      : auth.changedBy ?? undefined;
+
     const updated = await transitionOrderStatus({
       orderId: id,
       status: validation.data.status,
       note: validation.data.note,
       closure_reason_code: validation.data.closure_reason_code,
       closure_reason: validation.data.closure_reason,
-      changed_by: auth.authType === 'api_key'
-        ? (validation.data.changed_by || auth.changedBy)
-        : auth.changedBy,
+      changed_by: changedBy,
       payment_status: validation.data.payment_status,
       requestOrigin: request.nextUrl.origin,
     });

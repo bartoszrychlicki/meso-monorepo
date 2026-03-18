@@ -9,6 +9,7 @@ interface KpiCardProps {
   icon: React.ReactNode;
   label: string;
   value: string | number;
+  compact?: boolean;
   trend?: {
     direction: 'up' | 'down';
     percentage: number;
@@ -16,16 +17,28 @@ interface KpiCardProps {
   className?: string;
 }
 
-export function KpiCard({ icon, label, value, trend, className }: KpiCardProps) {
+export function KpiCard({
+  icon,
+  label,
+  value,
+  compact = false,
+  trend,
+  className,
+}: KpiCardProps) {
   return (
     <Card
       className={cn('overflow-hidden transition-all duration-200 hover:shadow-md', className)}
       data-component="kpi-card"
       data-field={label}
     >
-      <CardContent className="p-6">
+      <CardContent className={compact ? 'p-4' : 'p-6'}>
         <div className="flex items-center justify-between">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary shadow-sm">
+          <div
+            className={cn(
+              'flex items-center justify-center bg-primary/10 text-primary shadow-sm',
+              compact ? 'h-9 w-9 rounded-md' : 'h-10 w-10 rounded-lg'
+            )}
+          >
             {icon}
           </div>
           {trend && (
@@ -47,9 +60,11 @@ export function KpiCard({ icon, label, value, trend, className }: KpiCardProps) 
             </div>
           )}
         </div>
-        <div className="mt-4">
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold tracking-tight">{value}</p>
+        <div className={compact ? 'mt-3' : 'mt-4'}>
+          <p className={cn('text-muted-foreground', compact ? 'text-xs' : 'text-sm')}>{label}</p>
+          <p className={cn('font-bold tracking-tight', compact ? 'text-xl' : 'text-2xl')}>
+            {value}
+          </p>
         </div>
       </CardContent>
     </Card>

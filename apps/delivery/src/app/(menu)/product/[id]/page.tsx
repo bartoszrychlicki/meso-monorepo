@@ -15,14 +15,14 @@ export default async function ProductPage({ params }: PageProps) {
   const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
   const { data: product } = await supabase
-    .from(Tables.products)
+    .from(Tables.productsCatalog)
     .select(`
       *,
       category:menu_categories(id, name, slug, icon)
     `)
     .eq(isUUID ? 'id' : 'slug', id)
     .eq('is_active', true)
-    .eq('is_available', true)
+    .eq('is_hidden_in_menu', false)
     .single()
 
   if (!product) {

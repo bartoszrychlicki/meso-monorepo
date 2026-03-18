@@ -23,6 +23,7 @@ interface MenuGridProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onToggleAvailability: (id: string) => void;
+  onToggleMenuVisibility: (id: string) => void;
   onReorderProducts: (categoryId: string, productIds: string[]) => Promise<void>;
   onProductClick: (id: string) => void;
   isLoading: boolean;
@@ -37,16 +38,17 @@ export function MenuGrid({
   searchQuery,
   onSearchChange,
   onToggleAvailability,
+  onToggleMenuVisibility,
   onReorderProducts,
   onProductClick,
   isLoading,
 }: MenuGridProps) {
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [isSavingReorder, setIsSavingReorder] = useState(false);
-  const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
+  const categoryMap = new Map(categories.map((category) => [category.id, category.name]));
 
   const recipeMap = useMemo(
-    () => new Map(recipes.map((r) => [r.id, r])),
+    () => new Map(recipes.map((recipe) => [recipe.id, recipe])),
     [recipes]
   );
 
@@ -54,7 +56,6 @@ export function MenuGrid({
     const map = new Map<string, FoodCostResult>();
     for (const product of products) {
       const effectivePrice = getProductPromotionPricing(product).currentPrice;
-      // Prefer recipe-based cost
       if (product.recipe_id) {
         const recipe = recipeMap.get(product.recipe_id);
         if (recipe) {
@@ -64,15 +65,15 @@ export function MenuGrid({
           map.set(product.id, {
             totalCost: recipe.cost_per_unit,
             costPercentage,
-            ingredientCosts: recipe.ingredients.map((ing) => ({
-              reference_id: ing.reference_id,
-              cost: ing.quantity * (ing.cost_per_unit ?? 0),
+            ingredientCosts: recipe.ingredients.map((ingredient) => ({
+              reference_id: ingredient.reference_id,
+              cost: ingredient.quantity * (ingredient.cost_per_unit ?? 0),
             })),
           });
           continue;
         }
       }
-      // Fallback to inline ingredients
+
       const ingredients = product.ingredients ?? [];
       if (ingredients.length > 0 && stockItems.length > 0) {
         map.set(product.id, calculateFoodCost(ingredients, stockItems, effectivePrice));
@@ -93,7 +94,9 @@ export function MenuGrid({
   }, [canReorder, isReorderMode]);
 
   const handleReorder = async (productIds: string[]) => {
-    if (!selectedCategoryId) return;
+    if (!selectedCategoryId) {
+      return;
+    }
 
     setIsSavingReorder(true);
     try {
@@ -108,8 +111,8 @@ export function MenuGrid({
       <div className="space-y-4" data-component="menu-grid-skeleton">
         <Skeleton className="h-10 w-full rounded-lg" />
         <div className="grid grid-cols-2 gap-5 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-80 w-full rounded-xl" />
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Skeleton key={index} className="h-80 w-full rounded-xl" />
           ))}
         </div>
       </div>
@@ -125,7 +128,7 @@ export function MenuGrid({
             <Input
               placeholder="Szukaj produktu..."
               value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
+              onChange={(event) => onSearchChange(event.target.value)}
               className="pl-9"
               data-field="search"
             />
@@ -194,6 +197,7 @@ export function MenuGrid({
               categoryName={categoryMap.get(product.category_id)}
               foodCost={foodCostMap.get(product.id) ?? null}
               onToggleAvailability={onToggleAvailability}
+              onToggleMenuVisibility={onToggleMenuVisibility}
               onClick={onProductClick}
             />
           ))}

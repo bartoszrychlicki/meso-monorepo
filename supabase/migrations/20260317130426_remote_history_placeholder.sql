@@ -1,0 +1,2 @@
+-- Placeholder migration kept to align local repository history with
+-- a migration already applied remotely before it was committed to git.

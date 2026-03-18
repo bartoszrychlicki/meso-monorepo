@@ -37,6 +37,7 @@ interface DataTableProps<T> {
   emptyDescription?: string;
   emptyAction?: React.ReactNode;
   getRowId?: (item: T) => string;
+  renderFooter?: (visibleData: T[]) => React.ReactNode;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -53,6 +54,7 @@ export function DataTable<T extends Record<string, unknown>>({
   emptyDescription,
   emptyAction,
   getRowId,
+  renderFooter,
 }: DataTableProps<T>) {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<string | null>(null);
@@ -81,6 +83,8 @@ export function DataTable<T extends Record<string, unknown>>({
       return sortOrder === 'desc' ? -cmp : cmp;
     });
   }, [filteredData, sortBy, sortOrder]);
+
+  const footerContent = renderFooter?.(sortedData);
 
   const handleSort = (key: string) => {
     if (sortBy === key) {
@@ -125,7 +129,7 @@ export function DataTable<T extends Record<string, unknown>>({
         />
       ) : (
         <>
-          <div className="rounded-md border">
+          <div className="overflow-hidden rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -170,6 +174,12 @@ export function DataTable<T extends Record<string, unknown>>({
                 })}
               </TableBody>
             </Table>
+
+            {footerContent ? (
+              <div className="border-t bg-muted/20 px-4 py-3">
+                {footerContent}
+              </div>
+            ) : null}
           </div>
 
           {totalPages > 1 && onPageChange && (

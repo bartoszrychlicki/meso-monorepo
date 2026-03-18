@@ -65,6 +65,17 @@ function buildKitchenComparablePayload(item: Pick<OrderItem, 'product_name' | 'v
   };
 }
 
+function buildKitchenCompletionComparablePayload(
+  item: Pick<OrderItem, 'product_name' | 'variant_name' | 'quantity' | 'modifiers'>
+) {
+  return {
+    product_name: item.product_name,
+    variant_name: item.variant_name ?? null,
+    quantity: item.quantity,
+    modifiers: getKitchenModifierLabels(item),
+  };
+}
+
 export function isOrderEditableStatus(status: OrderStatus): boolean {
   return EDITABLE_ORDER_STATUS_SET.has(status);
 }
@@ -116,13 +127,13 @@ export function buildKitchenItemsFromOrderItems(
           variant_name: previousItem.variant_name ?? null,
           quantity: previousItem.quantity,
           modifiers: [...previousItem.modifiers],
-          notes: previousItem.notes ?? '',
         }
       : null;
     const nextComparable = buildKitchenComparablePayload(item);
+    const nextCompletionComparable = buildKitchenCompletionComparablePayload(item);
     const canPreserveCompletion =
       previousComparable &&
-      JSON.stringify(previousComparable) === JSON.stringify(nextComparable);
+      JSON.stringify(previousComparable) === JSON.stringify(nextCompletionComparable);
 
     return {
       id: previousItem?.id ?? crypto.randomUUID(),

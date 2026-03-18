@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { OrderStatus, OrderChannel, OrderSource, PaymentStatus } from '@/types/enums';
 import type { Order } from '@/types/order';
-import { getOrderStatsForLocalDay } from '../stats';
+import { filterOutCancelledOrders, getOrderStatsForLocalDay } from '../stats';
 
 function createOrder(
   id: string,
@@ -42,7 +42,8 @@ describe('order stats', () => {
       'Europe/Warsaw'
     );
 
-    expect(stats.orderCountToday).toBe(2);
+    expect(stats.orderCountToday).toBe(1);
+    expect(stats.cancelledOrderCountToday).toBe(1);
     expect(stats.revenueToday).toBe(42);
   });
 
@@ -61,6 +62,15 @@ describe('order stats', () => {
     );
 
     expect(stats.activeOrderCount).toBe(2);
-    expect(stats.avgOrderValue).toBe(20);
+    expect(stats.avgOrderValue).toBe(30);
+  });
+
+  it('filters cancelled orders out of aggregate collections', () => {
+    const orders = [
+      createOrder('1', '2026-03-12T08:00:00.000Z', 20, OrderStatus.PENDING),
+      createOrder('2', '2026-03-12T09:00:00.000Z', 30, OrderStatus.CANCELLED),
+    ];
+
+    expect(filterOutCancelledOrders(orders).map((order) => order.id)).toEqual(['1']);
   });
 });

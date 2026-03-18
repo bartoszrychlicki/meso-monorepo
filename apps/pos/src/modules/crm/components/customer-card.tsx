@@ -22,6 +22,7 @@ import {
   getTierColorClass,
   formatPoints,
 } from '@/modules/crm/utils/loyalty-calculator';
+import { getCustomerOrderHistory } from '@/modules/crm/utils/customer-list';
 import Link from 'next/link';
 
 interface CustomerCardProps {
@@ -50,7 +51,8 @@ function getProductInitials(name: string): string {
 }
 
 export function CustomerCard({ customer }: CustomerCardProps) {
-  const topProducts = customer.order_history.top_ordered_products?.slice(0, 3) ?? [];
+  const orderHistory = getCustomerOrderHistory(customer);
+  const topProducts = orderHistory.top_ordered_products?.slice(0, 3) ?? [];
 
   return (
     <Link href={`/crm/${customer.id}`}>
@@ -142,7 +144,7 @@ export function CustomerCard({ customer }: CustomerCardProps) {
                 <span>Zamówienia:</span>
               </div>
               <span data-field="total-orders">
-                {customer.order_history.total_orders}
+                {orderHistory.total_orders}
               </span>
             </div>
 
@@ -152,17 +154,17 @@ export function CustomerCard({ customer }: CustomerCardProps) {
                 <span>Wydane:</span>
               </div>
               <span className="font-medium" data-field="total-spent">
-                {formatCurrency(customer.order_history.total_spent)}
+                {formatCurrency(orderHistory.total_spent)}
               </span>
             </div>
           </div>
 
           {/* Last Order */}
-          {customer.order_history.last_order_date && (
+          {orderHistory.last_order_date && (
             <div className="pt-2 border-t">
               <p className="text-xs text-muted-foreground">
                 Ostatnie zamówienie:{' '}
-                {new Date(customer.order_history.last_order_date).toLocaleDateString(
+                {new Date(orderHistory.last_order_date).toLocaleDateString(
                   'pl-PL'
                 )}
               </p>

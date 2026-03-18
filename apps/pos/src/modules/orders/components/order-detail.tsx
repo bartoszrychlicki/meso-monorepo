@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Order } from '@/types/order';
 import {
   ModifierAction,
@@ -72,7 +73,7 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 };
 
 const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  [PaymentStatus.PENDING]: 'Oczekuje',
+  [PaymentStatus.PENDING]: 'Oczekuje na płatność',
   [PaymentStatus.PAID]: 'Opłacone',
   [PaymentStatus.FAILED]: 'Nieudane',
   [PaymentStatus.REFUNDED]: 'Zwrócone',
@@ -176,6 +177,12 @@ export function OrderDetail({
     setIsUpdating(true);
     try {
       await onRollbackStatus();
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Nie udalo sie cofnac statusu zamowienia.'
+      );
     } finally {
       setIsUpdating(false);
     }
@@ -248,6 +255,16 @@ export function OrderDetail({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Powód anulowania</AlertTitle>
           <AlertDescription>{order.closure_reason}</AlertDescription>
+        </Alert>
+      )}
+
+      {order.status === OrderStatus.PENDING && order.payment_status !== PaymentStatus.PAID && (
+        <Alert className="border-amber-300 bg-amber-50 text-amber-950" data-field="payment-pending-alert">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Zamówienie oczekuje na płatność</AlertTitle>
+          <AlertDescription>
+            To zamówienie nie zostało jeszcze opłacone i nie powinno być kierowane do realizacji.
+          </AlertDescription>
         </Alert>
       )}
 

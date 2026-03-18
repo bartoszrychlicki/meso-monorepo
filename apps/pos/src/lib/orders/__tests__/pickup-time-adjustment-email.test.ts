@@ -15,6 +15,7 @@ describe('pickup-time-adjustment-email', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.stubEnv('RESEND_API_KEY', 'test-key');
+    vi.stubEnv('DELIVERY_APP_URL', 'https://order.mesofood.pl');
     mockSend.mockReset();
   });
 
@@ -39,7 +40,6 @@ describe('pickup-time-adjustment-email', () => {
 
   it('sends pickup time adjustment email when customer email is present', async () => {
     mockSend.mockResolvedValueOnce({ data: { id: 'msg_1' }, error: null });
-    vi.stubEnv('DELIVERY_APP_URL', 'https://order.mesofood.pl');
 
     const result = await sendPickupTimeAdjustedEmail(
       {

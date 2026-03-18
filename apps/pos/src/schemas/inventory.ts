@@ -64,6 +64,27 @@ export const UpdateStockItemComponentSchema = z.object({
   quantity: z.number().positive('Ilosc musi byc dodatnia').describe('Updated quantity of component'),
 });
 
+export const CreateInventoryCountSchema = z.object({
+  scope: z.enum(['single', 'all']).describe('Inventory count scope'),
+  warehouse_id: z.string().nullable().optional().describe('Warehouse ID for single-warehouse counts'),
+}).refine(
+  (data) => (data.scope === 'single' ? !!data.warehouse_id : true),
+  { message: 'Magazyn jest wymagany dla inwentaryzacji jednego magazynu', path: ['warehouse_id'] }
+);
+
+export const UpdateInventoryCountLineSchema = z.object({
+  counted_quantity: z.number().min(0, 'Policzona ilosc nie moze byc ujemna').nullable().optional(),
+  note: z.string().nullable().optional(),
+  edited_inventory_category_id: z.string().nullable().optional(),
+  edited_storage_location: z.string().nullable().optional(),
+});
+
+export const AddInventoryCountItemSchema = z.object({
+  inventory_count_id: z.string().min(1, 'Inwentaryzacja jest wymagana'),
+  warehouse_id: z.string().min(1, 'Magazyn jest wymagany'),
+  stock_item_id: z.string().min(1, 'Pozycja magazynowa jest wymagana'),
+});
+
 export type CreateStockItemInput = z.infer<typeof CreateStockItemSchema>;
 export type UpdateStockItemInput = z.infer<typeof UpdateStockItemSchema>;
 export type CreateWarehouseInput = z.infer<typeof CreateWarehouseSchema>;
@@ -73,3 +94,6 @@ export type AdjustQuantityInput = z.infer<typeof AdjustQuantitySchema>;
 export type TransferStockInput = z.infer<typeof TransferStockSchema>;
 export type CreateStockItemComponentInput = z.infer<typeof CreateStockItemComponentSchema>;
 export type UpdateStockItemComponentInput = z.infer<typeof UpdateStockItemComponentSchema>;
+export type CreateInventoryCountInput = z.infer<typeof CreateInventoryCountSchema>;
+export type UpdateInventoryCountLineInput = z.infer<typeof UpdateInventoryCountLineSchema>;
+export type AddInventoryCountItemInput = z.infer<typeof AddInventoryCountItemSchema>;

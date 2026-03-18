@@ -43,10 +43,16 @@ export function getOrdersForLocalDay(
   );
 }
 
+export function filterOutCancelledOrders(orders: Order[]): Order[] {
+  return orders.filter((order) => order.status !== OrderStatus.CANCELLED);
+}
+
+export function getCancelledOrderCount(orders: Order[]): number {
+  return orders.filter((order) => order.status === OrderStatus.CANCELLED).length;
+}
+
 export function getRevenueForOrders(orders: Order[]): number {
-  return orders
-    .filter((order) => order.status !== OrderStatus.CANCELLED)
-    .reduce((sum, order) => sum + order.total, 0);
+  return filterOutCancelledOrders(orders).reduce((sum, order) => sum + order.total, 0);
 }
 
 export function getActiveOrderCount(orders: Order[]): number {
@@ -63,13 +69,16 @@ export function getOrderStatsForLocalDay(
   timeZone?: string
 ) {
   const todaysOrders = getOrdersForLocalDay(orders, referenceDate, timeZone);
-  const revenueToday = getRevenueForOrders(todaysOrders);
-  const orderCountToday = todaysOrders.length;
+  const todaysNonCancelledOrders = filterOutCancelledOrders(todaysOrders);
+  const revenueToday = getRevenueForOrders(todaysNonCancelledOrders);
+  const orderCountToday = todaysNonCancelledOrders.length;
 
   return {
     todaysOrders,
+    todaysNonCancelledOrders,
     revenueToday,
     orderCountToday,
+    cancelledOrderCountToday: getCancelledOrderCount(todaysOrders),
     avgOrderValue: orderCountToday > 0 ? revenueToday / orderCountToday : 0,
     activeOrderCount: getActiveOrderCount(orders),
   };

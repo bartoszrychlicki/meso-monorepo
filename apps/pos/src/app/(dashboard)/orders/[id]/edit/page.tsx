@@ -23,10 +23,18 @@ export default function OrderEditPage({
   const { order, isLoading } = useOrder(id);
   const { updateOrder } = useOrdersStore();
   const [isSaving, setIsSaving] = useState(false);
+  const hasCurrentOrder = Boolean(order && order.id === id);
 
-  useBreadcrumbLabel(id, order ? `${order.order_number} - edycja` : undefined);
+  useBreadcrumbLabel(id, hasCurrentOrder ? `${order?.order_number} - edycja` : undefined);
 
   const handleSave = async (input: Parameters<typeof updateOrder>[1]) => {
+    if (!order || order.id !== id) {
+      toast.error('Nie udało się zapisać zmian', {
+        description: 'Poczekaj, aż załaduje się właściwe zamówienie.',
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
       const result = await updateOrder(id, input);
@@ -46,9 +54,9 @@ export default function OrderEditPage({
     }
   };
 
-  if (isLoading || !order) {
+  if (isLoading || !hasCurrentOrder) {
     return (
-      <div className="space-y-6" data-page="order-edit">
+      <div className="space-y-6" data-page="order-edit" data-testid="order-edit-loading">
         <div className="flex items-center gap-4">
           <Skeleton className="h-8 w-56" />
           <Skeleton className="h-10 w-36" />
@@ -58,10 +66,12 @@ export default function OrderEditPage({
     );
   }
 
+  const currentOrder = order as NonNullable<typeof order>;
+
   return (
     <div className="space-y-6" data-page="order-edit" data-id={id}>
       <PageHeader
-        title={`Edytuj ${order.order_number}`}
+        title={`Edytuj ${currentOrder.order_number}`}
         description="Zmień skład zamówienia, telefon klienta i notatkę."
         actions={
           <Link href={`/orders/${id}`}>
@@ -74,8 +84,8 @@ export default function OrderEditPage({
       />
 
       <OrderEditForm
-        key={order.id}
-        order={order}
+        key={currentOrder.id}
+        order={currentOrder}
         isSaving={isSaving}
         onSave={handleSave}
       />

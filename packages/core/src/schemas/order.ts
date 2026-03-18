@@ -33,7 +33,9 @@ export const CreateOrderItemSchema = z.object({
 const PhoneSchema = z
   .string()
   .trim()
-  .regex(/^\+?[0-9\s\-()]{9,}$/, 'Niepoprawny numer telefonu');
+  .refine((value) => /^\+[0-9]{10,15}$/.test(value.replace(/[\s\-()]/g, '')), {
+    message: 'Niepoprawny numer telefonu',
+  });
 
 export const UpdateOrderItemSchema = CreateOrderItemSchema.extend({
   id: z.string().min(1).optional(),

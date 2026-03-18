@@ -9,25 +9,11 @@ vi.mock('@/lib/orders/cancel-order', () => ({
   cancelOrderWithOptionalRefund: mockCancelOrderWithOptionalRefund,
 }));
 
-vi.mock('@/lib/api/auth', () => ({
-  authenticateRequest: vi.fn().mockResolvedValue({ status: 401 }),
-  isApiKey: vi.fn().mockReturnValue(false),
-}));
-
-vi.mock('@/lib/api-keys', () => ({
-  hasPermission: vi.fn().mockReturnValue(true),
-}));
-
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(async () => ({
-    auth: {
-      getUser: vi.fn().mockResolvedValue({
-        data: {
-          user: { id: 'user-1' },
-        },
-      }),
-    },
-  })),
+vi.mock('@/modules/orders/server/route-auth', () => ({
+  authorizeOrderRoute: vi.fn().mockResolvedValue({
+    kind: 'session',
+    actorId: 'user-1',
+  }),
 }));
 
 import { POST } from '../route';

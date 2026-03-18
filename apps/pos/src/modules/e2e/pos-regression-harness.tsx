@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Category, Product } from '@/types/menu';
+import { Category, Product, ProductWriteInput } from '@/types/menu';
 import { CreateRecipeInput } from '@/schemas/recipe';
 import { DeliverySource, ProductCategory } from '@/types/enums';
 import { Button } from '@/components/ui/button';
@@ -109,8 +109,8 @@ export function PosRegressionHarness() {
   const [deliverySubmission, setDeliverySubmission] =
     useState<DeliverySubmission | null>(null);
   const [productSubmission, setProductSubmission] = useState<{
-    data: Omit<Product, 'created_at' | 'updated_at'>;
-    modifierIds: string[];
+    data: ProductWriteInput;
+    modifierGroupIds: string[];
   } | null>(null);
 
   const productFixture = useMemo(() => createProductFixture(), []);
@@ -265,10 +265,10 @@ export function PosRegressionHarness() {
           categories={e2eCategories as Category[]}
           stockItems={e2eStockItems}
           recipes={e2eRecipes}
-          onSubmit={(data, modifierIds) => {
+          onSubmit={(data, modifierGroupIds) => {
             setProductSubmission({
               data,
-              modifierIds,
+              modifierGroupIds,
             });
           }}
           onCancel={() => {}}

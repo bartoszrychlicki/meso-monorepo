@@ -94,6 +94,7 @@ export interface Product extends BaseEntity {
   image_url?: string; // @deprecated - use images[]
   images: ProductImage[];
   is_available: boolean; // Czy dostępny do zamówienia (tymczasowo niedostępny)
+  is_hidden_in_menu?: boolean; // Czy ukryty w Delivery mimo zachowania w systemie
   is_featured: boolean;
   allergens: Allergen[];
   nutritional_info?: NutritionalInfo;
@@ -113,6 +114,15 @@ export interface Product extends BaseEntity {
   pricing: ProductPricing[]; // spec 3.2, 3.6 MENU-004 - Ceny wielokanałowe
   active_promotions?: string[]; // spec 3.5 - ID aktywnych promocji (Sprint 2)
 }
+
+export type ProductWriteInput = Omit<Product, 'modifier_groups' | 'created_at' | 'updated_at'> & {
+  modifier_group_ids?: string[];
+};
+
+export type ModifierGroupWriteInput = Omit<
+  ModifierGroup,
+  'modifiers' | 'created_at' | 'updated_at'
+>;
 
 export interface RecipeIngredient {
   type: 'stock_item' | 'recipe';

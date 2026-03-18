@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Tables } from '@/lib/table-mapping'
 import { ProductCard } from '@/components/menu/ProductCard'
 
-const PRODUCT_FIELDS = 'id, name, name_jp, slug, description, price, original_price, promo_label, image_url, is_vegetarian, is_vegan, is_bestseller, is_signature, is_new, has_variants, has_addons'
+const PRODUCT_FIELDS = 'id, name, name_jp, slug, description, price, original_price, promo_label, image_url, is_available, is_hidden_in_menu, is_vegetarian, is_vegan, is_bestseller, is_signature, is_new, has_variants, has_addons'
 
 interface Product {
   id: string
@@ -29,6 +29,8 @@ interface Product {
   has_variants?: boolean
   has_addons?: boolean
   has_spice_level?: boolean
+  is_available?: boolean
+  is_hidden_in_menu?: boolean
 }
 
 function useDebounce(value: string, delay: number) {
@@ -68,7 +70,7 @@ export default function SearchPage() {
       .from(Tables.products)
       .select(`${PRODUCT_FIELDS}, categories!inner(name)`)
       .eq('is_active', true)
-      .eq('is_available', true)
+      .eq('is_hidden_in_menu', false)
       .or(`name.ilike.%${q}%,name_jp.ilike.%${q}%,description.ilike.%${q}%,categories.name.ilike.%${q}%`)
       .limit(20)
 
@@ -79,7 +81,7 @@ export default function SearchPage() {
         .from(Tables.products)
         .select(PRODUCT_FIELDS)
         .eq('is_active', true)
-        .eq('is_available', true)
+        .eq('is_hidden_in_menu', false)
         .or(`name.ilike.%${q}%,name_jp.ilike.%${q}%,description.ilike.%${q}%`)
         .limit(20)
       setResults(fallback ?? [])

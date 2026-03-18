@@ -1,16 +1,26 @@
 'use client';
 
 import { create } from 'zustand';
-import { Product, Category, ModifierGroup, MenuModifier } from '@/types/menu';
+import {
+  Product,
+  Category,
+  ModifierGroup,
+  MenuModifier,
+  type ModifierGroupWriteInput,
+  type ProductWriteInput,
+} from '@/types/menu';
 import {
   productsRepository,
   categoriesRepository,
   modifierGroupsRepository,
   modifiersRepository,
   toggleAvailability,
+  toggleMenuVisibility,
   createProductWithFoodCost,
   updateProductWithFoodCost,
+  listModifierGroups,
   reorderProductsInCategory,
+  setModifierGroupModifiers,
 } from './repository';
 import { deleteAllProductImages } from '@/lib/supabase/storage';
 import { applyCategoryReorder, sortProductsForMenu } from './utils/sort-order';
@@ -40,27 +50,25 @@ interface MenuStore {
   selectedCategoryId: string | null;
   searchQuery: string;
   isLoading: boolean;
-
-  // Actions
   loadAll: () => Promise<void>;
-  createProduct: (data: Omit<Product, 'created_at' | 'updated_at'>) => Promise<Product>;
-  updateProduct: (id: string, data: Partial<Product>) => Promise<void>;
+  createProduct: (data: ProductWriteInput) => Promise<Product>;
+  updateProduct: (id: string, data: Partial<ProductWriteInput>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   toggleProductAvailability: (id: string) => Promise<void>;
+  toggleProductMenuVisibility: (id: string) => Promise<void>;
   reorderProducts: (categoryId: string, productIds: string[]) => Promise<void>;
   createCategory: (data: Omit<Category, 'id' | 'created_at' | 'updated_at'>) => Promise<Category>;
   updateCategory: (id: string, data: Partial<Category>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   setSelectedCategory: (id: string | null) => void;
   setSearchQuery: (query: string) => void;
-
-  // Modifier actions
   loadModifiers: () => Promise<void>;
   createModifier: (data: Omit<MenuModifier, 'id' | 'created_at' | 'updated_at'>) => Promise<MenuModifier>;
   updateModifier: (id: string, data: Partial<MenuModifier>) => Promise<void>;
   deleteModifier: (id: string) => Promise<void>;
-
-  // Computed
+  createModifierGroup: (data: ModifierGroupWriteInput, modifierIds: string[]) => Promise<ModifierGroup>;
+  updateModifierGroup: (id: string, data: Partial<ModifierGroupWriteInput>, modifierIds: string[]) => Promise<void>;
+  deleteModifierGroup: (id: string) => Promise<void>;
   filteredProducts: () => Product[];
 }
 
@@ -97,18 +105,17 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
             }),
           100
         ),
-        loadAllPages(
-          (page, perPage) => modifierGroupsRepository.findAll({ page, per_page: perPage }),
-          100
-        ),
+        listModifierGroups(),
         loadAllPages(
           (page, perPage) => modifiersRepository.findAll({ page, per_page: perPage }),
           200
         ),
       ]);
+
       const sortedCategories = [...categories].sort(
         (left, right) => left.sort_order - right.sort_order
       );
+
       set({
         products: sortProductsForMenu(products, sortedCategories),
         categories: sortedCategories,
@@ -134,7 +141,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     const updated = await updateProductWithFoodCost(id, data);
     set((state) => ({
       products: sortProductsForMenu(
-        state.products.map((p) => (p.id === id ? updated : p)),
+        state.products.map((product) => (product.id === id ? updated : product)),
         state.categories
       ),
     }));
@@ -144,7 +151,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     await deleteAllProductImages(id);
     await productsRepository.delete(id);
     set((state) => ({
-      products: state.products.filter((p) => p.id !== id),
+      products: state.products.filter((product) => product.id !== id),
     }));
   },
 
@@ -152,9 +159,16 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     const updated = await toggleAvailability(id);
     set((state) => ({
       products: sortProductsForMenu(
-        state.products.map((p) => (p.id === id ? updated : p)),
+        state.products.map((product) => (product.id === id ? updated : product)),
         state.categories
       ),
+    }));
+  },
+
+  toggleProductMenuVisibility: async (id) => {
+    const updated = await toggleMenuVisibility(id);
+    set((state) => ({
+      products: state.products.map((product) => (product.id === id ? updated : product)),
     }));
   },
 
@@ -181,6 +195,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
       const categories = [...state.categories, category].sort(
         (left, right) => left.sort_order - right.sort_order
       );
+
       return {
         categories,
         products: sortProductsForMenu(state.products, categories),
@@ -193,7 +208,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     const updated = await categoriesRepository.update(id, data);
     set((state) => {
       const categories = state.categories
-        .map((c) => (c.id === id ? updated : c))
+        .map((category) => (category.id === id ? updated : category))
         .sort((left, right) => left.sort_order - right.sort_order);
 
       return {
@@ -206,7 +221,7 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
   deleteCategory: async (id) => {
     await categoriesRepository.delete(id);
     set((state) => ({
-      categories: state.categories.filter((c) => c.id !== id),
+      categories: state.categories.filter((category) => category.id !== id),
       selectedCategoryId: state.selectedCategoryId === id ? null : state.selectedCategoryId,
     }));
   },
@@ -214,8 +229,15 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
   loadModifiers: async () => {
     set({ isLoading: true });
     try {
-      const result = await modifiersRepository.findAll({ per_page: 200 });
-      set({ modifiers: result.data, isLoading: false });
+      const [modifiersResult, modifierGroupsResult] = await Promise.all([
+        modifiersRepository.findAll({ per_page: 200 }),
+        listModifierGroups(),
+      ]);
+      set({
+        modifiers: modifiersResult.data,
+        modifierGroups: modifierGroupsResult,
+        isLoading: false,
+      });
     } catch (error) {
       console.error('[MenuStore] loadModifiers failed:', error);
       set({ isLoading: false });
@@ -224,22 +246,54 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
 
   createModifier: async (data) => {
     const modifier = await modifiersRepository.create(data);
-    set((state) => ({ modifiers: [...state.modifiers, modifier] }));
+    const modifierGroups = await listModifierGroups();
+    set((state) => ({
+      modifiers: [...state.modifiers, modifier],
+      modifierGroups,
+    }));
     return modifier;
   },
 
   updateModifier: async (id, data) => {
     const updated = await modifiersRepository.update(id, data);
+    const modifierGroups = await listModifierGroups();
     set((state) => ({
-      modifiers: state.modifiers.map((m) => (m.id === id ? updated : m)),
+      modifiers: state.modifiers.map((modifier) => (modifier.id === id ? updated : modifier)),
+      modifierGroups,
     }));
   },
 
   deleteModifier: async (id) => {
     await modifiersRepository.delete(id);
+    const modifierGroups = await listModifierGroups();
     set((state) => ({
-      modifiers: state.modifiers.filter((m) => m.id !== id),
+      modifiers: state.modifiers.filter((modifier) => modifier.id !== id),
+      modifierGroups,
     }));
+  },
+
+  createModifierGroup: async (data, modifierIds) => {
+    const group = await modifierGroupsRepository.create(
+      data as unknown as Omit<ModifierGroup, 'id' | 'created_at' | 'updated_at'>
+    );
+    await setModifierGroupModifiers(group.id, modifierIds);
+    const modifierGroups = await listModifierGroups();
+    const createdGroup = modifierGroups.find((item) => item.id === group.id) ?? { ...group, modifiers: [] };
+    set({ modifierGroups });
+    return createdGroup;
+  },
+
+  updateModifierGroup: async (id, data, modifierIds) => {
+    await modifierGroupsRepository.update(id, data);
+    await setModifierGroupModifiers(id, modifierIds);
+    const modifierGroups = await listModifierGroups();
+    set({ modifierGroups });
+  },
+
+  deleteModifierGroup: async (id) => {
+    await modifierGroupsRepository.delete(id);
+    const modifierGroups = await listModifierGroups();
+    set({ modifierGroups });
   },
 
   setSelectedCategory: (id) => set({ selectedCategoryId: id }),
@@ -251,15 +305,15 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
     let filtered = products;
 
     if (selectedCategoryId) {
-      filtered = filtered.filter((p) => p.category_id === selectedCategoryId);
+      filtered = filtered.filter((product) => product.category_id === selectedCategoryId);
     }
 
     if (searchQuery) {
-      const lq = searchQuery.toLowerCase();
+      const lowerQuery = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (p) =>
-          p.name.toLowerCase().includes(lq) ||
-          (p.description?.toLowerCase().includes(lq) ?? false)
+        (product) =>
+          product.name.toLowerCase().includes(lowerQuery) ||
+          (product.description?.toLowerCase().includes(lowerQuery) ?? false)
       );
     }
 

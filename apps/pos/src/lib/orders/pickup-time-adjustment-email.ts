@@ -11,6 +11,8 @@ interface PickupTimeAdjustedEmailData {
   trackingUrl?: string;
 }
 
+const PICKUP_TIME_EMAIL_TIME_ZONE = 'Europe/Warsaw';
+
 function resolveTrackingUrl(orderId: string): string | undefined {
   const appUrl = process.env.DELIVERY_APP_URL?.trim() || 'https://order.mesofood.pl';
 
@@ -19,7 +21,7 @@ function resolveTrackingUrl(orderId: string): string | undefined {
 
 function formatPickupDateTime(dateString: string): string {
   return new Intl.DateTimeFormat('pl-PL', {
-    timeZone: 'Europe/Warsaw',
+    timeZone: PICKUP_TIME_EMAIL_TIME_ZONE,
     day: 'numeric',
     month: 'long',
     hour: '2-digit',

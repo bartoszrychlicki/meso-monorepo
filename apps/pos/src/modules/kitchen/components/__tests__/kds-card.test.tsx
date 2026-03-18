@@ -115,15 +115,14 @@ describe('KdsCard', () => {
       <KdsCard
         ticket={{
           ...ticketWithVariantAndModifiers,
-          estimated_ready_at: '2026-03-04T19:05:00.000Z',
+          estimated_ready_at: '2026-03-04T19:05:00',
         }}
       />
     );
 
-    expect(screen.getByText('Odbior: jutro, 20:05')).toBeInTheDocument();
+    expect(screen.getByText('Odbior: jutro, 19:05')).toBeInTheDocument();
     expect(screen.queryByText('Odbior: jutro, 18:45')).not.toBeInTheDocument();
   });
-
   it('does not render modifiers row when modifiers list is empty', () => {
     const ticketWithoutModifiers: KitchenTicket = {
       ...ticketWithVariantAndModifiers,

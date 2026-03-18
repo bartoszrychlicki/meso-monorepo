@@ -361,6 +361,13 @@ export default function ApiDocsPage() {
         {/* Products */}
         <div className="mb-8" id="menu-products">
           <h3 className="mb-4 text-xl font-semibold text-gray-800">Produkty</h3>
+          <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+            <strong>Breaking change od 15 marca 2026:</strong> endpointy <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">POST /api/v1/menu/products</code> oraz{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">PUT /api/v1/menu/products/:id</code> przyjmują teraz{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_group_ids</code> zamiast inline{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_groups</code>. Odczyt dalej zwraca{' '}
+            <code className="rounded bg-blue-100 px-1 py-0.5 text-xs">modifier_groups</code>, ale są one budowane z relacyjnego modelu grup i modyfikatorów.
+          </div>
           <div className="space-y-4">
             <Endpoint
               method="GET"
@@ -372,7 +379,11 @@ export default function ApiDocsPage() {
                 { name: 'per_page', type: 'number', desc: 'Wyników na stronę (domyślnie: 20, maks: 100)' },
                 { name: 'category_id', type: 'string', desc: 'Filtruj po kategorii (UUID)' },
                 { name: 'search', type: 'string', desc: 'Szukaj po nazwie produktu' },
-                { name: 'available', type: 'boolean', desc: 'Filtruj po dostępności (true/false)' },
+                { name: 'is_available', type: 'boolean', desc: 'Filtruj po dostępności (true/false)' },
+                { name: 'is_hidden_in_menu', type: 'boolean', desc: 'Filtruj po ukryciu w Delivery (true/false)' },
+                { name: 'channel', type: 'string', desc: 'Filtruj produkty z ceną dla kanału: delivery | pickup | dine_in' },
+                { name: 'updated_since', type: 'string', desc: 'Zwróć produkty zmienione po wskazanej dacie ISO' },
+                { name: 'include', type: 'string', desc: 'Lista pól po przecinku: modifiers,variants,pricing' },
               ]}
               response={`{
   "success": true,
@@ -387,9 +398,10 @@ export default function ApiDocsPage() {
       "price": 29.90,
       "tax_rate": 8,
       "is_available": true,
+      "is_hidden_in_menu": false,
       "allergens": ["gluten", "eggs", "milk"],
       "variants": [...],
-      "modifier_groups": [...],
+      "modifier_groups": [...], // wynik pochodzi z relacyjnego read modelu
       "pricing": [
         { "channel": "delivery", "price": 34.90 },
         { "channel": "pickup", "price": 29.90 }
@@ -415,6 +427,7 @@ export default function ApiDocsPage() {
   "price": 29.90,
   "tax_rate": 8,
   "is_available": true,
+  "is_hidden_in_menu": false,
   "is_featured": false,
   "allergens": ["gluten", "eggs"],
   "pricing": [
@@ -431,22 +444,9 @@ export default function ApiDocsPage() {
       "variant_type": "size"   // size | version | weight
     }
   ],
-  "modifier_groups": [         // opcjonalne
-    {
-      "name": "Dodatki",
-      "type": "multiple",      // single | multiple
-      "required": false,
-      "min_selections": 0,
-      "max_selections": 5,
-      "modifiers": [
-        {
-          "name": "Ser cheddar",
-          "price": 4.00,
-          "is_available": true,
-          "modifier_action": "add"
-        }
-      ]
-    }
+  "modifier_group_ids": [      // opcjonalne
+    "uuid-grupy-dodatki",
+    "uuid-grupy-sosy"
   ],
   "ingredients": [             // opcjonalne (BOM)
     {
@@ -476,7 +476,9 @@ export default function ApiDocsPage() {
               body={`{
   "name": "Burger Classic v2",
   "price": 31.90,
-  "is_available": false
+  "is_available": false,
+  "is_hidden_in_menu": true,
+  "modifier_group_ids": ["uuid-grupy-dodatki"]
 }`}
             />
 

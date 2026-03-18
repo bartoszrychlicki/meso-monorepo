@@ -12,7 +12,7 @@ export const ORDER_STATUS_COLORS: Record<OrderStatus, string> = {
 };
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
-  [OrderStatus.PENDING]: 'Oczekujące',
+  [OrderStatus.PENDING]: 'Oczekuje na płatność',
   [OrderStatus.CONFIRMED]: 'Potwierdzone',
   [OrderStatus.ACCEPTED]: 'Zaakceptowane',
   [OrderStatus.PREPARING]: 'W przygotowaniu',

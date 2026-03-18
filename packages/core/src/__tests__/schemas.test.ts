@@ -112,6 +112,14 @@ describe('UpdateOrderSchema', () => {
 
     expect(result.success).toBe(true);
   });
+
+  it('rejects a phone without international prefix', () => {
+    const result = UpdateOrderSchema.safeParse({
+      customer_phone: '500 200 300',
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe('RollbackOrderStatusSchema', () => {

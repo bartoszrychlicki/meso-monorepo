@@ -80,7 +80,6 @@ export function formatKitchenEstimatedReadyTime(
     referenceDate
   );
 }
-
 export function resolveKitchenTicketCurrentPickupTime(ticket: KitchenTicket): string | null {
   if (ticket.estimated_ready_at) {
     return ticket.estimated_ready_at;

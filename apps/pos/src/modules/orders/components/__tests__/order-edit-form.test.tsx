@@ -177,7 +177,6 @@ describe('OrderEditForm', () => {
     await waitFor(() => {
       expect(onSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          customer_name: 'Anna',
           customer_phone: '+48 500 222 333',
           notes: 'Dorzucic sztucce',
           items: [
@@ -257,5 +256,29 @@ describe('OrderEditForm', () => {
       await screen.findByText(/Zapis jest zablokowany, bo ta edycja zmienia wartość opłaconego zamówienia/i)
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Zapisz zmiany/i })).toBeDisabled();
+  });
+
+  it('does not send items when only non-item fields changed', async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
+
+    render(<OrderEditForm order={baseOrder} onSave={onSave} />);
+
+    await screen.findByText('Gyoza');
+
+    fireEvent.change(screen.getByLabelText('Telefon klienta'), {
+      target: { value: '+48 500 222 333' },
+    });
+    fireEvent.change(screen.getByLabelText('Notatka do zamówienia'), {
+      target: { value: 'Dorzucic sztucce' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: /Zapisz zmiany/i }));
+
+    await waitFor(() => {
+      expect(onSave).toHaveBeenCalledWith({
+        customer_phone: '+48 500 222 333',
+        notes: 'Dorzucic sztucce',
+      });
+    });
   });
 });
