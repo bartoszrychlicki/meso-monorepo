@@ -186,6 +186,8 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
     try {
       const stockItems = await inventoryRepository.getAllStockItems();
       set({ stockItems });
+    } catch (error) {
+      console.error('[InventoryStore] loadStockItems failed:', error);
     } finally {
       set({ isLoading: false });
     }
