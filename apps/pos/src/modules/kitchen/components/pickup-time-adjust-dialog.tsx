@@ -72,14 +72,9 @@ export function PickupTimeAdjustDialog({
         / (MINUTE_STEP * 60_000)
     ) * MINUTE_STEP;
 
-    const filteredOptions = minimumFutureAdjustment > 0
-      ? options.filter((value) => value >= minimumFutureAdjustment)
-      : options;
+    const filteredOptions = options.filter((value) => value >= minimumFutureAdjustment);
 
-    if (
-      minimumFutureAdjustment > 0 &&
-      !filteredOptions.some((value) => value >= minimumFutureAdjustment)
-    ) {
+    if (filteredOptions.length === 0) {
       filteredOptions.push(
         minimumFutureAdjustment,
         minimumFutureAdjustment + 10,

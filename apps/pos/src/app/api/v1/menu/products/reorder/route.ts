@@ -1,55 +1,17 @@
 import { NextRequest } from 'next/server';
-import { authorizeRequest, isApiKey } from '@/lib/api/auth';
 import {
   apiError,
   apiSuccess,
   apiValidationError,
 } from '@/lib/api/response';
 import { ReorderMenuProductsSchema } from '@/schemas/menu';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
-
-async function hasActiveStaffSession() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return false;
-  }
-
-  const { data: staffUserById } = await supabase
-    .from('users_users')
-    .select('is_active')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  if (staffUserById?.is_active === true) {
-    return true;
-  }
-
-  const normalizedEmail = user.email?.trim().toLowerCase();
-  if (!normalizedEmail) {
-    return false;
-  }
-
-  const { data: staffUserByEmail } = await supabase
-    .from('users_users')
-    .select('is_active')
-    .eq('email', normalizedEmail)
-    .maybeSingle();
-
-  return staffUserByEmail?.is_active === true;
-}
+import { createServiceClient } from '@/lib/supabase/server';
+import { authorizeMenuRoute } from '@/modules/menu/server/route-auth';
 
 export async function POST(request: NextRequest) {
-  const hasStaffSession = await hasActiveStaffSession();
-
-  if (!hasStaffSession) {
-    const auth = await authorizeRequest(request, 'menu:write');
-    if (!isApiKey(auth)) {
-      return auth;
-    }
+  const auth = await authorizeMenuRoute(request, 'menu:write');
+  if ('status' in auth) {
+    return auth;
   }
 
   let body: unknown;
