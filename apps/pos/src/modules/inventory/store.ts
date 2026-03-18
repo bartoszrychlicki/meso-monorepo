@@ -181,15 +181,13 @@ export const useInventoryStore = create<InventoryStore>()((set, get) => ({
   },
 
   loadStockItems: async () => {
-    set({ isLoading: true, loadError: null });
+    set({ isLoading: true });
 
     try {
       const stockItems = await inventoryRepository.getAllStockItems();
       set({ stockItems });
-    } catch {
-      set({
-        loadError: 'Nie udalo sie zaladowac pozycji magazynowych. Sprobuj ponownie.',
-      });
+    } catch (error) {
+      console.error('[InventoryStore] loadStockItems failed:', error);
     } finally {
       set({ isLoading: false });
     }

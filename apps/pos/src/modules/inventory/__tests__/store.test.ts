@@ -281,7 +281,7 @@ describe('useInventoryStore', () => {
   });
 
   describe('loadStockItems', () => {
-    it('loads stock items and clears previous loadError', async () => {
+    it('loads stock items without mutating shared loadError', async () => {
       const items = [makeStockItem({ id: 'stock-1' })];
       useInventoryStore.setState({ loadError: 'old error' });
       mockGetAllStockItems.mockResolvedValue(items);
@@ -289,19 +289,24 @@ describe('useInventoryStore', () => {
       await useInventoryStore.getState().loadStockItems();
 
       expect(useInventoryStore.getState().stockItems).toEqual(items);
-      expect(useInventoryStore.getState().loadError).toBeNull();
+      expect(useInventoryStore.getState().loadError).toBe('old error');
       expect(useInventoryStore.getState().isLoading).toBe(false);
     });
 
     it('captures network failure without throwing unhandled rejection', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      useInventoryStore.setState({ loadError: 'existing inventory warning' });
       mockGetAllStockItems.mockRejectedValue(new Error('TypeError: Load failed (example.supabase.co)'));
 
       await expect(useInventoryStore.getState().loadStockItems()).resolves.toBeUndefined();
 
-      expect(useInventoryStore.getState().loadError).toBe(
-        'Nie udalo sie zaladowac pozycji magazynowych. Sprobuj ponownie.'
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        '[InventoryStore] loadStockItems failed:',
+        expect.any(Error)
       );
+      expect(useInventoryStore.getState().loadError).toBe('existing inventory warning');
       expect(useInventoryStore.getState().isLoading).toBe(false);
+      consoleErrorSpy.mockRestore();
     });
   });
 
