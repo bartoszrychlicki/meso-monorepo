@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   closestCenter,
   DndContext,
@@ -26,6 +26,23 @@ import type { Product } from '@/types/menu';
 import { GripVertical, Loader2, ShoppingCart } from 'lucide-react';
 
 const PRODUCT_PLACEHOLDER_IMAGE = '/images/product-placeholder.svg';
+
+function haveSameProductOrder(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((productId, index) => productId === right[index]);
+}
+
+function haveSameProductSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const rightIds = new Set(right);
+  return left.every((productId) => rightIds.has(productId));
+}
 
 interface ProductReorderListProps {
   products: Product[];
@@ -124,15 +141,33 @@ export function ProductReorderList({
   onReorder,
   onClose,
 }: ProductReorderListProps) {
-  const [orderedProducts, setOrderedProducts] = useState(products);
-  const productIds = useMemo(
-    () => orderedProducts.map((product) => product.id),
-    [orderedProducts]
+  const [pendingOrderIds, setPendingOrderIds] = useState<string[] | null>(null);
+  const [isPersistingOrder, setIsPersistingOrder] = useState(false);
+  const productIds = useMemo(() => products.map((product) => product.id), [products]);
+  const pendingOrderMatchesProducts = useMemo(
+    () => (pendingOrderIds ? haveSameProductSet(pendingOrderIds, productIds) : false),
+    [pendingOrderIds, productIds]
   );
+  const orderedProductIds = useMemo(() => {
+    if (!pendingOrderIds || !pendingOrderMatchesProducts) {
+      return productIds;
+    }
 
-  useEffect(() => {
-    setOrderedProducts(products);
-  }, [products]);
+    return isPersistingOrder || isSaving || haveSameProductOrder(pendingOrderIds, productIds)
+      ? pendingOrderIds
+      : productIds;
+  }, [isPersistingOrder, isSaving, pendingOrderIds, pendingOrderMatchesProducts, productIds]);
+  const orderedProducts = useMemo(() => {
+    if (!pendingOrderIds) {
+      return products;
+    }
+
+    const productsById = new Map(products.map((product) => [product.id, product]));
+
+    return orderedProductIds
+      .map((productId) => productsById.get(productId))
+      .filter((product): product is Product => Boolean(product));
+  }, [orderedProductIds, pendingOrderIds, products]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, {
@@ -160,12 +195,16 @@ export function ProductReorderList({
     }
 
     const nextOrderedProducts = arrayMove(orderedProducts, oldIndex, newIndex);
-    setOrderedProducts(nextOrderedProducts);
+    const nextOrderedProductIds = nextOrderedProducts.map((product) => product.id);
+    setPendingOrderIds(nextOrderedProductIds);
+    setIsPersistingOrder(true);
 
     try {
-      await onReorder(nextOrderedProducts.map((product) => product.id));
+      await onReorder(nextOrderedProductIds);
     } catch {
-      setOrderedProducts(products);
+      setPendingOrderIds(null);
+    } finally {
+      setIsPersistingOrder(false);
     }
   };
 
@@ -196,7 +235,7 @@ export function ProductReorderList({
         collisionDetection={closestCenter}
         onDragEnd={handleDragEnd}
       >
-        <SortableContext items={productIds} strategy={verticalListSortingStrategy}>
+        <SortableContext items={orderedProductIds} strategy={verticalListSortingStrategy}>
           <div className="space-y-3">
             {orderedProducts.map((product, index) => (
               <SortableProductRow
