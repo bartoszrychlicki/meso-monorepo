@@ -39,6 +39,21 @@ describe('pickup-time helpers', () => {
     });
   });
 
+  it('does not mark pickup orders as adjusted when they only have initial eta', () => {
+    expect(
+      getPickupTimeDetails({
+        delivery_type: 'pickup',
+        scheduled_time: '2026-03-17T12:30:00.000Z',
+        estimated_ready_at: '2026-03-17T12:45:00.000Z',
+        metadata: {},
+      })
+    ).toEqual({
+      currentTime: '2026-03-17T12:45:00.000Z',
+      previousTime: null,
+      isAdjusted: false,
+    });
+  });
+
   it('formats same-day pickup time as hour and minute', () => {
     expect(
       formatCustomerPickupTime(
