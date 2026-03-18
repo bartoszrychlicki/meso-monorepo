@@ -18,6 +18,7 @@ import {
   setModifierGroupModifiersWithClient,
   setProductModifierGroupsWithClient,
 } from './relations';
+import { expandCategoryReorder } from './utils/reorder';
 
 export const productsRepository = createRepository<Product>('products');
 export const categoriesRepository = createRepository<Category>('categories');
@@ -216,23 +217,34 @@ export async function reorderProductsInCategory(
   const categoryProducts = await productsRepository.findMany(
     (product) => product.category_id === categoryId
   );
-  const categoryProductIds = new Set(categoryProducts.map((product) => product.id));
+  const sortedCategoryProducts = [...categoryProducts].sort((left, right) => {
+    const leftSortOrder = left.sort_order ?? Number.MAX_SAFE_INTEGER;
+    const rightSortOrder = right.sort_order ?? Number.MAX_SAFE_INTEGER;
+
+    if (leftSortOrder !== rightSortOrder) {
+      return leftSortOrder - rightSortOrder;
+    }
+
+    return left.id.localeCompare(right.id);
+  });
+  const categoryProductIds = new Set(sortedCategoryProducts.map((product) => product.id));
   const uniqueIds = new Set(productIds);
 
   if (uniqueIds.size !== productIds.length) {
     throw new Error('reorderProductsInCategory failed: duplicate product IDs');
   }
 
-  if (categoryProducts.length !== productIds.length) {
-    throw new Error('reorderProductsInCategory failed: incomplete category product list');
-  }
-
   if (productIds.some((productId) => !categoryProductIds.has(productId))) {
     throw new Error('reorderProductsInCategory failed: product outside category');
   }
 
+  const normalizedProductIds = expandCategoryReorder(
+    sortedCategoryProducts.map((product) => product.id),
+    productIds
+  );
+
   await Promise.all(
-    productIds.map((productId, index) =>
+    normalizedProductIds.map((productId, index) =>
       productsRepository.update(productId, { sort_order: index })
     )
   );
