@@ -72,15 +72,22 @@ export function PickupTimeAdjustDialog({
         / (MINUTE_STEP * 60_000)
     ) * MINUTE_STEP;
 
-    if (minimumFutureAdjustment > 0 && !options.some((value) => value >= minimumFutureAdjustment)) {
-      options.push(
+    const filteredOptions = minimumFutureAdjustment > 0
+      ? options.filter((value) => value >= minimumFutureAdjustment)
+      : options;
+
+    if (
+      minimumFutureAdjustment > 0 &&
+      !filteredOptions.some((value) => value >= minimumFutureAdjustment)
+    ) {
+      filteredOptions.push(
         minimumFutureAdjustment,
         minimumFutureAdjustment + 10,
         minimumFutureAdjustment + 20
       );
     }
 
-    return [...new Set(options)].sort((left, right) => left - right);
+    return [...new Set(filteredOptions)].sort((left, right) => left - right);
   }, [draftPickupTime, openedAtTimestamp]);
   const isBusy = isSubmitting || isConfirming;
   const canConfirm = draftPickupTime !== currentPickupTime;
