@@ -35,6 +35,15 @@ function haveSameProductOrder(left: string[], right: string[]): boolean {
   return left.every((productId, index) => productId === right[index]);
 }
 
+function haveSameProductSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const rightIds = new Set(right);
+  return left.every((productId) => rightIds.has(productId));
+}
+
 interface ProductReorderListProps {
   products: Product[];
   isSaving: boolean;
@@ -135,15 +144,19 @@ export function ProductReorderList({
   const [pendingOrderIds, setPendingOrderIds] = useState<string[] | null>(null);
   const [isPersistingOrder, setIsPersistingOrder] = useState(false);
   const productIds = useMemo(() => products.map((product) => product.id), [products]);
+  const pendingOrderMatchesProducts = useMemo(
+    () => (pendingOrderIds ? haveSameProductSet(pendingOrderIds, productIds) : false),
+    [pendingOrderIds, productIds]
+  );
   const orderedProductIds = useMemo(() => {
-    if (!pendingOrderIds) {
+    if (!pendingOrderIds || !pendingOrderMatchesProducts) {
       return productIds;
     }
 
     return isPersistingOrder || isSaving || haveSameProductOrder(pendingOrderIds, productIds)
       ? pendingOrderIds
       : productIds;
-  }, [isPersistingOrder, isSaving, pendingOrderIds, productIds]);
+  }, [isPersistingOrder, isSaving, pendingOrderIds, pendingOrderMatchesProducts, productIds]);
   const orderedProducts = useMemo(() => {
     if (!pendingOrderIds) {
       return products;

@@ -124,4 +124,40 @@ describe('ProductReorderList', () => {
 
     expect(getRenderedOrder(container)).toEqual(['Shoyu', 'Miso']);
   });
+
+  it('falls back to incoming products when the product set changes mid-save', async () => {
+    const onReorder = vi.fn().mockImplementation(
+      () => new Promise<void>(() => {})
+    );
+    const products = [
+      makeProduct('prod-1', 'Miso', 0),
+      makeProduct('prod-2', 'Shoyu', 1),
+    ];
+    const nextCategoryProducts = [
+      makeProduct('prod-3', 'Tantan', 0),
+      makeProduct('prod-4', 'Udon', 1),
+    ];
+
+    const { container, rerender } = render(
+      <ProductReorderList
+        products={products as never}
+        isSaving={false}
+        onReorder={onReorder}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Simulate reorder' }));
+
+    rerender(
+      <ProductReorderList
+        products={nextCategoryProducts as never}
+        isSaving
+        onReorder={onReorder}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(getRenderedOrder(container)).toEqual(['Tantan', 'Udon']);
+  });
 });
