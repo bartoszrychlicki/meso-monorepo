@@ -4,6 +4,7 @@ import type { Product } from '@/types/menu';
 // Mock the supabase client before importing the repository
 const mockFrom = vi.fn();
 const mockRpc = vi.fn();
+const mockFetch = vi.fn();
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
@@ -235,27 +236,44 @@ describe('reorderProductsInCategory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
+    vi.stubGlobal('fetch', mockFetch);
   });
 
-  it('calls the reorder RPC with category and ordered ids on supabase backend', async () => {
+  it('calls the protected reorder API with category and ordered ids on supabase backend', async () => {
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
-    mockRpc.mockResolvedValueOnce({ error: null });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+    });
 
     await reorderProductsInCategory('cat-1', ['prod-3', 'prod-1', 'prod-2']);
 
-    expect(mockRpc).toHaveBeenCalledWith('reorder_menu_products', {
-      p_category_id: 'cat-1',
-      p_product_ids: ['prod-3', 'prod-1', 'prod-2'],
+    expect(mockFetch).toHaveBeenCalledWith('/api/v1/menu/products/reorder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category_id: 'cat-1',
+        product_ids: ['prod-3', 'prod-1', 'prod-2'],
+      }),
     });
   });
 
-  it('throws when the reorder RPC fails', async () => {
+  it('throws when the reorder API fails', async () => {
     vi.stubEnv('NEXT_PUBLIC_DATA_BACKEND', 'supabase');
-    mockRpc.mockResolvedValueOnce({ error: { message: 'rpc failed' } });
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      json: vi.fn().mockResolvedValue({
+        error: {
+          message: 'Brak wymaganego uprawnienia: menu:write',
+        },
+      }),
+    });
 
     await expect(
       reorderProductsInCategory('cat-1', ['prod-1'])
-    ).rejects.toThrow('reorderProductsInCategory failed: rpc failed');
+    ).rejects.toThrow('reorderProductsInCategory failed: Brak wymaganego uprawnienia: menu:write');
   });
 
   it('updates local repository sort order when using localStorage backend', async () => {
@@ -267,7 +285,7 @@ describe('reorderProductsInCategory', () => {
 
     await reorderProductsInCategory('cat-1', ['prod-2', 'prod-1']);
 
-    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(mockProductsUpdate).toHaveBeenNthCalledWith(1, 'prod-2', { sort_order: 0 });
     expect(mockProductsUpdate).toHaveBeenNthCalledWith(2, 'prod-1', { sort_order: 1 });
   });

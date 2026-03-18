@@ -7,13 +7,24 @@ vi.mock('@/lib/api/auth', () => ({
 }));
 
 const mockRpc = vi.fn();
-const mockEq = vi.fn();
 const mockSelect = vi.fn();
 const mockFrom = vi.fn(() => ({
   select: mockSelect,
 }));
+const mockAuthGetUser = vi.fn();
+const mockCategoryEq = vi.fn();
+const mockStaffMaybeSingle = vi.fn();
+const mockStaffEq = vi.fn(() => ({
+  maybeSingle: mockStaffMaybeSingle,
+}));
 
 vi.mock('@/lib/supabase/server', () => ({
+  createClient: () => ({
+    auth: {
+      getUser: mockAuthGetUser,
+    },
+    from: mockFrom,
+  }),
   createServiceClient: () => ({
     from: mockFrom,
     rpc: mockRpc,
@@ -42,10 +53,25 @@ function makeRequest(body: unknown) {
 describe('POST /api/v1/menu/products/reorder', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockAuthGetUser.mockResolvedValue({
+      data: {
+        user: null,
+      },
+    });
     mockAuthorizeRequest.mockResolvedValue({ id: 'key-1', permissions: ['menu:write'] });
     mockIsApiKey.mockReturnValue(true);
-    mockSelect.mockReturnValue({ eq: mockEq });
-    mockEq.mockResolvedValue({
+    mockSelect.mockImplementation((columns: string) => {
+      if (columns === 'is_active') {
+        return { eq: mockStaffEq };
+      }
+
+      return { eq: mockCategoryEq };
+    });
+    mockStaffMaybeSingle.mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    mockCategoryEq.mockResolvedValue({
       data: productIds.map((id) => ({ id, category_id: categoryId })),
       error: null,
     });
@@ -65,6 +91,32 @@ describe('POST /api/v1/menu/products/reorder', () => {
       p_category_id: categoryId,
       p_product_ids: [...productIds].reverse(),
     });
+  });
+
+  it('allows active staff sessions without requiring an API key', async () => {
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: 'staff-1',
+          email: 'staff@example.com',
+        },
+      },
+    });
+    mockStaffMaybeSingle.mockResolvedValueOnce({
+      data: {
+        is_active: true,
+      },
+      error: null,
+    });
+
+    const response = await POST(makeRequest({
+      category_id: categoryId,
+      product_ids: [...productIds].reverse(),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(mockAuthorizeRequest).not.toHaveBeenCalled();
+    expect(mockRpc).toHaveBeenCalledOnce();
   });
 
   it('rejects duplicate product ids', async () => {

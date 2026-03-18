@@ -132,13 +132,32 @@ export async function reorderProductsInCategory(
   productIds: string[]
 ): Promise<void> {
   if (isSupabaseBackend()) {
-    const { error } = await supabase.rpc('reorder_menu_products', {
-      p_category_id: categoryId,
-      p_product_ids: productIds,
+    const response = await fetch('/api/v1/menu/products/reorder', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        category_id: categoryId,
+        product_ids: productIds,
+      }),
     });
 
-    if (error) {
-      throw new Error(`reorderProductsInCategory failed: ${error.message}`);
+    if (!response.ok) {
+      let errorMessage = `request failed with status ${response.status}`;
+
+      try {
+        const payload = await response.json() as {
+          error?: {
+            message?: string;
+          };
+        };
+        errorMessage = payload.error?.message || errorMessage;
+      } catch {
+        // Keep the fallback message when the response has no JSON error payload.
+      }
+
+      throw new Error(`reorderProductsInCategory failed: ${errorMessage}`);
     }
 
     return;
