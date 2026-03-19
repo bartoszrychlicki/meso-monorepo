@@ -320,6 +320,60 @@ describe('useMenuStore — Modifiers', () => {
       ]);
     });
 
+    it('normalizes partial optimistic reorder payloads before saving', async () => {
+      useMenuStore.setState({
+        categories: [
+          { id: 'cat-1', name: 'Ramen', slug: 'ramen', sort_order: 0, is_active: true, created_at: '', updated_at: '' } as never,
+        ],
+        products: [
+          makeProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0, name: 'A' }) as never,
+          makeProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1, name: 'B' }) as never,
+          makeProduct({ id: 'prod-3', category_id: 'cat-1', sort_order: 2, name: 'C' }) as never,
+        ],
+      });
+      mockReorderProductsInCategory.mockResolvedValue(undefined);
+
+      await useMenuStore.getState().reorderProducts('cat-1', ['prod-3', 'prod-1']);
+
+      expect(mockReorderProductsInCategory).toHaveBeenCalledWith('cat-1', [
+        'prod-3',
+        'prod-2',
+        'prod-1',
+      ]);
+      expect(useMenuStore.getState().products.map((product) => product.id)).toEqual([
+        'prod-3',
+        'prod-2',
+        'prod-1',
+      ]);
+    });
+
+    it('ignores stale product ids while preserving existing category products', async () => {
+      useMenuStore.setState({
+        categories: [
+          { id: 'cat-1', name: 'Ramen', slug: 'ramen', sort_order: 0, is_active: true, created_at: '', updated_at: '' } as never,
+        ],
+        products: [
+          makeProduct({ id: 'prod-1', category_id: 'cat-1', sort_order: 0, name: 'A' }) as never,
+          makeProduct({ id: 'prod-2', category_id: 'cat-1', sort_order: 1, name: 'B' }) as never,
+          makeProduct({ id: 'prod-3', category_id: 'cat-1', sort_order: 2, name: 'C' }) as never,
+        ],
+      });
+      mockReorderProductsInCategory.mockResolvedValue(undefined);
+
+      await useMenuStore.getState().reorderProducts('cat-1', ['prod-3', 'prod-x', 'prod-1']);
+
+      expect(mockReorderProductsInCategory).toHaveBeenCalledWith('cat-1', [
+        'prod-3',
+        'prod-2',
+        'prod-1',
+      ]);
+      expect(useMenuStore.getState().products.map((product) => product.id)).toEqual([
+        'prod-3',
+        'prod-2',
+        'prod-1',
+      ]);
+    });
+
     it('rolls back optimistic reorder when persistence fails', async () => {
       useMenuStore.setState({
         categories: [

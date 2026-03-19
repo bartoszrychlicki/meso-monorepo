@@ -15,6 +15,7 @@ const mockFrom = vi.fn(() => ({
   select: mockSelect,
 }));
 const mockCategoryEq = vi.fn();
+const mockOrder = vi.fn();
 
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: () => ({
@@ -50,11 +51,20 @@ describe('POST /api/v1/menu/products/reorder', () => {
     mockAuthorizeRequest.mockResolvedValue({ id: 'key-1', permissions: ['menu:write'] });
     mockIsApiKey.mockReturnValue(true);
     mockAuthorizeMenuRoute.mockResolvedValue({ kind: 'api_key', actorId: 'key-1' });
-    mockSelect.mockImplementation(() => ({ eq: mockCategoryEq }));
-    mockCategoryEq.mockResolvedValue({
-      data: productIds.map((id) => ({ id, category_id: categoryId })),
-      error: null,
-    });
+    mockSelect.mockImplementation(() => ({
+      eq: mockCategoryEq,
+    }));
+    mockCategoryEq.mockImplementation(() => ({
+      order: mockOrder,
+    }));
+    mockOrder
+      .mockImplementationOnce(() => ({
+        order: mockOrder,
+      }))
+      .mockResolvedValueOnce({
+        data: productIds.map((id) => ({ id })),
+        error: null,
+      });
     mockRpc.mockResolvedValue({ error: null });
   });
 
@@ -133,22 +143,50 @@ describe('POST /api/v1/menu/products/reorder', () => {
     expect(mockRpc).not.toHaveBeenCalled();
   });
 
-  it('rejects incomplete category payloads', async () => {
+  it('expands incomplete category payloads using the current category order', async () => {
     const response = await POST(makeRequest({
       category_id: categoryId,
       product_ids: [productIds[0]],
     }));
     const body = await response.json();
 
-    expect(response.status).toBe(422);
-    expect(body.error.code).toBe('VALIDATION_ERROR');
-    expect(mockRpc).not.toHaveBeenCalled();
+    expect(response.status).toBe(200);
+    expect(body.data.product_ids).toEqual(productIds);
+    expect(mockRpc).toHaveBeenCalledWith('reorder_menu_products', {
+      p_category_id: categoryId,
+      p_product_ids: productIds,
+    });
   });
 
-  it('rejects products outside the category', async () => {
+  it('ignores stale products outside the category when rebuilding the current order', async () => {
     const response = await POST(makeRequest({
       category_id: categoryId,
       product_ids: [...productIds, '44444444-4444-4444-8444-444444444444'],
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.data.product_ids).toEqual(productIds);
+    expect(mockRpc).toHaveBeenCalledWith('reorder_menu_products', {
+      p_category_id: categoryId,
+      p_product_ids: productIds,
+    });
+  });
+
+  it('returns validation error when the category no longer exists', async () => {
+    mockOrder.mockReset();
+    mockOrder
+      .mockImplementationOnce(() => ({
+        order: mockOrder,
+      }))
+      .mockResolvedValueOnce({
+        data: [],
+        error: null,
+      });
+
+    const response = await POST(makeRequest({
+      category_id: categoryId,
+      product_ids: [...productIds].reverse(),
     }));
     const body = await response.json();
 
