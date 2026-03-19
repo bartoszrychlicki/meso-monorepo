@@ -47,6 +47,15 @@ export async function POST(request: NextRequest) {
   }
 
   const existingIds = (categoryProducts ?? []).map((product) => product.id);
+  if (existingIds.length === 0) {
+    return apiValidationError([
+      {
+        field: 'category_id',
+        message: 'Kategoria nie istnieje lub nie zawiera produktow do zmiany kolejnosci',
+      },
+    ]);
+  }
+
   const currentCategoryIds = new Set(existingIds);
   const requestedExistingIds = product_ids.filter((id) => currentCategoryIds.has(id));
   const normalizedProductIds = expandCategoryReorder(existingIds, requestedExistingIds);

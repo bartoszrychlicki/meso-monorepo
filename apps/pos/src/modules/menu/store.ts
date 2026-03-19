@@ -175,11 +175,14 @@ export const useMenuStore = create<MenuStore>((set, get) => ({
 
   reorderProducts: async (categoryId, productIds) => {
     const previousProducts = get().products;
+    const existingCategoryIds = previousProducts
+      .filter((product) => product.category_id === categoryId)
+      .map((product) => product.id);
+    const existingCategoryIdSet = new Set(existingCategoryIds);
+    const requestedExistingIds = productIds.filter((id) => existingCategoryIdSet.has(id));
     const normalizedProductIds = expandCategoryReorder(
-      previousProducts
-        .filter((product) => product.category_id === categoryId)
-        .map((product) => product.id),
-      productIds
+      existingCategoryIds,
+      requestedExistingIds
     );
     const optimisticProducts = sortProductsForMenu(
       applyCategoryReorder(previousProducts, categoryId, normalizedProductIds),

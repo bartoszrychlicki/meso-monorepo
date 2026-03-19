@@ -172,4 +172,26 @@ describe('POST /api/v1/menu/products/reorder', () => {
       p_product_ids: productIds,
     });
   });
+
+  it('returns validation error when the category no longer exists', async () => {
+    mockOrder.mockReset();
+    mockOrder
+      .mockImplementationOnce(() => ({
+        order: mockOrder,
+      }))
+      .mockResolvedValueOnce({
+        data: [],
+        error: null,
+      });
+
+    const response = await POST(makeRequest({
+      category_id: categoryId,
+      product_ids: [...productIds].reverse(),
+    }));
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body.error.code).toBe('VALIDATION_ERROR');
+    expect(mockRpc).not.toHaveBeenCalled();
+  });
 });
