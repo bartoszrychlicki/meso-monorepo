@@ -10,8 +10,10 @@ import { CartItem, CartSummary, PromoCodeInput } from '@/components/cart'
 import { EmptyState } from '@/components/common/EmptyState'
 import { AnonymousBanner } from '@/components/auth'
 import { useAuth } from '@/hooks/useAuth'
+import { getProductImageUrl } from '@/lib/product-image'
 import { cn } from '@/lib/utils'
 import { formatPrice } from '@/lib/formatters'
+import type { Product } from '@/types/menu'
 
 export default function CartPage() {
   const router = useRouter()
@@ -20,6 +22,7 @@ export default function CartPage() {
   const itemCount = useCartStore(selectItemCount)
   const canCheckout = useCartStore((state) => state.canCheckout)
   const total = useCartStore(selectTotal)
+  const syncItemImages = useCartStore((state) => state.syncItemImages)
 
   useEffect(() => {
     async function syncCoupon() {
@@ -41,6 +44,30 @@ export default function CartPage() {
     }
     syncCoupon()
   }, [])
+
+  useEffect(() => {
+    async function syncCartImages() {
+      if (useCartStore.getState().items.length === 0) return
+
+      try {
+        const res = await fetch('/api/menu', { cache: 'no-store' })
+        if (!res.ok) return
+
+        const data = (await res.json()) as { products?: Product[] }
+        const imagesByProductId = Object.fromEntries(
+          (data.products || [])
+            .map((product) => [product.id, getProductImageUrl(product)])
+            .filter((entry): entry is [string, string] => Boolean(entry[1]))
+        )
+
+        syncItemImages(imagesByProductId)
+      } catch {
+        // Silently fail — non-critical
+      }
+    }
+
+    syncCartImages()
+  }, [syncItemImages])
 
   const checkout = canCheckout()
 
@@ -138,16 +165,16 @@ export default function CartPage() {
 
       {/* Fixed CTA Button */}
       <div
-        className="fixed bottom-[85px] left-0 right-0 z-50 mx-4 lg:relative lg:bottom-auto lg:mx-0 lg:mt-6"
+        className="fixed bottom-[85px] left-0 right-0 z-50 px-4 lg:relative lg:bottom-auto lg:px-0 lg:mt-6"
         style={{ bottom: 'calc(85px + env(safe-area-inset-bottom, 0px))' }}
       >
-        <div className="bg-background border border-border p-4 rounded-2xl shadow-xl lg:p-0 lg:border-0 lg:shadow-none lg:bg-transparent">
+        <div className="mx-auto max-w-2xl">
           <Link
             data-testid="cart-checkout-link"
             href={checkout.allowed ? (isPermanent ? '/checkout' : '/login?redirect=/checkout') : '#'}
             onClick={(e) => !checkout.allowed && e.preventDefault()}
             className={cn(
-              'block w-full rounded-xl py-4 text-center font-display text-sm font-semibold tracking-wider transition-all',
+              'block w-full rounded-2xl py-4 text-center font-display text-sm font-semibold tracking-wider shadow-xl transition-all',
               checkout.allowed
                 ? 'bg-accent text-accent-foreground neon-glow-yellow hover:scale-[1.02]'
                 : 'bg-secondary text-muted-foreground cursor-not-allowed'

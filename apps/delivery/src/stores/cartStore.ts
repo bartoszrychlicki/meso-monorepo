@@ -63,6 +63,7 @@ interface CartState {
   clearLoyaltyCoupon: () => void
   setTip: (amount: number) => void
   setLocationConfig: (minOrder: number, deliveryFee: number) => void
+  syncItemImages: (imagesByProductId: Record<string, string>) => void
 
   // Getters
   getItemCount: () => number
@@ -202,6 +203,17 @@ export const useCartStore = create<CartState>()(
 
       setLocationConfig: (minOrder, deliveryFee) => {
         set({ minOrderValue: minOrder, baseDeliveryFee: deliveryFee })
+      },
+
+      syncItemImages: (imagesByProductId) => {
+        const nextItems = get().items.map((item) => {
+          const nextImage = imagesByProductId[item.productId]
+          if (!nextImage || nextImage === item.image) return item
+          return { ...item, image: nextImage }
+        })
+
+        const changed = nextItems.some((item, index) => item !== get().items[index])
+        if (changed) set({ items: nextItems })
       },
 
       getItemCount: () => {

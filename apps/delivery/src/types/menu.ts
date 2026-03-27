@@ -1,3 +1,5 @@
+import type { ProductImage } from '@/lib/product-image'
+
 export interface Category {
   id: string
   name: string
@@ -21,6 +23,7 @@ export interface Product {
   original_price?: number
   promo_label?: string | null
   image_url?: string
+  images?: ProductImage[] | string | null
   prep_time_min: number
   prep_time_max: number
   calories?: number
