@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import Image from 'next/image'
 import { Minus, Plus, Trash2 } from 'lucide-react'
 import { CartItem as CartItemType, useCartStore } from '@/stores/cartStore'
@@ -14,8 +15,7 @@ interface CartItemProps {
 export function CartItem({ item }: CartItemProps) {
   const updateQuantity = useCartStore((state) => state.updateQuantity)
   const removeItem = useCartStore((state) => state.removeItem)
-
-
+  const [imageFailed, setImageFailed] = useState(false)
 
   const itemTotal = () => {
     const basePrice = item.price + (item.variantPrice || 0)
@@ -35,7 +35,7 @@ export function CartItem({ item }: CartItemProps) {
     )}>
       {/* Product Image */}
       <div className="relative w-20 h-20 rounded-lg overflow-hidden bg-card flex-shrink-0">
-        {item.image ? (
+        {item.image && !imageFailed ? (
           <Image
             src={item.image}
             alt={item.name}
@@ -44,6 +44,7 @@ export function CartItem({ item }: CartItemProps) {
             sizes="80px"
             placeholder="blur"
             blurDataURL={PRODUCT_BLUR_PLACEHOLDER}
+            onError={() => setImageFailed(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

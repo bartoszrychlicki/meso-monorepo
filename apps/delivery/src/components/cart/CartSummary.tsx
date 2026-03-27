@@ -16,7 +16,7 @@ export function CartSummary() {
 
   return (
     <div className={cn(
-      'p-4 rounded-xl space-y-3',
+      'p-4 pb-28 lg:pb-4 rounded-xl space-y-3',
       'bg-white/5 border border-border'
     )}>
       {/* Subtotal */}

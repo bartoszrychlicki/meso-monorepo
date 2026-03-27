@@ -8,7 +8,7 @@ import { ArrowLeft, ChevronDown, Clock, Minus, Plus } from 'lucide-react'
 import { useCartStore, type CartItemAddon } from '@/stores/cartStore'
 import { formatPrice, formatPriceDelta } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
-import { PRODUCT_BLUR_PLACEHOLDER } from '@/lib/product-image'
+import { getProductImageUrl, PRODUCT_BLUR_PLACEHOLDER, type ProductImage } from '@/lib/product-image'
 import { Badge } from '@/components/ui/badge'
 import { getAllergenLabel } from '@/types/menu'
 import { toast } from 'sonner'
@@ -64,6 +64,7 @@ export interface ProductDetailProduct {
   original_price?: number | null
   promo_label?: string | null
   image_url?: string
+  images?: ProductImage[] | string | null
   is_vegetarian?: boolean
   is_vegan?: boolean
   is_gluten_free?: boolean
@@ -170,6 +171,7 @@ function normalizeModifierGroups(product: ProductDetailProduct): ModifierGroup[]
 export function ProductDetailClient({ product }: ProductDetailClientProps) {
   const router = useRouter()
   const addItem = useCartStore((state) => state.addItem)
+  const imageUrl = getProductImageUrl(product)
 
   const [quantity, setQuantity] = useState(1)
   const [storyOpen, setStoryOpen] = useState(false)
@@ -303,7 +305,7 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
       name: product.name,
       price: product.price,
       quantity,
-      image: product.image_url,
+      image: imageUrl,
       variantId: selectedVariant?.id,
       variantName: selectedVariant?.name,
       variantPrice: selectedVariant?.price,
@@ -337,9 +339,9 @@ export function ProductDetailClient({ product }: ProductDetailClientProps) {
       </button>
 
       <div className="relative mb-6 aspect-video overflow-hidden rounded-2xl bg-secondary">
-        {product.image_url ? (
+        {imageUrl ? (
           <Image
-            src={product.image_url}
+            src={imageUrl}
             alt={product.name}
             fill
             className="object-cover"
