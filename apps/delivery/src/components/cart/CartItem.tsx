@@ -6,7 +6,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react'
 import { CartItem as CartItemType, useCartStore } from '@/stores/cartStore'
 import { cn } from '@/lib/utils'
 import { formatPrice } from '@/lib/formatters'
-import { PRODUCT_BLUR_PLACEHOLDER } from '@/lib/product-image'
+import { PRODUCT_BLUR_PLACEHOLDER, shouldBypassImageOptimization } from '@/lib/product-image'
 
 interface CartItemProps {
   item: CartItemType
@@ -45,6 +45,7 @@ export function CartItem({ item }: CartItemProps) {
             placeholder="blur"
             blurDataURL={PRODUCT_BLUR_PLACEHOLDER}
             onError={() => setImageFailed(true)}
+            unoptimized={shouldBypassImageOptimization(item.image)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

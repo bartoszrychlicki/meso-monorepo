@@ -31,3 +31,7 @@ export function getProductImageUrl(
   // Fallback to image_url
   return product.image_url || undefined
 }
+
+export function shouldBypassImageOptimization(src: string | undefined): boolean {
+  return Boolean(src && src.includes('.supabase.co/storage/v1/object/public/'))
+}
