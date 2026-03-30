@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { resolveLocale, type Locale } from '@meso/core'
 
 export interface P24Config {
     merchantId: number
@@ -134,7 +135,8 @@ export class P24 {
         email: string,
         urlReturn: string,
         urlStatus: string,
-        client?: string
+        client?: string,
+        locale: Locale = 'pl'
     ): Promise<string> {
         const sign = this.calculateSign(sessionId, amount, 'PLN', this.config.crcKey)
 
@@ -152,7 +154,7 @@ export class P24 {
             sign,
             encoding: 'UTF-8',
             country: 'PL',
-            language: 'pl',
+            language: resolveLocale(locale) === 'en' ? 'en' : 'pl',
         }
 
         try {

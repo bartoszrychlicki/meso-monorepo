@@ -12,16 +12,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
-const resetPasswordSchema = z.object({
-  password: z.string().min(8, 'Hasło musi mieć minimum 8 znaków'),
-  confirmPassword: z.string(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Hasła nie są identyczne',
-  path: ['confirmPassword'],
-})
-
-type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>
+type ResetPasswordFormData = {
+  password: string
+  confirmPassword: string
+}
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -29,6 +25,15 @@ export default function ResetPasswordPage() {
   const [isSuccess, setIsSuccess] = useState(false)
   const [isValidSession, setIsValidSession] = useState<boolean | null>(null)
   const supabase = createClient()
+  const { t } = useDeliveryI18n()
+
+  const resetPasswordSchema = z.object({
+    password: z.string().min(8, t('auth.passwordMin')),
+    confirmPassword: z.string(),
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: t('auth.passwordsMismatch'),
+    path: ['confirmPassword'],
+  })
 
   const {
     register,
@@ -71,7 +76,7 @@ export default function ResetPasswordPage() {
       }
 
       setIsSuccess(true)
-      toast.success('Hasło zostało zmienione!')
+      toast.success(t('auth.resetSuccess'))
 
       // Redirect after a short delay
       setTimeout(() => {
@@ -79,7 +84,7 @@ export default function ResetPasswordPage() {
       }, 3000)
     } catch (error) {
       console.error('Reset password submit failed:', error)
-      toast.error('Wystąpił błąd. Spróbuj ponownie.')
+      toast.error(t('auth.genericError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -103,15 +108,15 @@ export default function ResetPasswordPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">
-            Link wygasł
+            {t('auth.resetLinkExpired')}
           </h1>
           <p className="text-white/60">
-            Ten link do resetu hasła jest nieważny lub wygasł.
+            {t('auth.resetLinkExpiredDescription')}
           </p>
         </div>
         <Link href="/forgot-password">
           <Button className="bg-primary hover:bg-primary/90">
-            Wyślij nowy link
+            {t('auth.sendNewLink')}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </Link>
@@ -128,16 +133,15 @@ export default function ResetPasswordPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">
-            Hasło zmienione!
+            {t('auth.resetSuccess')}
           </h1>
           <p className="text-white/60">
-            Twoje hasło zostało pomyślnie zmienione.
-            Za chwilę przekierujemy Cię do logowania.
+            {t('auth.resetSuccessDescription')} {t('auth.redirectingToLogin')}
           </p>
         </div>
         <Link href="/login">
           <Button className="bg-primary hover:bg-primary/90">
-            Zaloguj się teraz
+            {t('auth.resetLoginNow')}
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </Link>
@@ -153,10 +157,10 @@ export default function ResetPasswordPage() {
           <Lock className="w-7 h-7 text-primary" />
         </div>
         <h1 className="text-2xl font-bold text-white mb-2">
-          Ustaw nowe hasło
+          {t('auth.resetTitle')}
         </h1>
         <p className="text-white/60">
-          Wprowadź nowe hasło dla swojego konta
+          {t('auth.resetDescription')}
         </p>
       </div>
 
@@ -164,13 +168,13 @@ export default function ResetPasswordPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="password" className="text-white/80">
-            Nowe hasło
+            {t('auth.newPassword')}
           </Label>
           <Input
             id="password"
             type="password"
             autoComplete="new-password"
-            placeholder="Minimum 8 znaków"
+            placeholder={t('auth.passwordMinPlaceholder')}
             {...register('password')}
             className="bg-card border-white/10 text-white placeholder:text-white/40 focus:border-primary"
           />
@@ -181,13 +185,13 @@ export default function ResetPasswordPage() {
 
         <div className="space-y-2">
           <Label htmlFor="confirmPassword" className="text-white/80">
-            Powtórz hasło
+            {t('auth.repeatPassword')}
           </Label>
           <Input
             id="confirmPassword"
             type="password"
             autoComplete="new-password"
-            placeholder="Powtórz nowe hasło"
+            placeholder={t('auth.confirmPassword')}
             {...register('confirmPassword')}
             className="bg-card border-white/10 text-white placeholder:text-white/40 focus:border-primary"
           />
@@ -204,10 +208,10 @@ export default function ResetPasswordPage() {
           {isSubmitting ? (
             <>
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Zapisywanie...
+              {t('common.loading')}
             </>
           ) : (
-            'Zmień hasło'
+            t('auth.resetButton')
           )}
         </Button>
       </form>

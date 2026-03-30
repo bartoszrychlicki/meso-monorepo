@@ -14,6 +14,7 @@ interface UserStore {
   loadUser: () => Promise<void>;
   loadLocations: () => Promise<void>;
   setCurrentLocation: (locationId: string) => void;
+  setCurrentUserLocale: (locale: 'pl' | 'en' | null) => void;
   reset: () => void;
 }
 
@@ -139,6 +140,18 @@ export const useUserStore = create<UserStore>()((set, get) => ({
     const { locations } = get();
     const location = locations.find((l) => l.id === locationId) ?? null;
     set({ currentLocation: location });
+  },
+
+  setCurrentUserLocale: (locale) => {
+    const { currentUser } = get();
+    if (!currentUser) return;
+
+    set({
+      currentUser: {
+        ...currentUser,
+        ui_language: locale,
+      },
+    });
   },
 
   reset: () => {

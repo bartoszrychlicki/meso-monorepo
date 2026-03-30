@@ -4,28 +4,30 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { ChevronRight, Home } from 'lucide-react';
 import { useBreadcrumbLabels } from './breadcrumb-context';
-
-const routeLabels: Record<string, string> = {
-  dashboard: 'Dashboard',
-  orders: 'Zamówienia',
-  kitchen: 'Kuchnia KDS',
-  menu: 'Menu',
-  inventory: 'Magazyn',
-  employees: 'Pracownicy',
-  settings: 'Ustawienia',
-  new: 'Nowy',
-  'time-tracking': 'Czas pracy',
-  login: 'Logowanie',
-  'clock-in': 'Rejestracja',
-  recipes: 'Receptury',
-  crm: 'Klienci',
-  edit: 'Edytuj',
-};
+import { usePosI18n } from '@/lib/i18n/provider';
 
 export function Breadcrumbs() {
   const pathname = usePathname();
   const dynamicLabels = useBreadcrumbLabels();
+  const { t } = usePosI18n();
   const segments = pathname.split('/').filter(Boolean);
+
+  const routeLabels: Record<string, string> = {
+    dashboard: t('breadcrumbs.dashboard'),
+    orders: t('breadcrumbs.orders'),
+    kitchen: t('breadcrumbs.kitchen'),
+    menu: t('breadcrumbs.menu'),
+    inventory: t('breadcrumbs.inventory'),
+    employees: t('breadcrumbs.employees'),
+    settings: t('breadcrumbs.settings'),
+    new: t('breadcrumbs.new'),
+    'time-tracking': t('breadcrumbs.timeTracking'),
+    login: t('breadcrumbs.login'),
+    'clock-in': t('breadcrumbs.clockIn'),
+    recipes: t('breadcrumbs.recipes'),
+    crm: t('breadcrumbs.crm'),
+    edit: t('breadcrumbs.edit'),
+  };
 
   if (segments.length === 0) return null;
 

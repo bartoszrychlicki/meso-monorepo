@@ -11,18 +11,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
-const forgotPasswordSchema = z.object({
-  email: z.string().email('Nieprawidłowy adres email'),
-})
-
-type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>
+type ForgotPasswordFormData = {
+  email: string
+}
 
 export default function ForgotPasswordPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [submittedEmail, setSubmittedEmail] = useState('')
   const supabase = createClient()
+  const { t } = useDeliveryI18n()
+
+  const forgotPasswordSchema = z.object({
+    email: z.string().email(t('auth.invalidEmail')),
+  })
 
   const {
     register,
@@ -47,9 +51,9 @@ export default function ForgotPasswordPage() {
 
       setSubmittedEmail(data.email)
       setIsSubmitted(true)
-      toast.success('Link do resetu hasła został wysłany!')
+      toast.success(t('account.resetPasswordEmailSent'))
     } catch {
-      toast.error('Wystąpił błąd. Spróbuj ponownie.')
+      toast.error(t('auth.genericError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -63,16 +67,16 @@ export default function ForgotPasswordPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">
-            Sprawdź email
+            {t('auth.checkEmail')}
           </h1>
           <p className="text-white/60">
-            Wysłaliśmy link do resetu hasła na adres:
+            {t('auth.resetLinkSent')}
           </p>
           <p className="text-white font-medium mt-1">{submittedEmail}</p>
         </div>
         <div className="space-y-3 pt-4">
           <p className="text-white/40 text-sm">
-            Nie otrzymałeś emaila? Sprawdź folder spam lub{' '}
+            {t('auth.notReceivedEmail')}{' '}
             <button
               onClick={() => {
                 setIsSubmitted(false)
@@ -80,13 +84,13 @@ export default function ForgotPasswordPage() {
               }}
               className="text-primary hover:underline"
             >
-              spróbuj ponownie
+              {t('auth.tryAgain')}
             </button>
           </p>
           <Link href="/login">
             <Button variant="ghost" className="text-white/60 hover:text-white">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              Powrót do logowania
+              {t('auth.backToLogin')}
             </Button>
           </Link>
         </div>
@@ -102,10 +106,10 @@ export default function ForgotPasswordPage() {
           <Mail className="w-7 h-7 text-primary" />
         </div>
         <h1 className="text-2xl font-bold text-white mb-2">
-          Zapomniałeś hasła?
+          {t('auth.forgotTitle')}
         </h1>
         <p className="text-white/60">
-          Podaj swój email, a wyślemy Ci link do resetu hasła
+          {t('auth.forgotDescription')}
         </p>
       </div>
 
@@ -113,7 +117,7 @@ export default function ForgotPasswordPage() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email" className="text-white/80">
-            Adres email
+            {t('auth.email')}
           </Label>
           <Input
             id="email"
@@ -136,10 +140,10 @@ export default function ForgotPasswordPage() {
           {isSubmitting ? (
             <>
               <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-              Wysyłanie...
+              {t('auth.sending')}
             </>
           ) : (
-            'Wyślij link resetujący'
+            t('auth.sendResetLink')
           )}
         </Button>
       </form>
@@ -149,7 +153,7 @@ export default function ForgotPasswordPage() {
         <Link href="/login">
           <Button variant="ghost" className="text-white/60 hover:text-white">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Powrót do logowania
+            {t('auth.backToLogin')}
           </Button>
         </Link>
       </div>

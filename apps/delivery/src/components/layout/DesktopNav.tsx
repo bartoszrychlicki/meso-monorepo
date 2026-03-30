@@ -6,19 +6,21 @@ import { Home, Search, ClipboardList, User, Trophy, ShoppingCart } from 'lucide-
 import { useCartStore, selectItemCount, selectSubtotal } from '@/stores/cartStore'
 import { formatPrice } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
-
-const navItems = [
-  { path: '/', label: 'Menu', icon: Home },
-  { path: '/search', label: 'Szukaj', icon: Search },
-  { path: '/orders', label: 'Zamówienia', icon: ClipboardList },
-  { path: '/loyalty', label: 'Punkty', icon: Trophy },
-  { path: '/account', label: 'Profil', icon: User },
-]
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
 export function DesktopNav() {
   const pathname = usePathname()
   const totalItems = useCartStore(selectItemCount)
   const subtotal = useCartStore(selectSubtotal)
+  const { t } = useDeliveryI18n()
+
+  const navItems = [
+    { path: '/', label: t('nav.menu'), icon: Home },
+    { path: '/search', label: t('nav.search'), icon: Search },
+    { path: '/orders', label: t('nav.orders'), icon: ClipboardList },
+    { path: '/loyalty', label: t('nav.points'), icon: Trophy },
+    { path: '/account', label: t('nav.profile'), icon: User },
+  ]
 
   return (
     <header
@@ -75,7 +77,7 @@ export function DesktopNav() {
                 </span>
               </>
             ) : (
-              <span>Koszyk</span>
+              <span>{t('nav.cart')}</span>
             )}
           </Link>
         </div>

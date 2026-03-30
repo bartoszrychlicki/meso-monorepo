@@ -6,45 +6,47 @@ import { motion } from 'framer-motion'
 import { useAuth, useUserDisplay } from '@/hooks/useAuth'
 import { LoginPrompt } from '@/components/auth'
 import { cn } from '@/lib/utils'
-
-const MENU_ITEMS = [
-  {
-    icon: User,
-    label: 'Dane osobowe',
-    subtitle: 'Imię, email, telefon',
-    href: '/account/personal',
-    color: 'text-primary',
-    bg: 'bg-primary/20',
-  },
-  {
-    icon: MapPin,
-    label: 'Zapisane adresy',
-    subtitle: 'Zarządzaj adresami',
-    href: '/account/addresses',
-    color: 'text-primary',
-    bg: 'bg-primary/20',
-  },
-{
-    icon: Heart,
-    label: 'Ulubione produkty',
-    subtitle: 'Twoje ulubione',
-    href: '/account/favorites',
-    color: 'text-primary',
-    bg: 'bg-primary/20',
-  },
-  {
-    icon: Settings,
-    label: 'Ustawienia',
-    subtitle: 'Powiadomienia, język',
-    href: '/account/settings',
-    color: 'text-primary',
-    bg: 'bg-primary/20',
-  },
-]
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
 export default function AccountPage() {
   const { isLoading, isPermanent, signOut } = useAuth()
   const { displayName, avatarInitial, email } = useUserDisplay()
+  const { t } = useDeliveryI18n()
+
+  const MENU_ITEMS = [
+    {
+      icon: User,
+      label: t('account.personal.label'),
+      subtitle: t('account.personal.subtitle'),
+      href: '/account/personal',
+      color: 'text-primary',
+      bg: 'bg-primary/20',
+    },
+    {
+      icon: MapPin,
+      label: t('account.addresses.label'),
+      subtitle: t('account.addresses.subtitle'),
+      href: '/account/addresses',
+      color: 'text-primary',
+      bg: 'bg-primary/20',
+    },
+    {
+      icon: Heart,
+      label: t('account.favorites.label'),
+      subtitle: t('account.favorites.subtitle'),
+      href: '/account/favorites',
+      color: 'text-primary',
+      bg: 'bg-primary/20',
+    },
+    {
+      icon: Settings,
+      label: t('account.settings.label'),
+      subtitle: t('account.settings.subtitle'),
+      href: '/account/settings',
+      color: 'text-primary',
+      bg: 'bg-primary/20',
+    },
+  ]
 
   if (isLoading) {
     return (
@@ -55,11 +57,11 @@ export default function AccountPage() {
   }
 
   if (!isPermanent) {
-    return (
-      <LoginPrompt
-        icon="👤"
-        title="TWÓJ PROFIL"
-        description="Zaloguj się, aby zarządzać profilem, adresami i metodami płatności."
+      return (
+        <LoginPrompt
+          icon="👤"
+        title={t('account.title')}
+        description={t('account.description')}
       />
     )
   }
@@ -129,13 +131,13 @@ export default function AccountPage() {
           className="flex w-full items-center gap-4 rounded-xl border border-border bg-card p-4 transition-colors hover:border-destructive/30 hover:bg-card/80"
         >
           <LogOut className="h-5 w-5 text-destructive" />
-          <span className="text-sm font-medium text-destructive">Wyloguj się</span>
+          <span className="text-sm font-medium text-destructive">{t('account.logout')}</span>
         </button>
       </motion.div>
 
       {/* Version */}
       <p className="text-center text-xs text-muted-foreground/40 pt-2">
-        MESO App v1.0.0
+        {t('account.version')}
       </p>
     </div>
   )

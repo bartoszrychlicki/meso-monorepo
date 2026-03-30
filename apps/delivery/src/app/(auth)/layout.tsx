@@ -1,11 +1,14 @@
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
 export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const { t } = useDeliveryI18n()
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -15,7 +18,7 @@ export default function AuthLayout({
           className="flex items-center gap-2 text-white/60 hover:text-white transition-colors w-fit"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="text-sm">Powrót do menu</span>
+          <span className="text-sm">{t('auth.backToMenu')}</span>
         </Link>
       </header>
 

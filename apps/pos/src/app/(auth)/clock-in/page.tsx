@@ -21,6 +21,8 @@ import { seedAll } from '@/seed';
 import { Delete, LogIn, Clock, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { usePosI18n } from '@/lib/i18n/provider';
+import { INTL_LOCALES } from '@meso/core';
 
 export default function ClockInPage() {
   const [employeeCode, setEmployeeCode] = useState('');
@@ -28,6 +30,7 @@ export default function ClockInPage() {
   const [locationId, setLocationId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const { locale, t } = usePosI18n();
 
   const {
     employees,
@@ -88,7 +91,7 @@ export default function ClockInPage() {
       );
 
       if (!employee) {
-        setError('Nieprawidłowy kod pracownika lub PIN');
+        setError(t('clockIn.error.invalidCredentials'));
         setPin('');
         setIsSubmitting(false);
         return;
@@ -99,7 +102,7 @@ export default function ClockInPage() {
       );
 
       if (alreadyClockedIn) {
-        setError('Pracownik jest już zarejestrowany');
+        setError(t('clockIn.error.alreadyClockedIn'));
         setPin('');
         setIsSubmitting(false);
         return;
@@ -107,17 +110,17 @@ export default function ClockInPage() {
 
       await clockIn(employee.id, locationId);
       toast.success(
-        `${employee.first_name} ${employee.last_name} - zmiana rozpoczęta`
+        t('clockIn.success', { name: `${employee.first_name} ${employee.last_name}` })
       );
       setEmployeeCode('');
       setPin('');
     } catch {
-      setError('Wystąpił błąd. Spróbuj ponownie.');
+      setError(t('clockIn.error.generic'));
       setPin('');
     } finally {
       setIsSubmitting(false);
     }
-  }, [employeeCode, pin, locationId, employees, activeWorkTimes, clockIn]);
+  }, [employeeCode, pin, locationId, employees, activeWorkTimes, clockIn, t]);
 
   const digits = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -131,12 +134,12 @@ export default function ClockInPage() {
             data-action="back-to-login"
           >
             <ArrowLeft className="h-4 w-4" />
-            Logowanie
+            {t('clockIn.backToLogin')}
           </Link>
           <div className="flex items-center gap-2 text-white/50">
             <Clock className="h-4 w-4" />
             <span className="text-sm font-mono">
-              {new Date().toLocaleTimeString('pl-PL', {
+              {new Date().toLocaleTimeString(INTL_LOCALES[locale], {
                 hour: '2-digit',
                 minute: '2-digit',
               })}
@@ -149,12 +152,12 @@ export default function ClockInPage() {
             <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-lg shadow-lg">
               M
             </div>
-            <CardTitle className="text-xl">Rejestracja czasu pracy</CardTitle>
-            <CardDescription>Wprowadź kod i PIN aby rozpocząć zmianę</CardDescription>
+            <CardTitle className="text-xl">{t('clockIn.title')}</CardTitle>
+            <CardDescription>{t('clockIn.description')}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Kod pracownika</Label>
+              <Label>{t('clockIn.employeeCode')}</Label>
               <Input
                 value={employeeCode}
                 onChange={(e) => {
@@ -168,10 +171,10 @@ export default function ClockInPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Lokalizacja</Label>
+              <Label>{t('clockIn.location')}</Label>
               <Select value={locationId} onValueChange={setLocationId}>
                 <SelectTrigger data-field="location">
-                  <SelectValue placeholder="Wybierz lokalizację" />
+                  <SelectValue placeholder={t('clockIn.locationPlaceholder')} />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((loc) => (
@@ -184,7 +187,7 @@ export default function ClockInPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>PIN</Label>
+              <Label>{t('clockIn.pin')}</Label>
               <div className="flex justify-center gap-3">
                 {[0, 1, 2, 3].map((i) => (
                   <div
@@ -260,7 +263,7 @@ export default function ClockInPage() {
           <Card className="border-0 shadow-lg backdrop-blur">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                Aktywne zmiany
+                {t('clockIn.activeShifts')}
                 <Badge variant="secondary">{activeWorkTimes.length}</Badge>
               </CardTitle>
             </CardHeader>
@@ -283,7 +286,7 @@ export default function ClockInPage() {
                         <RoleBadge role={emp.role} showIcon={false} />
                       </div>
                       <span className="text-xs text-muted-foreground">
-                        od {formatTime(wt.clock_in)}
+                        {t('clockIn.from', { time: formatTime(wt.clock_in, locale) })}
                       </span>
                     </div>
                   );

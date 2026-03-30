@@ -15,29 +15,38 @@ import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
 import { PENDING_REFERRAL_INPUT_KEY } from '@/lib/referrals'
 import { useAuth } from '@/hooks/useAuth'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
-const registerSchema = z.object({
-  firstName: z.string().min(2, 'Imię musi mieć minimum 2 znaki'),
-  lastName: z.string().min(2, 'Nazwisko musi mieć minimum 2 znaki'),
-  email: z.string().email('Nieprawidłowy adres email'),
-  password: z.string().min(8, 'Hasło musi mieć minimum 8 znaków'),
-  confirmPassword: z.string(),
-  marketingConsent: z.boolean(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'Hasła nie są identyczne',
-  path: ['confirmPassword'],
-})
-
-type RegisterFormData = z.infer<typeof registerSchema>
+type RegisterFormData = {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  confirmPassword: string
+  marketingConsent: boolean
+}
 
 export default function RegisterPage() {
   const router = useRouter()
   const { isPermanent, isLoading: authLoading } = useAuth()
+  const { t } = useDeliveryI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const [showConfirmPass, setShowConfirmPass] = useState(false)
   const [referralInput, setReferralInput] = useState('')
   const supabase = createClient()
+
+  const registerSchema = z.object({
+    firstName: z.string().min(2, t('auth.firstNameMin')),
+    lastName: z.string().min(2, t('auth.lastNameMin')),
+    email: z.string().email(t('auth.invalidEmail')),
+    password: z.string().min(8, t('auth.passwordMin')),
+    confirmPassword: z.string(),
+    marketingConsent: z.boolean(),
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: t('auth.passwordsMismatch'),
+    path: ['confirmPassword'],
+  })
 
   const {
     register,
@@ -79,7 +88,7 @@ export default function RegisterPage() {
 
       if (error) {
         if (error.message.includes('already registered') || error.message.includes('User already registered')) {
-          toast.error('Ten email jest już zarejestrowany. Spróbuj się zalogować.')
+          toast.error(t('auth.alreadyRegistered'))
         } else {
           toast.error(error.message)
         }
@@ -91,16 +100,16 @@ export default function RegisterPage() {
       }
 
       toast.success(
-        'Sprawdź swoją skrzynkę email!',
+        t('auth.checkInbox'),
         {
-          description: 'Kliknij link w wiadomości, aby aktywować konto i odebrać 50 punktów.',
+          description: t('auth.checkInboxDescription'),
           duration: 8000,
         }
       )
 
       router.push('/?registered=pending')
     } catch {
-      toast.error('Wystąpił błąd. Spróbuj ponownie.')
+      toast.error(t('auth.genericError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -128,7 +137,7 @@ export default function RegisterPage() {
       </Link>
 
       <h2 className="mb-6 text-center font-display text-lg font-semibold tracking-wider">
-        ZAREJESTRUJ SIĘ
+        {t('auth.registerTitle')}
       </h2>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -137,7 +146,7 @@ export default function RegisterPage() {
           <div className="relative">
             <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
-              placeholder="Imię"
+              placeholder={t('auth.firstName')}
               autoComplete="given-name"
               {...register('firstName')}
               className={`${inputCls} pl-10 pr-4`}
@@ -153,7 +162,7 @@ export default function RegisterPage() {
           <div className="relative">
             <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
-              placeholder="Nazwisko"
+              placeholder={t('auth.lastName')}
               autoComplete="family-name"
               {...register('lastName')}
               className={`${inputCls} pl-10 pr-4`}
@@ -170,7 +179,7 @@ export default function RegisterPage() {
             <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="email"
-              placeholder="Email"
+              placeholder={t('auth.email')}
               autoComplete="email"
               {...register('email')}
               className={`${inputCls} pl-10 pr-4`}
@@ -187,7 +196,7 @@ export default function RegisterPage() {
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type={showPass ? 'text' : 'password'}
-              placeholder="Hasło (min. 8 znaków)"
+              placeholder={t('auth.passwordMinPlaceholder')}
               autoComplete="new-password"
               {...register('password')}
               className={`${inputCls} pl-10 pr-10`}
@@ -211,7 +220,7 @@ export default function RegisterPage() {
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type={showConfirmPass ? 'text' : 'password'}
-              placeholder="Powtórz hasło"
+              placeholder={t('auth.confirmPassword')}
               autoComplete="new-password"
               {...register('confirmPassword')}
               className={`${inputCls} pl-10 pr-10`}
@@ -241,7 +250,7 @@ export default function RegisterPage() {
             htmlFor="marketingConsent"
             className="text-xs text-muted-foreground cursor-pointer leading-relaxed"
           >
-            Chcę otrzymywać informacje o promocjach, nowościach i ekskluzywnych ofertach MESO
+            {t('auth.marketingConsent')}
           </Label>
         </div>
 
@@ -253,13 +262,13 @@ export default function RegisterPage() {
               type="tel"
               value={referralInput}
               onChange={(e) => setReferralInput(e.target.value)}
-              placeholder="Kod lub numer polecającego (opcjonalnie)"
+              placeholder={t('auth.referralPlaceholder')}
               autoComplete="off"
               className={`${inputCls} pl-10 pr-4`}
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground/60">
-            Podaj kod lub numer osoby, która Cię poleciła. Po aktywacji konta dostaniesz kupon powitalny na darmowe Gyoza.
+            {t('auth.referralHelp')}
           </p>
         </div>
 
@@ -272,10 +281,10 @@ export default function RegisterPage() {
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              TWORZENIE KONTA...
+              {t('auth.registerLoading')}
             </span>
           ) : (
-            'ZAREJESTRUJ'
+            t('auth.registerButton')
           )}
         </button>
       </form>
@@ -284,7 +293,7 @@ export default function RegisterPage() {
       <div className="relative my-5">
         <Separator className="bg-border" />
         <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-4 text-xs text-muted-foreground">
-          lub
+          {t('auth.or')}
         </span>
       </div>
 
@@ -294,7 +303,7 @@ export default function RegisterPage() {
         disabled
         className="w-full rounded-xl border border-border bg-transparent py-3 text-sm font-medium text-foreground transition-colors hover:bg-card/50 disabled:opacity-50"
       >
-        Kontynuuj z Google
+        {t('auth.continueWithGoogle')}
       </button>
 
       {/* Skip link */}
@@ -302,26 +311,26 @@ export default function RegisterPage() {
         href="/"
         className="block text-center text-xs text-muted-foreground hover:text-foreground mt-3"
       >
-        Pomiń i przeglądaj menu →
+        {t('auth.skipToMenu')}
       </Link>
 
       {/* Login link */}
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Masz już konto?{' '}
+        {t('auth.haveAccount')}{' '}
         <Link href="/login" className="text-primary hover:underline">
-          Zaloguj się
+          {t('auth.loginLink')}
         </Link>
       </p>
 
       {/* Terms */}
       <p className="text-center text-muted-foreground/60 text-[10px] mt-4">
-        Zakładając konto akceptujesz{' '}
+        {t('auth.acceptTerms')}{' '}
         <Link href="/regulamin" className="underline hover:text-muted-foreground">
-          Regulamin
+          {t('footer.terms')}
         </Link>{' '}
-        oraz{' '}
+        {t('auth.and')}{' '}
         <Link href="/polityka-prywatnosci" className="underline hover:text-muted-foreground">
-          Politykę Prywatności
+          {t('footer.privacy')}
         </Link>
       </p>
     </motion.div>

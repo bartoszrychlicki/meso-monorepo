@@ -7,24 +7,26 @@ import { useCartStore, selectItemCount, selectSubtotal } from '@/stores/cartStor
 import { motion, AnimatePresence } from 'framer-motion'
 import { formatPrice } from '@/lib/formatters'
 import { cn } from '@/lib/utils'
-
-const baseNavItems = [
-  { path: '/', label: 'Menu', icon: Home },
-  { path: '/loyalty', label: 'Punkty', icon: Trophy },
-  { path: '/orders', label: 'Zamówienia', icon: ClipboardList },
-]
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
 export function MobileNav() {
   const pathname = usePathname()
   const totalItems = useCartStore(selectItemCount)
   const subtotal = useCartStore(selectSubtotal)
+  const { t } = useDeliveryI18n()
+
+  const baseNavItems = [
+    { path: '/', label: t('nav.menu'), icon: Home },
+    { path: '/loyalty', label: t('nav.points'), icon: Trophy },
+    { path: '/orders', label: t('nav.orders'), icon: ClipboardList },
+  ]
 
   const hideCart =
     pathname === '/cart' ||
     pathname === '/checkout' ||
     pathname.startsWith('/product/')
 
-  const navItems = [...baseNavItems, { path: '/account', label: 'Profil', icon: User }]
+  const navItems = [...baseNavItems, { path: '/account', label: t('nav.profile'), icon: User }]
 
   return (
     <>
@@ -46,7 +48,7 @@ export function MobileNav() {
                   {totalItems}
                 </span>
                 <span className="font-display text-xs font-semibold tracking-wide text-accent-foreground">
-                  Zobacz zamówienie
+                  {t('nav.viewOrder')}
                 </span>
               </div>
               <span className="font-display text-xs font-bold text-accent-foreground">

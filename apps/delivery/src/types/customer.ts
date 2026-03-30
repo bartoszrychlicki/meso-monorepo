@@ -15,6 +15,7 @@ export interface Customer {
   referred_by?: string
   marketing_consent: boolean
   sms_consent: boolean
+  ui_language?: 'pl' | 'en' | null
   is_active: boolean
   created_at: string
 }

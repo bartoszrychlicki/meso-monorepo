@@ -12,21 +12,26 @@ import { toast } from 'sonner'
 import { Separator } from '@/components/ui/separator'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
-const loginSchema = z.object({
-  email: z.string().email('Nieprawidłowy adres email'),
-  password: z.string().min(1, 'Hasło jest wymagane'),
-})
-
-type LoginFormData = z.infer<typeof loginSchema>
+type LoginFormData = {
+  email: string
+  password: string
+}
 
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isPermanent, isLoading: authLoading } = useAuth()
+  const { t } = useDeliveryI18n()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showPass, setShowPass] = useState(false)
   const supabase = createClient()
+
+  const loginSchema = z.object({
+    email: z.string().email(t('auth.invalidEmail')),
+    password: z.string().min(1, t('auth.passwordRequired')),
+  })
 
   const redirectTo = searchParams.get('redirect') || '/'
 
@@ -59,20 +64,20 @@ function LoginForm() {
 
       if (error) {
         if (error.message.includes('Invalid login credentials')) {
-          toast.error('Nieprawidłowy email lub hasło')
+          toast.error(t('auth.loginInvalidCredentials'))
         } else if (error.message.includes('Email not confirmed')) {
-          toast.error('Potwierdź swój email przed zalogowaniem')
+          toast.error(t('auth.loginEmailNotConfirmed'))
         } else {
           toast.error(error.message)
         }
         return
       }
 
-      toast.success('Witaj ponownie!')
+      toast.success(t('auth.loginSuccess'))
       router.push(redirectTo)
       router.refresh()
     } catch {
-      toast.error('Wystąpił błąd. Spróbuj ponownie.')
+      toast.error(t('auth.genericError'))
     } finally {
       setIsSubmitting(false)
     }
@@ -100,7 +105,7 @@ function LoginForm() {
       </Link>
 
       <h2 className="mb-6 text-center font-display text-lg font-semibold tracking-wider">
-        ZALOGUJ SIĘ
+        {t('auth.loginTitle')}
       </h2>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -110,7 +115,7 @@ function LoginForm() {
             <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type="email"
-              placeholder="Email"
+              placeholder={t('auth.email')}
               autoComplete="email"
               {...register('email')}
               className={`${inputCls} pl-10 pr-4`}
@@ -127,7 +132,7 @@ function LoginForm() {
             <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <input
               type={showPass ? 'text' : 'password'}
-              placeholder="Hasło"
+              placeholder={t('auth.passwordPlaceholder')}
               autoComplete="current-password"
               {...register('password')}
               className={`${inputCls} pl-10 pr-10`}
@@ -145,7 +150,7 @@ function LoginForm() {
               href="/forgot-password"
               className="text-xs text-primary hover:underline"
             >
-              Zapomniałeś hasła?
+              {t('auth.forgotPasswordLink')}
             </Link>
           </div>
           {errors.password && (
@@ -162,10 +167,10 @@ function LoginForm() {
           {isSubmitting ? (
             <span className="flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              LOGOWANIE...
+              {t('auth.loginLoading')}
             </span>
           ) : (
-            'ZALOGUJ'
+            t('auth.loginButton')
           )}
         </button>
       </form>
@@ -174,7 +179,7 @@ function LoginForm() {
       <div className="relative my-5">
         <Separator className="bg-border" />
         <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-background px-4 text-xs text-muted-foreground">
-          lub
+          {t('auth.or')}
         </span>
       </div>
 
@@ -184,7 +189,7 @@ function LoginForm() {
         disabled
         className="w-full rounded-xl border border-border bg-transparent py-3 text-sm font-medium text-foreground transition-colors hover:bg-card/50 disabled:opacity-50"
       >
-        Kontynuuj z Google
+        {t('auth.continueWithGoogle')}
       </button>
 
       {/* Skip link */}
@@ -192,14 +197,14 @@ function LoginForm() {
         href="/menu"
         className="block text-center text-xs text-muted-foreground hover:text-foreground mt-3"
       >
-        Pomiń i przeglądaj menu →
+        {t('auth.skipToMenu')}
       </Link>
 
       {/* Register link */}
       <p className="mt-6 text-center text-xs text-muted-foreground">
-        Nie masz konta?{' '}
+        {t('auth.noAccount')}{' '}
         <Link href="/register" className="text-primary hover:underline">
-          Zarejestruj się
+          {t('auth.registerLink')}
         </Link>
       </p>
     </motion.div>

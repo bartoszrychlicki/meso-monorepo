@@ -27,6 +27,7 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from '@/components/ui/sidebar';
+import { usePosI18n } from '@/lib/i18n/provider';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -41,24 +42,25 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Shield,
 };
 
-const mainNavItems = [
-  { title: 'Dashboard', href: '/dashboard', icon: 'LayoutDashboard' },
-  { title: 'Zamówienia', href: '/orders', icon: 'ShoppingCart' },
-  { title: 'Menu', href: '/menu', icon: 'UtensilsCrossed' },
-  { title: 'Receptury', href: '/recipes', icon: 'ChefHat' },
-  { title: 'Magazyn', href: '/inventory', icon: 'Warehouse' },
-  { title: 'Dostawy', href: '/deliveries', icon: 'Truck' },
-  { title: 'Klienci', href: '/crm', icon: 'UserCheck' },
-  { title: 'Pracownicy', href: '/employees', icon: 'Users' },
-];
-
-const secondaryNavItems = [
-  { title: 'Uzytkownicy', href: '/admin/users', icon: 'Shield' },
-  { title: 'Ustawienia', href: '/settings', icon: 'Settings' },
-];
-
 export function AppSidebar() {
   const pathname = usePathname();
+  const { t } = usePosI18n();
+
+  const mainNavItems = [
+    { title: t('nav.dashboard'), href: '/dashboard', icon: 'LayoutDashboard' },
+    { title: t('nav.orders'), href: '/orders', icon: 'ShoppingCart' },
+    { title: t('nav.menu'), href: '/menu', icon: 'UtensilsCrossed' },
+    { title: t('nav.recipes'), href: '/recipes', icon: 'ChefHat' },
+    { title: t('nav.inventory'), href: '/inventory', icon: 'Warehouse' },
+    { title: t('nav.deliveries'), href: '/deliveries', icon: 'Truck' },
+    { title: t('nav.customers'), href: '/crm', icon: 'UserCheck' },
+    { title: t('nav.employees'), href: '/employees', icon: 'Users' },
+  ];
+
+  const secondaryNavItems = [
+    { title: t('nav.users'), href: '/admin/users', icon: 'Shield' },
+    { title: t('nav.settings'), href: '/settings', icon: 'Settings' },
+  ];
 
   const isActive = (href: string) => {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -112,9 +114,9 @@ export function AppSidebar() {
                   data-action="navigate"
                   data-id="/kitchen"
                 >
-                  <a href="/kitchen" target="_blank" rel="noopener noreferrer">
-                    <ChefHat className="h-4 w-4" />
-                    <span>Kuchnia KDS</span>
+                    <a href="/kitchen" target="_blank" rel="noopener noreferrer">
+                      <ChefHat className="h-4 w-4" />
+                    <span>{t('nav.kitchen')}</span>
                     <ExternalLink className="ml-auto h-3 w-3 text-muted-foreground" />
                   </a>
                 </SidebarMenuButton>
@@ -151,7 +153,7 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarFooter className="border-t border-sidebar-border">
         <div className="px-2 py-2 text-xs text-muted-foreground">
-          MESOpos v0.2.0
+          {t('nav.version')}
         </div>
       </SidebarFooter>
     </Sidebar>

@@ -9,6 +9,7 @@ import {
     upsertP24Session,
 } from '@/lib/p24-payment-sessions'
 import { Tables } from '@/lib/table-mapping'
+import { DELIVERY_LOCALE_COOKIE, resolveDeliveryLocale } from '@/lib/i18n/config'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,6 +33,13 @@ export async function POST(request: Request) {
 
         const body = await request.json()
         const { orderId } = body
+        const locale = resolveDeliveryLocale(
+            request.headers.get('cookie')
+                ?.split('; ')
+                .find((entry) => entry.startsWith(`${DELIVERY_LOCALE_COOKIE}=`))
+                ?.split('=')[1],
+            request.headers.get('accept-language')
+        )
 
         if (!orderId) {
             return NextResponse.json({ error: 'Brak ID zamówienia' }, { status: 400 })
@@ -146,6 +154,8 @@ export async function POST(request: Request) {
             email,
             `${appUrl}/order-confirmation?orderId=${order.id}`, // urlReturn
             `${appUrl}/api/payments/p24/status`, // urlStatus
+            undefined,
+            locale
         )
 
         const completedMetadata = upsertP24Session(
