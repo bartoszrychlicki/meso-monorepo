@@ -69,10 +69,13 @@ function SettingsContent() {
         .update({ ui_language: nextLocale })
         .eq('id', currentUser.id);
 
-      if (!error) {
-        setCurrentUserLocale(nextLocale);
-        setLocale(nextLocale);
+      if (error) {
+        toast.error(t('settings.saveError'));
+        return;
       }
+
+      setCurrentUserLocale(nextLocale);
+      setLocale(nextLocale);
     }
 
     toast.success(t('settings.saved'));
@@ -324,7 +327,6 @@ function SettingsContent() {
                     <SelectContent>
                       <SelectItem value="pl">{t('settings.language.pl')}</SelectItem>
                       <SelectItem value="en">{t('settings.language.en')}</SelectItem>
-                      <SelectItem value="de">{t('settings.language.de')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

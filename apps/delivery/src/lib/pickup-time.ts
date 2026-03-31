@@ -32,7 +32,7 @@ export function getPickupTimeDetails(order: PickupTimeOrderLike): PickupTimeDeta
   return {
     currentTime,
     previousTime: latestAdjustment?.previous_time ?? null,
-    isAdjusted: !!order.estimated_ready_at,
+    isAdjusted: !!latestAdjustment,
   };
 }
 
