@@ -195,7 +195,7 @@ export function useCheckout() {
                 .single()
 
             if (locationError || !locations) {
-                throw new Error('Nie znaleziono aktywnej restauracji')
+                throw new Error('Ta lokalizacja jest obecnie nieaktywna i nie przyjmuje nowych zamówień.')
             }
 
             const scheduledTimestamp = buildScheduledTimestamp(deliveryData)

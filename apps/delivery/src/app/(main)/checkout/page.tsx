@@ -54,6 +54,7 @@ export default function CheckoutPage() {
     const todayDate = useMemo(() => formatDateInputValue(new Date()), [])
     const [deliveryConfig, setDeliveryConfig] = useState<DeliveryConfigRecord | null>(null)
     const [locationConfigLoaded, setLocationConfigLoaded] = useState(false)
+    const [locationUnavailable, setLocationUnavailable] = useState(false)
     const [pickupEstimate, setPickupEstimate] = useState('~20')
     const [selectedPickupDate, setSelectedPickupDate] = useState(todayDate)
 
@@ -181,6 +182,11 @@ export default function CheckoutPage() {
                     maxOrder: payOnPickupRuntimeConfig.maxOrder,
                 })
                 setPayOnPickupFee(payOnPickupRuntimeConfig.fee)
+                setLocationUnavailable(false)
+            } else {
+                setLocationUnavailable(true)
+                setPickupLocation(null)
+                setDeliveryConfig(null)
             }
 
             setLocationConfigLoaded(true)
@@ -283,6 +289,18 @@ export default function CheckoutPage() {
 
     if (items.length === 0) {
         return <EmptyState type="cart" action={{ label: 'Wróć do menu', href: '/' }} />
+    }
+
+    if (locationConfigLoaded && locationUnavailable) {
+        return (
+            <EmptyState
+                type="custom"
+                title="Ta lokalizacja jest obecnie nieaktywna"
+                description="Nie przyjmuje teraz nowych zamowien online. Wroc pozniej albo skontaktuj sie z obsluga."
+                icon={<Store className="w-16 h-16 text-primary/50" />}
+                action={{ label: 'Wroc do koszyka', href: '/cart' }}
+            />
+        )
     }
 
     if (locationConfigLoaded && !pickupEnabled) {

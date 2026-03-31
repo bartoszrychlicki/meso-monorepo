@@ -152,6 +152,15 @@ describe('POST /api/v1/orders', () => {
     mockServerRepo.findById.mockResolvedValue(mockProduct)
     mockServerRepo.findMany.mockResolvedValue([])
     mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'locations') {
+        return chain({
+          data: {
+            is_active: true,
+          },
+          error: null,
+        })
+      }
+
       if (table === 'crm_customers') {
         return chain({
           data: {
@@ -207,6 +216,15 @@ describe('POST /api/v1/orders', () => {
     vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
 
     mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'locations') {
+        return chain({
+          data: {
+            is_active: true,
+          },
+          error: null,
+        })
+      }
+
       if (table === 'crm_customers') {
         return chain({
           data: {
@@ -255,6 +273,15 @@ describe('POST /api/v1/orders', () => {
     vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
 
     mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'locations') {
+        return chain({
+          data: {
+            is_active: true,
+          },
+          error: null,
+        })
+      }
+
       if (table === 'crm_customers') {
         return chain({
           data: {
@@ -307,6 +334,15 @@ describe('POST /api/v1/orders', () => {
     vi.setSystemTime(new Date('2026-03-19T12:00:00.000Z'))
 
     mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'locations') {
+        return chain({
+          data: {
+            is_active: true,
+          },
+          error: null,
+        })
+      }
+
       if (table === 'crm_customers') {
         return chain({
           data: {
@@ -346,6 +382,50 @@ describe('POST /api/v1/orders', () => {
 
     expect(res.status).toBe(201)
     expect(body.success).toBe(true)
+  })
+
+  it('rejects orders when the location is inactive', async () => {
+    mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'locations') {
+        return chain({
+          data: {
+            is_active: false,
+          },
+          error: null,
+        })
+      }
+
+      if (table === 'crm_customers') {
+        return chain({
+          data: {
+            order_history: {
+              total_orders: 0,
+            },
+          },
+          error: null,
+        })
+      }
+
+      return chain({ data: null, error: null })
+    })
+
+    const res = await POST(
+      makeRequest('http://localhost:3000/api/v1/orders', {
+        method: 'POST',
+        body: JSON.stringify(validOrderBody),
+      })
+    )
+    const body = await res.json()
+
+    expect(res.status).toBe(422)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(body.error.details).toEqual([
+      expect.objectContaining({
+        field: 'location_id',
+        message: 'Ta lokalizacja jest obecnie nieaktywna i nie przyjmuje nowych zamówień.',
+      }),
+    ])
+    expect(mockRpc).not.toHaveBeenCalledWith('next_order_number', expect.anything())
   })
 
   it('creates an order successfully', async () => {
@@ -399,6 +479,15 @@ describe('POST /api/v1/orders', () => {
 
   it('rejects pickup orders when pickup is disabled for the location', async () => {
     mockServiceFrom.mockImplementation((table: string) => {
+      if (table === 'locations') {
+        return chain({
+          data: {
+            is_active: true,
+          },
+          error: null,
+        })
+      }
+
       if (table === 'crm_customers') {
         return chain({
           data: {

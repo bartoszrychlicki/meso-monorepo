@@ -59,6 +59,10 @@ type DeliveryAvailabilityConfig = {
   is_pickup_active?: boolean | null;
 };
 
+type LocationStatusRecord = {
+  is_active?: boolean | null;
+};
+
 function asRpcError(value: unknown): RpcErrorLike {
   return (value ?? {}) as RpcErrorLike;
 }
@@ -315,6 +319,39 @@ export async function POST(request: NextRequest) {
     if (existing) {
       return apiSuccess(existing);
     }
+  }
+
+  const { data: locationStatus, error: locationStatusError } = await serviceClient
+    .from('locations')
+    .select('is_active')
+    .eq('id', input.location_id)
+    .maybeSingle();
+
+  if (locationStatusError) {
+    return apiError(
+      'LOCATION_LOOKUP_ERROR',
+      'Nie udało się sprawdzić statusu lokalizacji',
+      500,
+      [locationStatusError]
+    );
+  }
+
+  if (!locationStatus) {
+    return apiValidationError([
+      {
+        field: 'location_id',
+        message: 'Nie znaleziono lokalizacji dla tego zamówienia.',
+      },
+    ]);
+  }
+
+  if ((locationStatus as LocationStatusRecord).is_active === false) {
+    return apiValidationError([
+      {
+        field: 'location_id',
+        message: 'Ta lokalizacja jest obecnie nieaktywna i nie przyjmuje nowych zamówień.',
+      },
+    ]);
   }
 
   const { data: deliveryAvailabilityConfig, error: deliveryAvailabilityError } = await serviceClient

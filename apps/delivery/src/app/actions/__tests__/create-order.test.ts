@@ -99,6 +99,32 @@ describe('createOrderAction', () => {
     })
   })
 
+  it('maps location validation errors to a readable message', async () => {
+    mockCreate.mockRejectedValueOnce(
+      new ApiError(
+        {
+          code: 'VALIDATION_ERROR',
+          message: 'Błąd walidacji danych',
+          details: [
+            {
+              field: 'location_id',
+              message: 'Ta lokalizacja jest obecnie nieaktywna i nie przyjmuje nowych zamówień.',
+            },
+          ],
+        },
+        422
+      )
+    )
+
+    const result = await createOrderAction(input)
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        'Popraw dane zamówienia: Lokalizacja: Ta lokalizacja jest obecnie nieaktywna i nie przyjmuje nowych zamówień.',
+    })
+  })
+
   it('returns ApiError message for non-validation API errors', async () => {
     mockCreate.mockRejectedValueOnce(
       new ApiError(
