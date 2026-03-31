@@ -1,7 +1,38 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const AUTH_USER = process.env.BASIC_AUTH_USER || 'meso'
+const AUTH_PASS = process.env.BASIC_AUTH_PASS || 'likwidacja2026'
+
 export async function proxy(request: NextRequest) {
+  const auth = request.headers.get('authorization')
+
+  if (auth) {
+    const [scheme, encoded] = auth.split(' ')
+
+    if (scheme === 'Basic' && encoded) {
+      try {
+        const decoded = atob(encoded)
+        const [user, pass] = decoded.split(':')
+
+        if (user === AUTH_USER && pass === AUTH_PASS) {
+          return await continueWithSupabase(request)
+        }
+      } catch {
+        // Invalid auth header falls through to the 401 response.
+      }
+    }
+  }
+
+  return new NextResponse('Dostep ograniczony', {
+    status: 401,
+    headers: {
+      'WWW-Authenticate': 'Basic realm="MESO Food"',
+    },
+  })
+}
+
+async function continueWithSupabase(request: NextRequest) {
   // Password gate: DISABLED for now
   // const isPublicPath =
   //   request.nextUrl.pathname === '/gate' ||
@@ -67,6 +98,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|monitoring|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
