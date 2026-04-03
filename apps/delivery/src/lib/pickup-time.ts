@@ -1,6 +1,8 @@
 import { getLatestPickupTimeAdjustment } from '@meso/core';
+import type { Locale } from '@meso/core';
 import { format, isSameDay, addDays } from 'date-fns';
-import { pl } from 'date-fns/locale';
+import { enGB, pl } from 'date-fns/locale';
+import { readDeliveryLocaleCookie } from '@/lib/i18n/config';
 
 interface PickupTimeOrderLike {
   delivery_type?: string | null;
@@ -30,26 +32,31 @@ export function getPickupTimeDetails(order: PickupTimeOrderLike): PickupTimeDeta
   return {
     currentTime,
     previousTime: latestAdjustment?.previous_time ?? null,
-    isAdjusted: Boolean(latestAdjustment),
+    isAdjusted: !!latestAdjustment,
   };
 }
 
 export function formatCustomerPickupTime(
   dateString: string,
-  referenceDate: Date = new Date()
+  referenceDate: Date = new Date(),
+  locale: Locale = readDeliveryLocaleCookie()
 ): string | null {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) {
     return null;
   }
 
+  const dateLocale = locale === 'en' ? enGB : pl;
+
   if (isSameDay(date, referenceDate)) {
-    return format(date, 'HH:mm', { locale: pl });
+    return format(date, 'HH:mm', { locale: dateLocale });
   }
 
   if (isSameDay(date, addDays(referenceDate, 1))) {
-    return `jutro, ${format(date, 'HH:mm', { locale: pl })}`;
+    return locale === 'en'
+      ? `tomorrow, ${format(date, 'HH:mm', { locale: dateLocale })}`
+      : `jutro, ${format(date, 'HH:mm', { locale: dateLocale })}`;
   }
 
-  return format(date, 'd MMM, HH:mm', { locale: pl });
+  return format(date, 'd MMM, HH:mm', { locale: dateLocale });
 }

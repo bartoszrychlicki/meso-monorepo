@@ -7,6 +7,7 @@ export interface User extends BaseEntity {
   email: string;
   role: UserRole;
   location_id: string;
+  ui_language?: 'pl' | 'en' | null;
   is_active: boolean;
   avatar_url?: string;
 }

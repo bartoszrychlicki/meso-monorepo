@@ -31,11 +31,16 @@ import { ApiKeysManager } from '@/modules/settings/components/api-keys-manager';
 import { LocationList } from '@/modules/settings/components/location-list';
 import { ReceiptDefaultsCard, KdsDefaultsCard } from '@/modules/settings/components/global-defaults-forms';
 import { LoadingSkeleton } from '@/components/shared/loading-skeleton';
+import { createClient } from '@/lib/supabase/client';
+import { usePosI18n } from '@/lib/i18n/provider';
+import { useUserStore } from '@/modules/users/store';
 
 function SettingsContent() {
   const searchParams = useSearchParams();
   const defaultTab = searchParams.get('tab') || 'general';
   const { theme: currentTheme, setTheme } = useTheme();
+  const { t, setLocale } = usePosI18n();
+  const { currentUser, setCurrentUserLocale } = useUserStore();
   const [settings, setSettings] = useState({
     // General
     companyName: 'MESO Restaurant',
@@ -55,9 +60,25 @@ function SettingsContent() {
     emailNotifications: true,
   });
 
-  const handleSave = () => {
-    // TODO: Integrate with backend
-    toast.success('Ustawienia zapisane pomyślnie');
+  const handleSave = async () => {
+    if (currentUser) {
+      const supabase = createClient();
+      const nextLocale = settings.language as 'pl' | 'en';
+      const { error } = await supabase
+        .from('users_users')
+        .update({ ui_language: nextLocale })
+        .eq('id', currentUser.id);
+
+      if (error) {
+        toast.error(t('settings.saveError'));
+        return;
+      }
+
+      setCurrentUserLocale(nextLocale);
+      setLocale(nextLocale);
+    }
+
+    toast.success(t('settings.saved'));
   };
 
   useEffect(() => {
@@ -65,6 +86,12 @@ function SettingsContent() {
       setSettings((prev) => ({ ...prev, theme: currentTheme }));
     }
   }, [currentTheme]);
+
+  useEffect(() => {
+    if (currentUser?.ui_language) {
+      setSettings((prev) => ({ ...prev, language: currentUser.ui_language ?? 'pl' }));
+    }
+  }, [currentUser?.ui_language]);
 
   const updateSetting = (key: string, value: string | number | boolean) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -76,12 +103,12 @@ function SettingsContent() {
   return (
     <div className="space-y-6" data-page="settings">
       <PageHeader
-        title="Ustawienia"
-        description="Zarządzaj ustawieniami systemu i konfiguruj swój punkt sprzedaży"
+        title={t('settings.title')}
+        description={t('settings.description')}
         actions={
           <Button onClick={handleSave} data-action="save-settings">
             <Save className="mr-2 h-4 w-4" />
-            Zapisz zmiany
+            {t('settings.save')}
           </Button>
         }
       />
@@ -90,23 +117,23 @@ function SettingsContent() {
         <TabsList className="grid w-full grid-cols-5 lg:w-auto">
           <TabsTrigger value="general" className="gap-2">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Ogólne</span>
+            <span className="hidden sm:inline">{t('settings.tabs.general')}</span>
           </TabsTrigger>
           <TabsTrigger value="locations" className="gap-2">
             <MapPin className="h-4 w-4" />
-            <span className="hidden sm:inline">Lokalizacje</span>
+            <span className="hidden sm:inline">{t('settings.tabs.locations')}</span>
           </TabsTrigger>
           <TabsTrigger value="appearance" className="gap-2">
             <Palette className="h-4 w-4" />
-            <span className="hidden sm:inline">Wygląd</span>
+            <span className="hidden sm:inline">{t('settings.tabs.appearance')}</span>
           </TabsTrigger>
           <TabsTrigger value="api-keys" className="gap-2">
             <Key className="h-4 w-4" />
-            <span className="hidden sm:inline">Klucze API</span>
+            <span className="hidden sm:inline">{t('settings.tabs.apiKeys')}</span>
           </TabsTrigger>
           <TabsTrigger value="integrations" className="gap-2">
             <Plug className="h-4 w-4" />
-            <span className="hidden sm:inline">Integracje</span>
+            <span className="hidden sm:inline">{t('settings.tabs.integrations')}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -114,15 +141,15 @@ function SettingsContent() {
         <TabsContent value="general" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Informacje o firmie</CardTitle>
+              <CardTitle>{t('settings.companyInfo.title')}</CardTitle>
               <CardDescription>
-                Podstawowe dane firmy używane w systemie i na paragonach
+                {t('settings.companyInfo.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="companyName">Nazwa firmy</Label>
+                  <Label htmlFor="companyName">{t('settings.companyName')}</Label>
                   <Input
                     id="companyName"
                     value={settings.companyName}
@@ -131,7 +158,7 @@ function SettingsContent() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="companyNIP">NIP</Label>
+                  <Label htmlFor="companyNIP">{t('settings.companyNip')}</Label>
                   <Input
                     id="companyNIP"
                     value={settings.companyNIP}
@@ -141,7 +168,7 @@ function SettingsContent() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="companyAddress">Adres</Label>
+                <Label htmlFor="companyAddress">{t('settings.companyAddress')}</Label>
                 <Input
                   id="companyAddress"
                   value={settings.companyAddress}
@@ -154,15 +181,15 @@ function SettingsContent() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Ustawienia regionalne i podatkowe</CardTitle>
+              <CardTitle>{t('settings.region.title')}</CardTitle>
               <CardDescription>
-                Waluta, strefa czasowa i domyślna stawka VAT
+                {t('settings.region.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Waluta</Label>
+                  <Label htmlFor="currency">{t('settings.currency')}</Label>
                   <Select value={settings.currency} onValueChange={(v) => updateSetting('currency', v)}>
                     <SelectTrigger id="currency" data-field="currency">
                       <SelectValue />
@@ -175,20 +202,20 @@ function SettingsContent() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="timezone">Strefa czasowa</Label>
+                  <Label htmlFor="timezone">{t('settings.timezone')}</Label>
                   <Select value={settings.timezone} onValueChange={(v) => updateSetting('timezone', v)}>
                     <SelectTrigger id="timezone" data-field="timezone">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Europe/Warsaw">Europa/Warszawa (UTC+1)</SelectItem>
-                      <SelectItem value="Europe/London">Europa/Londyn (UTC+0)</SelectItem>
-                      <SelectItem value="America/New_York">Ameryka/Nowy Jork (UTC-5)</SelectItem>
+                      <SelectItem value="Europe/Warsaw">{t('settings.timezone.warsaw')}</SelectItem>
+                      <SelectItem value="Europe/London">{t('settings.timezone.london')}</SelectItem>
+                      <SelectItem value="America/New_York">{t('settings.timezone.newYork')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="defaultTaxRate">Domyślna stawka VAT (%)</Label>
+                  <Label htmlFor="defaultTaxRate">{t('settings.defaultTaxRate')}</Label>
                   <Input
                     id="defaultTaxRate"
                     type="number"
@@ -205,17 +232,17 @@ function SettingsContent() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Powiadomienia</CardTitle>
+              <CardTitle>{t('settings.notifications.title')}</CardTitle>
               <CardDescription>
-                Konfiguruj powiadomienia o ważnych zdarzeniach w systemie
+                {t('settings.notifications.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="orderNotifications">Powiadomienia o zamówieniach</Label>
+                  <Label htmlFor="orderNotifications">{t('settings.notifications.orders.label')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Otrzymuj powiadomienia o nowych zamówieniach
+                    {t('settings.notifications.orders.help')}
                   </p>
                 </div>
                 <Switch
@@ -228,9 +255,9 @@ function SettingsContent() {
               <Separator />
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="lowStockAlerts">Alerty o niskim stanie magazynowym</Label>
+                  <Label htmlFor="lowStockAlerts">{t('settings.notifications.stock.label')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Powiadomienia gdy stan magazynowy jest niski
+                    {t('settings.notifications.stock.help')}
                   </p>
                 </div>
                 <Switch
@@ -243,9 +270,9 @@ function SettingsContent() {
               <Separator />
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="emailNotifications">Powiadomienia e-mail</Label>
+                  <Label htmlFor="emailNotifications">{t('settings.notifications.email.label')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Wysyłaj podsumowania dzienne na e-mail
+                    {t('settings.notifications.email.help')}
                   </p>
                 </div>
                 <Switch
@@ -271,36 +298,35 @@ function SettingsContent() {
         <TabsContent value="appearance" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Wygląd</CardTitle>
+              <CardTitle>{t('settings.appearance.title')}</CardTitle>
               <CardDescription>
-                Dostosuj wygląd aplikacji do swoich preferencji
+                {t('settings.appearance.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="theme">Motyw</Label>
+                  <Label htmlFor="theme">{t('settings.theme')}</Label>
                   <Select value={settings.theme} onValueChange={(v) => updateSetting('theme', v)}>
                     <SelectTrigger id="theme" data-field="theme">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="light">Jasny</SelectItem>
-                      <SelectItem value="dark">Ciemny</SelectItem>
-                      <SelectItem value="system">Systemowy</SelectItem>
+                      <SelectItem value="light">{t('settings.theme.light')}</SelectItem>
+                      <SelectItem value="dark">{t('settings.theme.dark')}</SelectItem>
+                      <SelectItem value="system">{t('settings.theme.system')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="language">Język</Label>
+                  <Label htmlFor="language">{t('settings.language')}</Label>
                   <Select value={settings.language} onValueChange={(v) => updateSetting('language', v)}>
                     <SelectTrigger id="language" data-field="language">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pl">Polski</SelectItem>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="de">Deutsch</SelectItem>
+                      <SelectItem value="pl">{t('settings.language.pl')}</SelectItem>
+                      <SelectItem value="en">{t('settings.language.en')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -318,16 +344,16 @@ function SettingsContent() {
         <TabsContent value="integrations" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Integracje</CardTitle>
+              <CardTitle>{t('settings.integrations.title')}</CardTitle>
               <CardDescription>
-                Połącz MESOpos z zewnętrznymi usługami
+                {t('settings.integrations.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
                 <Plug className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                <p className="font-medium mb-1">Integracje zewnętrzne</p>
-                <p>Stripe, Przelewy24, SMS API - dostępne wkrótce</p>
+                <p className="font-medium mb-1">{t('settings.integrations.emptyTitle')}</p>
+                <p>{t('settings.integrations.emptyBody')}</p>
               </div>
             </CardContent>
           </Card>

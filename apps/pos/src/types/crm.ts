@@ -33,6 +33,7 @@ export interface CustomerPreferences {
   favorite_products?: string[];      // Product IDs
   dietary_restrictions?: string[];   // Allergen codes
   default_payment_method?: string;
+  ui_language?: 'pl' | 'en';
 }
 
 /**

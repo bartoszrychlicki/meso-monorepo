@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { Instagram, Facebook } from 'lucide-react'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
 // TikTok icon (not in lucide-react)
 const TikTok = ({ className }: { className?: string }) => (
@@ -12,13 +13,14 @@ const TikTok = ({ className }: { className?: string }) => (
 
 export function Footer() {
     const currentYear = new Date().getFullYear()
+    const { t } = useDeliveryI18n()
 
     return (
         <footer className="bg-background border-t border-white/10 py-6 px-4 mt-auto">
             <div className="max-w-6xl mx-auto">
                 {/* Payment Methods */}
                 <div className="flex flex-wrap items-center justify-center gap-4 mb-6">
-                    <span className="text-white/40 text-xs">Akceptujemy:</span>
+                    <span className="text-white/40 text-xs">{t('footer.accepted')}</span>
                     <div className="flex items-center gap-3">
                         {/* BLIK */}
                         <div className="bg-white rounded px-2 py-1">
@@ -86,14 +88,14 @@ export function Footer() {
                         href="/regulamin"
                         className="text-white/60 hover:text-white transition-colors"
                     >
-                        Regulamin
+                        {t('footer.terms')}
                     </Link>
                     <span className="text-white/20">|</span>
                     <Link
                         href="/polityka-prywatnosci"
                         className="text-white/60 hover:text-white transition-colors"
                     >
-                        Polityka Prywatności
+                        {t('footer.privacy')}
                     </Link>
                 </div>
 
@@ -113,7 +115,7 @@ export function Footer() {
                         </a>
                     </p>
                     <p className="pt-2">
-                        © {currentYear} MESO Food. Wszelkie prawa zastrzeżone.
+                        © {currentYear} MESO Food. {t('footer.rights')}
                     </p>
                 </div>
             </div>

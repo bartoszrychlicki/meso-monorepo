@@ -16,14 +16,22 @@ import { Separator } from '@/components/ui/separator';
 import { Breadcrumbs } from './breadcrumbs';
 import { useUserStore } from '@/modules/users/store';
 import { signOut } from '@/app/(auth)/login/actions';
+import { usePosI18n } from '@/lib/i18n/provider';
 
 export function Header() {
   const { currentUser, currentLocation, locations, isLoading, loadUser, setCurrentLocation } =
     useUserStore();
+  const { setLocale, t } = usePosI18n();
 
   useEffect(() => {
     loadUser();
   }, [loadUser]);
+
+  useEffect(() => {
+    if (currentUser?.ui_language) {
+      setLocale(currentUser.ui_language);
+    }
+  }, [currentUser?.ui_language, setLocale]);
 
   useEffect(() => {
     Sentry.setUser(
@@ -59,7 +67,7 @@ export function Header() {
             >
               <MapPin className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">
-                {currentLocation?.name || 'Wybierz lokalizacje'}
+                {currentLocation?.name || t('header.selectLocation')}
               </span>
             </Button>
           </DropdownMenuTrigger>
@@ -74,7 +82,7 @@ export function Header() {
               </DropdownMenuItem>
             ))}
             {locations.length === 0 && (
-              <DropdownMenuItem disabled>Brak lokalizacji</DropdownMenuItem>
+              <DropdownMenuItem disabled>{t('header.noLocations')}</DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -97,7 +105,7 @@ export function Header() {
             size="icon"
             className="h-8 w-8"
             data-action="logout"
-            aria-label="Wyloguj sie"
+            aria-label={t('header.logoutAria')}
           >
             <LogOut className="h-4 w-4" />
           </Button>

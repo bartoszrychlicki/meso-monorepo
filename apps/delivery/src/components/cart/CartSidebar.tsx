@@ -6,6 +6,7 @@ import { useCartStore, selectItemCount, selectSubtotal } from '@/stores/cartStor
 import { useAuth } from '@/hooks/useAuth'
 import { formatPrice } from '@/lib/formatters'
 import { LoyaltyBox } from './LoyaltyBox'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
 export function CartSidebar() {
   const { isPermanent } = useAuth()
@@ -14,6 +15,7 @@ export function CartSidebar() {
   const subtotal = useCartStore(selectSubtotal)
   const updateQuantity = useCartStore((s) => s.updateQuantity)
   const removeItem = useCartStore((s) => s.removeItem)
+  const { t } = useDeliveryI18n()
 
   return (
     <div className="sticky top-20 space-y-4">
@@ -21,7 +23,7 @@ export function CartSidebar() {
         <div className="mb-4 flex items-center gap-2">
           <ShoppingCart className="h-5 w-5 text-primary" />
           <h2 className="font-display text-sm font-semibold tracking-wider">
-            KOSZYK
+            {t('cart.title')}
           </h2>
           {totalItems > 0 && (
             <span className="ml-auto rounded-full bg-primary/20 px-2 py-0.5 text-xs font-medium text-primary">
@@ -33,7 +35,7 @@ export function CartSidebar() {
         {items.length === 0 ? (
           <div className="py-8 text-center text-sm text-muted-foreground">
             <ShoppingCart className="mx-auto mb-2 h-8 w-8 opacity-30" />
-            Twój koszyk jest pusty
+            {t('cart.empty')}
           </div>
         ) : (
           <>
@@ -105,7 +107,7 @@ export function CartSidebar() {
 
             <div className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
               <div className="flex justify-between font-display text-base font-bold text-foreground">
-                <span>Razem</span>
+                <span>{t('cart.total')}</span>
                 <span>{formatPrice(subtotal)}</span>
               </div>
             </div>
@@ -114,7 +116,9 @@ export function CartSidebar() {
               href={isPermanent ? '/checkout' : '/login?redirect=/checkout'}
               className="mt-4 block w-full rounded-lg bg-accent py-3 text-center font-display text-sm font-semibold tracking-wider text-accent-foreground transition-all neon-glow-yellow hover:scale-[1.02]"
             >
-              {isPermanent ? `ZAMÓW \u2022 ${formatPrice(subtotal)}` : 'ZALOGUJ SIĘ I ZAMÓW'}
+              {isPermanent
+                ? t('cart.order', { total: formatPrice(subtotal) })
+                : t('cart.loginAndOrder')}
             </Link>
           </>
         )}

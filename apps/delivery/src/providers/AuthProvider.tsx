@@ -5,6 +5,8 @@ import { AuthChangeEvent, User, Session } from '@supabase/supabase-js'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { PENDING_REFERRAL_INPUT_KEY } from '@/lib/referrals'
+import { fetchCustomerByAuthId } from '@/lib/customers'
+import { useDeliveryI18n } from '@/lib/i18n/provider'
 
 interface AuthContextType {
   user: User | null
@@ -26,6 +28,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Use state to ensure single instance across renders
   const [supabase] = useState(() => createClient())
+  const { setLocale } = useDeliveryI18n()
 
   // All users must be registered — no anonymous flow
   const isPermanent = !!user
@@ -120,6 +123,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         toast.error('Nie udało się zastosować polecenia')
       })
   }, [user])
+
+  useEffect(() => {
+    if (!user?.id) return
+
+    fetchCustomerByAuthId<{ ui_language: 'pl' | 'en' | null }>(
+      supabase,
+      user.id,
+      'ui_language'
+    )
+      .then((data) => {
+        if (data?.ui_language) {
+          setLocale(data.ui_language)
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to sync delivery locale from customer profile', error)
+      })
+  }, [setLocale, supabase, user?.id])
 
   return (
     <AuthContext.Provider
