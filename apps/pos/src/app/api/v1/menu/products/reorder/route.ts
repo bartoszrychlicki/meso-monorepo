@@ -7,6 +7,7 @@ import {
 import { ReorderMenuProductsSchema } from '@/schemas/menu';
 import { createServiceClient } from '@/lib/supabase/server';
 import { authorizeMenuRoute } from '@/modules/menu/server/route-auth';
+import { expandCategoryReorder } from '@/modules/menu/utils/reorder';
 
 export async function POST(request: NextRequest) {
   const auth = await authorizeMenuRoute(request, 'menu:write');
@@ -36,29 +37,32 @@ export async function POST(request: NextRequest) {
 
   const { data: categoryProducts, error: categoryProductsError } = await serviceClient
     .from('menu_products')
-    .select('id, category_id')
-    .eq('category_id', category_id);
+    .select('id')
+    .eq('category_id', category_id)
+    .order('sort_order', { ascending: true })
+    .order('id', { ascending: true });
 
   if (categoryProductsError) {
     return apiError('DB_ERROR', 'Nie udalo sie pobrac produktow kategorii', 500);
   }
 
   const existingIds = (categoryProducts ?? []).map((product) => product.id);
-  const missingIds = existingIds.filter((id) => !product_ids.includes(id));
-  const foreignIds = product_ids.filter((id) => !existingIds.includes(id));
-
-  if (missingIds.length > 0 || foreignIds.length > 0) {
+  if (existingIds.length === 0) {
     return apiValidationError([
       {
-        field: 'product_ids',
-        message: 'Lista produktow musi zawierac wszystkie produkty z kategorii i tylko z tej kategorii',
+        field: 'category_id',
+        message: 'Kategoria nie istnieje lub nie zawiera produktow do zmiany kolejnosci',
       },
     ]);
   }
 
+  const currentCategoryIds = new Set(existingIds);
+  const requestedExistingIds = product_ids.filter((id) => currentCategoryIds.has(id));
+  const normalizedProductIds = expandCategoryReorder(existingIds, requestedExistingIds);
+
   const { error } = await serviceClient.rpc('reorder_menu_products', {
     p_category_id: category_id,
-    p_product_ids: product_ids,
+    p_product_ids: normalizedProductIds,
   });
 
   if (error) {
@@ -67,7 +71,7 @@ export async function POST(request: NextRequest) {
 
   return apiSuccess({
     category_id,
-    product_ids,
+    product_ids: normalizedProductIds,
     updated: true,
   });
 }
